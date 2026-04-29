@@ -11,7 +11,7 @@ import os
 import shutil
 import uuid
 
-app = FastAPI(title="Sistema Interno de Reboque MVP V3")
+app = FastAPI(title="Sistema Interno de Reboque MVP V6")
 app.mount('/static', StaticFiles(directory='static'), name='static')
 templates = Jinja2Templates(directory='templates')
 
@@ -49,12 +49,10 @@ def servico_by_id(sid: int):
 
 def registrar_evento(servico, status, detalhe=''):
     servico.setdefault('historico', [])
-    servico['historico'].append({
-        'status': status,
-        'detalhe': detalhe,
-        'data_hora': agora(),
-    })
-    servico['ultimo_evento'] = f"{agora()} - {status}{(' - ' + detalhe) if detalhe else ''}"
+    evento = {'status': status, 'detalhe': detalhe, 'data_hora': agora()}
+    servico['historico'].append(evento)
+    servico['ultimo_evento'] = f"{evento['data_hora']} - {status}{(' - ' + detalhe) if detalhe else ''}"
+    servico['atualizado_em'] = evento['data_hora']
 
 
 @app.get('/', response_class=HTMLResponse)
@@ -182,7 +180,6 @@ def enviar_servico(sid: int, motorista_id: int = Form(...)):
         s['motorista_id'] = motorista_id
         s['motorista_nome'] = m['nome']
         s['status'] = 'enviado'
-        s['atualizado_em'] = agora()
         registrar_evento(s, 'enviado', f"Enviado para {m['nome']}")
     return RedirectResponse('/', status_code=303)
 
@@ -227,8 +224,7 @@ def api_servicos():
 @app.get('/motorista/{mid}', response_class=HTMLResponse)
 def tela_motorista(mid: int, request: Request):
     m = motorista_by_id(mid)
-    meus_servicos = [s for s in servicos if s.get('motorista_id') == mid and s.get('status') not in ['finalizado', 'recusado']]
-    return templates.TemplateResponse('motorista.html', {'request': request, 'm': m, 'servicos': meus_servicos})
+    return templates.TemplateResponse('motorista.html', {'request': request, 'm': m})
 
 
 @app.get('/api/motorista/{mid}/servicos')
@@ -240,32 +236,40 @@ def api_servicos_motorista(mid: int):
 def atualizar_status(sid: int, status: str = Form(...)):
     s = servico_by_id(sid)
     if not s:
-        return JSONResponse({'ok': False}, status_code=404)
+        return JSONResponse({'ok': False, 'erro': 'Serviço não encontrado'}, status_code=404)
     s['status'] = status
-    s['atualizado_em'] = agora()
     registrar_evento(s, status)
     return {'ok': True, 'servico': s}
 
 
-@app.post('/api/servicos/{sid}/baixa')
-async def baixar_servico(
-    sid: int,
-    placa_veiculo: str = Form(''),
-    status: str = Form('finalizado'),
-    fotos: list[UploadFile] = File(default=[]),
-):
+@app.post('/api/servicos/{sid}/placa')
+def enviar_placa(sid: int, placa_veiculo: str = Form(...)):
     s = servico_by_id(sid)
     if not s:
         return JSONResponse({'ok': False, 'erro': 'Serviço não encontrado'}, status_code=404)
+    placa = placa_veiculo.upper().replace('-', '').strip()
+    if not placa:
+        return JSONResponse({'ok': False, 'erro': 'Informe a placa'}, status_code=400)
+    s['placa_veiculo_removido'] = placa
+    # quando o motorista lança placa, isso é o marco operacional de chegada na origem
+    if s.get('status') not in ['em transporte', 'finalizado']:
+        s['status'] = 'na origem'
+    registrar_evento(s, 'placa lançada', f'Placa: {placa}')
+    return {'ok': True, 'servico': s}
 
-    if placa_veiculo:
-        s['placa_veiculo_removido'] = placa_veiculo.upper().strip()
 
+@app.post('/api/servicos/{sid}/fotos')
+async def enviar_fotos(sid: int, fotos: list[UploadFile] = File(default=[])):
+    s = servico_by_id(sid)
+    if not s:
+        return JSONResponse({'ok': False, 'erro': 'Serviço não encontrado'}, status_code=404)
     salvas = []
     for foto in fotos:
         if not foto or not foto.filename:
             continue
         ext = os.path.splitext(foto.filename)[1].lower() or '.jpg'
+        if ext not in ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.heic']:
+            ext = '.jpg'
         nome_arquivo = f"servico_{sid}_{uuid.uuid4().hex}{ext}"
         caminho = os.path.join(UPLOAD_DIR, nome_arquivo)
         with open(caminho, 'wb') as buffer:
@@ -273,12 +277,30 @@ async def baixar_servico(
         url = f"/static/uploads/{nome_arquivo}"
         s.setdefault('fotos', []).append(url)
         salvas.append(url)
+    registrar_evento(s, 'fotos/checklist', f'Fotos adicionadas: {len(salvas)}')
+    return {'ok': True, 'fotos': salvas, 'servico': s}
 
-    s['status'] = status
-    s['atualizado_em'] = agora()
-    detalhe = f"Placa: {s.get('placa_veiculo_removido','')} | Fotos adicionadas: {len(salvas)}"
-    registrar_evento(s, 'baixa/finalização', detalhe)
+
+@app.post('/api/servicos/{sid}/finalizar')
+def finalizar_servico(sid: int):
+    s = servico_by_id(sid)
+    if not s:
+        return JSONResponse({'ok': False, 'erro': 'Serviço não encontrado'}, status_code=404)
+    s['status'] = 'finalizado'
+    registrar_evento(s, 'finalizado', 'Serviço finalizado pelo motorista')
     return {'ok': True, 'servico': s}
+
+
+# Endpoint mantido por compatibilidade com versões antigas
+@app.post('/api/servicos/{sid}/baixa')
+async def baixar_servico(sid: int, placa_veiculo: str = Form(''), status: str = Form('finalizado'), fotos: list[UploadFile] = File(default=[])):
+    if placa_veiculo:
+        enviar_placa(sid, placa_veiculo)
+    if fotos:
+        await enviar_fotos(sid, fotos)
+    if status == 'finalizado':
+        return finalizar_servico(sid)
+    return {'ok': True, 'servico': servico_by_id(sid)}
 
 
 @app.get('/exportar')

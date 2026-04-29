@@ -20,106 +20,22 @@
 <main>
 <section class="card"><h3>Mapa dos motoristas</h3><div id="map"></div><small>O motorista precisa abrir a Área do Motorista no celular e permitir localização.</small></section>
 <section class="card"><h3>Motoristas</h3><table><thead><tr><th>Nome</th><th>Veículo</th><th>Status</th><th>Última posição</th><th>Link motorista</th></tr></thead><tbody>{% for m in motoristas %}<tr><td>{{m.nome}}</td><td>{{m.veiculo}} {{m.placa}}</td><td><span class="badge {{'ok' if m.online else ''}}">{{'Online' if m.online else 'Offline'}}</span></td><td>{{m.ultima_atualizacao}}</td><td><a target="_blank" href="/motorista/{{m.id}}">abrir</a><br><small>Online: {{request.base_url}}motorista/{{m.id}}</small></td></tr>{% endfor %}</tbody></table></section>
-<section class="card"><h3>Serviços</h3><table><thead><tr><th>ID</th><th>Protocolo</th><th>Seguradora</th><th>Tipo</th><th>Origem → Destino</th><th>Status</th><th>Motorista</th><th>Placa removido</th><th>Fotos</th><th>Último evento</th><th>Ação</th></tr></thead><tbody>{% for s in servicos %}<tr><td>{{s.id}}</td><td>{{s.protocolo}}</td><td>{{s.seguradora}}</td><td>{{s.tipo}}</td><td><b>{{s.origem}}</b><br>→ {{s.destino}}<br><a target="_blank" href="https://www.google.com/maps/dir/?api=1&origin={{s.origem|urlencode}}&destination={{s.destino|urlencode}}">rota</a></td><td><span class="badge">{{s.status}}</span></td><td>{{s.motorista_nome}}</td><td>{{s.placa_veiculo_removido}}</td><td>{% for foto in s.fotos %}<a target="_blank" href="{{foto}}">foto {{loop.index}}</a><br>{% endfor %}</td><td><small>{{s.ultimo_evento}}</small></td><td><form method="post" action="/servicos/{{s.id}}/enviar"><select name="motorista_id">{% for m in motoristas %}<option value="{{m.id}}">{{m.nome}} {{'🟢' if m.online else '⚪'}}</option>{% endfor %}</select><button>Enviar para celular</button></form></td></tr>{% endfor %}</tbody></table></section>
+<section class="card"><h3>Serviços</h3><table><thead><tr><th>ID</th><th>Protocolo</th><th>Seguradora</th><th>Tipo</th><th>Origem → Destino</th><th>Status</th><th>Motorista</th><th>Placa removido</th><th>Fotos</th><th>Último evento</th><th>Ação</th></tr></thead><tbody>{% for s in servicos %}<tr><td>{{s.id}}</td><td>{{s.protocolo}}</td><td>{{s.seguradora}}</td><td>{{s.tipo}}</td><td><b>{{s.origem}}</b><br>→ {{s.destino}}<br><a target="_blank" href="https://www.google.com/maps/dir/?api=1&origin={{s.origem|urlencode}}&destination={{s.destino|urlencode}}">rota</a></td><td><span class="badge">{{s.status}}</span></td><td>{{s.motorista_nome}}</td><td><b>{{s.placa_veiculo_removido}}</b></td><td>{% for foto in s.fotos %}<a target="_blank" href="{{foto}}">foto {{loop.index}}</a><br>{% endfor %}</td><td><small>{{s.ultimo_evento}}</small></td><td><form method="post" action="/servicos/{{s.id}}/enviar"><select name="motorista_id">{% for m in motoristas %}<option value="{{m.id}}">{{m.nome}} {{'🟢' if m.online else '⚪'}}</option>{% endfor %}</select><button>Enviar para celular</button></form></td></tr>{% endfor %}</tbody></table></section>
 </main></div>
 <div id="toast" class="toast"></div>
 <script>
 const map = L.map('map').setView([-22.9068,-43.1729], 10);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19, attribution:'© OpenStreetMap'}).addTo(map);
-let markers = {};
-let statusAnterior = {};
-let somLiberado = false;
-let primeiraLeitura = true;
-let audioCtx = null;
-
-function statusLabel(status){
-  const mapa = {'enviado':'serviço enviado','aceito':'serviço aceito','a caminho':'motorista a caminho','na origem':'motorista na origem','em transporte':'serviço em transporte','finalizado':'serviço finalizado','recusado':'serviço recusado','baixa/finalização':'baixa enviada'};
-  return mapa[status] || status;
-}
-function criarAudioContext(){
-  const AudioContext = window.AudioContext || window.webkitAudioContext;
-  if(!audioCtx) audioCtx = new AudioContext();
-  return audioCtx;
-}
-async function ativarSom(){
-  try{
-    const ctx = criarAudioContext();
-    if(ctx.state === 'suspended') await ctx.resume();
-    somLiberado = true;
-    localStorage.setItem('somCentralLiberado','1');
-    await tocarSom('teste');
-    falar('Som da central ativado');
-    mostrarToast('🔊 Som da central ativado. Pode deixar essa aba aberta.');
-  }catch(e){
-    alert('O navegador bloqueou o som. Clique novamente em Ativar som e confira o volume do computador.');
-    console.log(e);
-  }
-}
-function tocarTom(freq, inicio, dur, volume=0.35){
-  const ctx = criarAudioContext();
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.frequency.setValueAtTime(freq, ctx.currentTime + inicio);
-  osc.type = 'square';
-  gain.gain.setValueAtTime(volume, ctx.currentTime + inicio);
-  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + inicio + dur);
-  osc.connect(gain); gain.connect(ctx.destination);
-  osc.start(ctx.currentTime + inicio); osc.stop(ctx.currentTime + inicio + dur);
-}
-async function tocarSom(tipo){
-  if(!somLiberado) return;
-  try{
-    const ctx = criarAudioContext();
-    if(ctx.state === 'suspended') await ctx.resume();
-    const padroes = {'enviado':[520,700],'aceito':[850,1050],'a caminho':[650,850],'na origem':[950,1150],'em transporte':[750,950,1150],'finalizado':[1100,900,1200],'recusado':[300,220],'baixa/finalização':[1100,900,1200],'teste':[700,950]};
-    const notas = padroes[tipo] || [700,950];
-    notas.forEach((f,i)=>tocarTom(f, i*0.18, 0.15, 0.35));
-  }catch(e){ console.log('Erro no som:', e); }
-}
-function falar(texto){
-  try{
-    if(!somLiberado || !('speechSynthesis' in window)) return;
-    const u = new SpeechSynthesisUtterance(texto);
-    u.lang = 'pt-BR'; u.volume = 1; u.rate = 1;
-    window.speechSynthesis.cancel(); window.speechSynthesis.speak(u);
-  }catch(e){ console.log(e); }
-}
-function mostrarToast(msg){
-  const t = document.getElementById('toast'); t.innerText = msg; t.classList.add('show');
-  setTimeout(()=>t.classList.remove('show'), 4500);
-}
-async function refreshDrivers(){
-  const res = await fetch('/api/motoristas?ts=' + Date.now()); const data = await res.json();
-  data.forEach(m=>{
-    if(m.online && m.lat && m.lng){
-      const txt = `<b>${m.nome}</b><br>${m.veiculo||''} ${m.placa||''}<br>${m.ultima_atualizacao}`;
-      if(markers[m.id]) markers[m.id].setLatLng([m.lat,m.lng]).setPopupContent(txt);
-      else markers[m.id] = L.marker([m.lat,m.lng]).addTo(map).bindPopup(txt);
-    } else if(markers[m.id]){ map.removeLayer(markers[m.id]); delete markers[m.id]; }
-  });
-}
-async function monitorarServicos(){
-  const res = await fetch('/api/servicos?ts=' + Date.now()); const data = await res.json();
-  data.forEach(s=>{
-    const anterior = statusAnterior[s.id];
-    const atual = `${s.status}|${s.placa_veiculo_removido||''}|${(s.fotos||[]).length}`;
-    if(anterior && anterior !== atual && !primeiraLeitura){
-      const detalhePlaca = s.placa_veiculo_removido ? ` | Placa: ${s.placa_veiculo_removido}` : '';
-      const msg = `${s.motorista_nome||'Motorista'} atualizou ${s.protocolo}: ${s.status}${detalhePlaca}`;
-      tocarSom(s.status);
-      falar(`${s.motorista_nome||'Motorista'}: ${statusLabel(s.status)}`);
-      mostrarToast(msg);
-      setTimeout(()=>window.location.reload(), 2500);
-    }
-    statusAnterior[s.id] = atual;
-  });
-  primeiraLeitura = false;
-}
-if(localStorage.getItem('somCentralLiberado') === '1') somLiberado = true;
-document.addEventListener('click', async function(){
-  if(somLiberado && audioCtx && audioCtx.state === 'suspended') await audioCtx.resume();
-}, {once:false});
-setInterval(refreshDrivers, 5000); refreshDrivers();
-setInterval(monitorarServicos, 3000); monitorarServicos();
-</script>
-</body></html>
+let markers = {}; let statusAnterior = {}; let somLiberado = false; let primeiraLeitura = true; let audioCtx = null;
+function criarAudioContext(){ const AudioContext = window.AudioContext || window.webkitAudioContext; if(!audioCtx) audioCtx = new AudioContext(); return audioCtx; }
+async function ativarSom(){ try{ const ctx = criarAudioContext(); if(ctx.state === 'suspended') await ctx.resume(); somLiberado = true; localStorage.setItem('somCentralLiberado','1'); tocarSom('teste'); falar('Som da central ativado'); mostrarToast('🔊 Som da central ativado.'); }catch(e){ alert('O navegador bloqueou o som. Clique novamente em Ativar som.'); }}
+function tocarTom(freq, inicio, dur, volume=0.35){ const ctx = criarAudioContext(); const osc = ctx.createOscillator(); const gain = ctx.createGain(); osc.frequency.setValueAtTime(freq, ctx.currentTime + inicio); osc.type='square'; gain.gain.setValueAtTime(volume, ctx.currentTime + inicio); gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + inicio + dur); osc.connect(gain); gain.connect(ctx.destination); osc.start(ctx.currentTime + inicio); osc.stop(ctx.currentTime + inicio + dur); }
+function tocarSom(tipo){ if(!somLiberado) return; const padroes={'enviado':[520,700],'aceito':[850,1050],'a caminho':[650,850],'na origem':[950,1150],'placa lançada':[1000,1300],'fotos/checklist':[900,1100,900],'em transporte':[750,950,1150],'finalizado':[1100,900,1200],'recusado':[300,220],'teste':[700,950]}; (padroes[tipo]||[700,950]).forEach((f,i)=>tocarTom(f,i*0.18,0.15)); }
+function falar(texto){ try{ if(!somLiberado || !('speechSynthesis' in window)) return; const u = new SpeechSynthesisUtterance(texto); u.lang='pt-BR'; window.speechSynthesis.cancel(); window.speechSynthesis.speak(u); }catch(e){} }
+function mostrarToast(msg){ const t=document.getElementById('toast'); t.innerText=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),4500); }
+async function refreshDrivers(){ const res=await fetch('/api/motoristas?ts='+Date.now()); const data=await res.json(); data.forEach(m=>{ if(m.online && m.lat && m.lng){ const txt=`<b>${m.nome}</b><br>${m.veiculo||''} ${m.placa||''}<br>${m.ultima_atualizacao}`; if(markers[m.id]) markers[m.id].setLatLng([m.lat,m.lng]).setPopupContent(txt); else markers[m.id]=L.marker([m.lat,m.lng]).addTo(map).bindPopup(txt); } else if(markers[m.id]){ map.removeLayer(markers[m.id]); delete markers[m.id]; }}); }
+async function monitorarServicos(){ const res=await fetch('/api/servicos?ts='+Date.now()); const data=await res.json(); data.forEach(s=>{ const anterior=statusAnterior[s.id]; const atual=`${s.status}|${s.placa_veiculo_removido||''}|${(s.fotos||[]).length}|${s.ultimo_evento||''}`; if(anterior && anterior!==atual && !primeiraLeitura){ const msg=`${s.motorista_nome||'Motorista'} atualizou ${s.protocolo}: ${s.status}${s.placa_veiculo_removido ? ' | Placa: '+s.placa_veiculo_removido : ''}`; let tipoSom=s.status; if((s.ultimo_evento||'').includes('placa lançada')) tipoSom='placa lançada'; if((s.ultimo_evento||'').includes('fotos/checklist')) tipoSom='fotos/checklist'; tocarSom(tipoSom); falar(msg); mostrarToast(msg); setTimeout(()=>window.location.reload(),1800); } statusAnterior[s.id]=atual; }); primeiraLeitura=false; }
+if(localStorage.getItem('somCentralLiberado')==='1') somLiberado=true;
+document.addEventListener('click', async function(){ if(somLiberado && audioCtx && audioCtx.state==='suspended') await audioCtx.resume(); }, {once:false});
+setInterval(refreshDrivers,5000); refreshDrivers(); setInterval(monitorarServicos,3000); monitorarServicos();
+</script></body></html>
