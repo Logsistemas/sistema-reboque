@@ -1,149 +1,148 @@
+
 <!doctype html>
 <html lang="pt-br">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Área do Motorista</title>
-<link rel="stylesheet" href="/static/style.css">
+  <meta charset="utf-8">
+  <title>Área do Motorista</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="/static/style.css">
 </head>
-<body class="mobile">
-<header>🚛 Área do Motorista</header>
-<main class="phone">
+<body class="driver">
+<header>🚚 Área do Motorista</header>
+
+<main class="driver-main">
   <section class="card">
-    <h2>{{m.nome if m else 'Motorista não encontrado'}}</h2>
-    <p id="gpsStatus">GPS parado.</p>
-    <button onclick="goOnline()">Ficar ONLINE e enviar localização</button>
-    <button class="secondary" onclick="goOffline()">Ficar OFFLINE</button>
+    {% if m %}
+      <h1>{{m.nome}}</h1>
+      <p id="statusMotorista">Offline</p>
+      <button onclick="ficarOnline()">Ficar ONLINE e enviar localização</button>
+      <button class="dark" onclick="ficarOffline()">Ficar OFFLINE</button>
+    {% else %}
+      <h1>Motorista não encontrado</h1>
+    {% endif %}
   </section>
+
   <section class="card">
-    <h3>Serviços enviados</h3>
-    <div id="servicos"></div>
+    <h2>Serviços enviados</h2>
+    <div id="servicos">Carregando...</div>
   </section>
 </main>
-<script>
-const MID = {{m.id if m else 0}};
-let watchId = null;
-let carregando = false;
 
-function sendLoc(pos){
-  fetch(`/api/motoristas/${MID}/localizacao`,{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({lat:pos.coords.latitude,lng:pos.coords.longitude,online:true})
-  });
-  document.getElementById('gpsStatus').innerText='Online - localização enviada: '+new Date().toLocaleTimeString();
+<script>
+const motoristaId = "{{m.id if m else ''}}";
+let watchId = null;
+let digitando = false;
+
+function apiPost(url, data){
+  return fetch(url, {method:'POST', body:data}).then(r=>r.json());
 }
-function goOnline(){
-  if(!navigator.geolocation){alert('Celular sem GPS no navegador');return;}
-  watchId = navigator.geolocation.watchPosition(sendLoc, err=>alert('Permita a localização no navegador. Erro: '+err.message), {enableHighAccuracy:true, maximumAge:5000, timeout:15000});
-}
-async function goOffline(){
+
+function ficarOnline(){
+  if(!navigator.geolocation){ alert('GPS não disponível'); return; }
   if(watchId) navigator.geolocation.clearWatch(watchId);
-  await fetch(`/api/motoristas/${MID}/offline`,{method:'POST'});
-  document.getElementById('gpsStatus').innerText='Offline';
+  watchId = navigator.geolocation.watchPosition(pos=>{
+    fetch(`/api/motoristas/${motoristaId}/localizacao`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({lat:pos.coords.latitude, lng:pos.coords.longitude, online:true})
+    });
+    document.getElementById('statusMotorista').innerText = 'Online - localização enviada: ' + new Date().toLocaleTimeString();
+  }, err=>alert('Permita a localização no navegador'), {enableHighAccuracy:true});
 }
-function estaDigitando(){
-  const a = document.activeElement;
-  if(!a) return false;
-  if(['INPUT','TEXTAREA','SELECT'].includes(a.tagName)) return true;
-  const arquivos = document.querySelectorAll('input[type=file]');
-  for(const f of arquivos){ if(f.files && f.files.length > 0) return true; }
-  return false;
+
+function ficarOffline(){
+  fetch(`/api/motoristas/${motoristaId}/offline`, {method:'POST'});
+  document.getElementById('statusMotorista').innerText = 'Offline';
 }
-async function setStatus(id,status){
-  const fd=new FormData(); fd.append('status',status);
-  const res = await fetch(`/api/servicos/${id}/status`,{method:'POST',body:fd});
-  const data = await res.json();
-  if(data.ok){ mostrarAviso(`Status atualizado: ${status}`); loadServices(true); }
-  else alert('Erro ao atualizar status.');
-}
-async function enviarPlaca(id){
-  const input = document.getElementById(`placa-${id}`);
-  const placa = (input.value || '').trim().toUpperCase();
-  if(!placa){ alert('Informe a placa do veículo removido.'); input.focus(); return; }
-  const fd = new FormData(); fd.append('placa_veiculo', placa);
-  const res = await fetch(`/api/servicos/${id}/placa`,{method:'POST',body:fd});
-  const data = await res.json();
-  if(data.ok){ mostrarAviso('Placa enviada para a central.'); input.value = data.servico.placa_veiculo_removido || placa; }
-  else alert(data.erro || 'Erro ao enviar placa.');
-}
-async function enviarFotos(id){
-  const fileInput = document.getElementById(`fotos-${id}`);
-  if(!fileInput.files || fileInput.files.length === 0){ alert('Selecione pelo menos uma foto.'); return; }
+
+async function mudarStatus(id, status){
   const fd = new FormData();
-  for(const f of fileInput.files){ fd.append('fotos', f); }
-  const btn = document.getElementById(`btn-fotos-${id}`);
-  btn.disabled = true; btn.innerText = 'Enviando fotos...';
-  const res = await fetch(`/api/servicos/${id}/fotos`,{method:'POST',body:fd});
-  const data = await res.json();
-  btn.disabled = false; btn.innerText = 'Enviar fotos/checklist para a central';
-  if(data.ok){ mostrarAviso(`${data.fotos.length} foto(s) enviada(s).`); fileInput.value=''; loadServices(true); }
-  else alert(data.erro || 'Erro ao enviar fotos.');
+  fd.append('status', status);
+  const res = await apiPost(`/api/servicos/${id}/status`, fd);
+  if(res.ok){ carregarServicos(true); }
+  else alert(res.erro || 'Erro ao mudar status');
 }
-async function finalizarServico(id){
-  if(!confirm('Finalizar este serviço? Use apenas quando chegar ao destino.')) return;
-  const res = await fetch(`/api/servicos/${id}/finalizar`,{method:'POST'});
-  const data = await res.json();
-  if(data.ok){ mostrarAviso('Serviço finalizado.'); loadServices(true); }
-  else alert(data.erro || 'Erro ao finalizar.');
+
+async function enviarPlaca(id){
+  const input = document.getElementById(`placa_${id}`);
+  const placa = input.value.trim();
+  if(!placa){ alert('Digite a placa primeiro'); return; }
+  const fd = new FormData();
+  fd.append('placa_veiculo', placa);
+  const res = await apiPost(`/api/servicos/${id}/placa`, fd);
+  if(res.ok){
+    alert('Placa enviada para a central');
+    carregarServicos(true);
+  } else alert(res.erro || 'Erro ao enviar placa');
 }
-function mostrarAviso(msg){
-  const el = document.getElementById('aviso') || document.createElement('div');
-  el.id='aviso'; el.className='aviso'; el.innerText=msg; document.body.appendChild(el);
-  setTimeout(()=>el.remove(), 2800);
+
+async function enviarFotos(id){
+  const input = document.getElementById(`fotos_${id}`);
+  if(!input.files.length){ alert('Selecione pelo menos uma foto'); return; }
+  const fd = new FormData();
+  for(const f of input.files){ fd.append('fotos', f); }
+  const res = await apiPost(`/api/servicos/${id}/fotos`, fd);
+  if(res.ok){
+    alert('Fotos enviadas: ' + res.fotos.length);
+    input.value = '';
+    carregarServicos(true);
+  } else alert(res.erro || 'Erro ao enviar fotos');
 }
-function jobHtml(s){
-  const placa = s.placa_veiculo_removido || '';
-  const fotos = (s.fotos || []).map((f,i)=>`<a target="_blank" href="${f}">foto ${i+1}</a>`).join(' · ');
-  return `<div class="job" data-id="${s.id}">
-    <h3>${s.protocolo} - ${s.tipo||''}</h3>
-    <p><b>${s.seguradora||''}</b></p>
-    <p><b>Origem:</b> ${s.origem}</p>
-    <p><b>Destino:</b> ${s.destino}</p>
-    <p><b>Status:</b> <span class="badge">${s.status}</span></p>
-    ${placa ? `<p><b>Placa já enviada:</b> ${placa}</p>` : ''}
-    ${fotos ? `<p><b>Fotos enviadas:</b> ${fotos}</p>` : ''}
-    <a class="btnlink" target="_blank" href="https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(s.origem)}&destination=${encodeURIComponent(s.destino)}">Abrir rota</a>
-    <div class="grid">
-      <button onclick="setStatus(${s.id},'aceito')">Aceitar</button>
-      <button class="danger" onclick="setStatus(${s.id},'recusado')">Recusar</button>
-      <button onclick="setStatus(${s.id},'a caminho')">A caminho</button>
-      <button onclick="setStatus(${s.id},'na origem')">Na origem</button>
-      <button onclick="setStatus(${s.id},'em transporte')">Em transporte</button>
+
+async function finalizar(id){
+  if(!confirm('Finalizar serviço no destino?')) return;
+  const res = await fetch(`/api/servicos/${id}/finalizar`, {method:'POST'}).then(r=>r.json());
+  if(res.ok){ carregarServicos(true); }
+  else alert(res.erro || 'Erro ao finalizar');
+}
+
+function rota(origem, destino){
+  return 'https://www.google.com/maps/dir/?api=1&origin=' + encodeURIComponent(origem) + '&destination=' + encodeURIComponent(destino);
+}
+
+async function carregarServicos(forcar=false){
+  if(digitando && !forcar) return;
+  const data = await fetch(`/api/motorista/${motoristaId}/servicos`).then(r=>r.json());
+  const box = document.getElementById('servicos');
+  if(!data.length){ box.innerHTML = '<p>Nenhum serviço enviado no momento.</p>'; return; }
+
+  box.innerHTML = data.map(s=>`
+    <div class="service-card">
+      <h3>${s.protocolo || ''} - ${s.tipo || ''}</h3>
+      <p><b>Cliente:</b> ${s.seguradora || ''}</p>
+      <p><b>Origem:</b> ${s.origem || ''}</p>
+      <p><b>Destino:</b> ${s.destino || ''}</p>
+      <p><b>Status:</b> ${s.status || ''}</p>
+      <a class="button-link" target="_blank" href="${rota(s.origem, s.destino)}">Abrir rota</a>
+
+      <div class="actions">
+        <button onclick="mudarStatus('${s.id}','aceito')">Aceitar</button>
+        <button class="danger" onclick="mudarStatus('${s.id}','recusado')">Recusar</button>
+        <button onclick="mudarStatus('${s.id}','a caminho')">A caminho</button>
+        <button onclick="mudarStatus('${s.id}','na origem')">Na origem</button>
+        <button onclick="mudarStatus('${s.id}','em transporte')">Em transporte</button>
+      </div>
+
+      <div class="checklist">
+        <h4>Baixa na origem</h4>
+        <label>Placa do veículo removido</label>
+        <input id="placa_${s.id}" value="${s.placa_veiculo_removido || s.placa_removida || ''}" placeholder="Ex: ABC1D23"
+          onfocus="digitando=true" onblur="setTimeout(()=>digitando=false, 1000)">
+        <button onclick="enviarPlaca('${s.id}')">Enviar placa para a central</button>
+
+        <h4>Checklist / fotos de avarias</h4>
+        <input id="fotos_${s.id}" type="file" accept="image/*" multiple>
+        <button onclick="enviarFotos('${s.id}')">Enviar fotos/checklist</button>
+
+        <h4>Finalização</h4>
+        <button class="dark" onclick="finalizar('${s.id}')">Finalizar serviço no destino</button>
+      </div>
     </div>
-    <div class="baixa">
-      <h4>Cheguei na origem</h4>
-      <p class="hint">Informe a placa assim que chegar ao veículo. A central verá automaticamente.</p>
-      <input id="placa-${s.id}" placeholder="Placa do veículo removido" value="${placa}" autocomplete="off">
-      <button type="button" onclick="enviarPlaca(${s.id})">Enviar placa para a central</button>
-    </div>
-    <div class="baixa">
-      <h4>Checklist / fotos do veículo</h4>
-      <p class="hint">Use para fotos de avarias, estado do veículo, painel, lateral etc.</p>
-      <input id="fotos-${s.id}" type="file" accept="image/*" multiple capture="environment">
-      <button type="button" id="btn-fotos-${s.id}" onclick="enviarFotos(${s.id})">Enviar fotos/checklist para a central</button>
-    </div>
-    <div class="baixa finalizar">
-      <h4>Destino</h4>
-      <p class="hint">Finalize somente após chegar ao destino e entregar o veículo.</p>
-      <button type="button" onclick="finalizarServico(${s.id})">Finalizar serviço no destino</button>
-    </div>
-  </div>`;
+  `).join('');
 }
-async function loadServices(force=false){
-  if(carregando) return;
-  if(!force && estaDigitando()) return;
-  carregando = true;
-  try{
-    const res=await fetch(`/api/motorista/${MID}/servicos?ts=${Date.now()}`);
-    const data=await res.json();
-    const el=document.getElementById('servicos');
-    if(!data.length){el.innerHTML='<p>Nenhum serviço enviado no momento.</p>'; return;}
-    el.innerHTML=data.map(jobHtml).join('');
-  } finally { carregando = false; }
-}
-setInterval(()=>loadServices(false), 5000);
-loadServices(true);
+
+setInterval(()=>carregarServicos(false), 4000);
+carregarServicos(true);
 </script>
 </body>
 </html>
