@@ -1,0 +1,19 @@
+<!doctype html><html lang="pt-br"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Área do Motorista</title><link rel="stylesheet" href="/static/style.css"></head><body class="mobile"><header>🚛 Área do Motorista</header><main class="phone"><section class="card"><h2>{{m.nome if m else 'Motorista não encontrado'}}</h2><p id="gpsStatus">GPS parado.</p><button onclick="goOnline()">Ficar ONLINE e enviar localização</button><button class="secondary" onclick="goOffline()">Ficar OFFLINE</button></section><section class="card"><h3>Serviços enviados</h3><div id="servicos"></div></section></main><script>
+const MID = {{m.id if m else 0}}; let watchId = null;
+function sendLoc(pos){fetch(`/api/motoristas/${MID}/localizacao`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lat:pos.coords.latitude,lng:pos.coords.longitude,online:true})});document.getElementById('gpsStatus').innerText='Online - localização enviada: '+new Date().toLocaleTimeString();}
+function goOnline(){if(!navigator.geolocation){alert('Celular sem GPS no navegador');return;} watchId = navigator.geolocation.watchPosition(sendLoc, err=>alert('Permita a localização no navegador. Erro: '+err.message), {enableHighAccuracy:true, maximumAge:5000, timeout:15000});}
+async function goOffline(){ if(watchId) navigator.geolocation.clearWatch(watchId); await fetch(`/api/motoristas/${MID}/offline`,{method:'POST'}); document.getElementById('gpsStatus').innerText='Offline'; }
+async function setStatus(id,status){const fd=new FormData(); fd.append('status',status); await fetch(`/api/servicos/${id}/status`,{method:'POST',body:fd}); loadServices();}
+async function enviarBaixa(id){
+  const form = document.getElementById(`baixa-${id}`);
+  const fd = new FormData(form);
+  const placa = (fd.get('placa_veiculo') || '').toString().trim();
+  if(!placa){ alert('Informe a placa do veículo removido.'); return; }
+  const res = await fetch(`/api/servicos/${id}/baixa`,{method:'POST',body:fd});
+  const data = await res.json();
+  if(data.ok){ alert('Baixa enviada com sucesso.'); loadServices(); }
+  else alert('Erro ao enviar baixa.');
+}
+async function loadServices(){const res=await fetch(`/api/motorista/${MID}/servicos`); const data=await res.json(); const el=document.getElementById('servicos'); if(!data.length){el.innerHTML='<p>Nenhum serviço enviado no momento.</p>';return;} el.innerHTML=data.map(s=>`<div class="job"><h3>${s.protocolo} - ${s.tipo||''}</h3><p><b>${s.seguradora||''}</b></p><p><b>Origem:</b> ${s.origem}</p><p><b>Destino:</b> ${s.destino}</p><p><b>Status:</b> ${s.status}</p>${s.placa_veiculo_removido ? `<p><b>Placa removido:</b> ${s.placa_veiculo_removido}</p>` : ''}<a class="btnlink" target="_blank" href="https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(s.origem)}&destination=${encodeURIComponent(s.destino)}">Abrir rota</a><div class="grid"><button onclick="setStatus(${s.id},'aceito')">Aceitar</button><button class="danger" onclick="setStatus(${s.id},'recusado')">Recusar</button><button onclick="setStatus(${s.id},'a caminho')">A caminho</button><button onclick="setStatus(${s.id},'na origem')">Na origem</button><button onclick="setStatus(${s.id},'em transporte')">Em transporte</button></div><form class="baixa" id="baixa-${s.id}" enctype="multipart/form-data" onsubmit="event.preventDefault(); enviarBaixa(${s.id});"><h4>Baixa do serviço</h4><input name="placa_veiculo" placeholder="Placa do veículo removido" value="${s.placa_veiculo_removido||''}" required><label>Fotos do veículo</label><input name="fotos" type="file" accept="image/*" multiple capture="environment"><input type="hidden" name="status" value="finalizado"><button type="submit">Enviar baixa e finalizar</button></form></div>`).join('');}
+setInterval(loadServices, 4000); loadServices();
+</script></body></html>
