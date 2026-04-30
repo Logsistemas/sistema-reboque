@@ -1,11 +1,41 @@
-<!doctype html><html lang="pt-br"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Área do Motorista</title><link rel="stylesheet" href="/static/style.css"></head><body><div class="top">🚛 Área do Motorista</div><div class="center-wrap">{% if not m %}<div class="card"><h1>Motorista não encontrado</h1><p>Confirme o link com a central.</p></div>{% else %}<div class="card"><h1>{{m.nome}}</h1><p id="statusLoc">{{'Online' if m.online else 'Offline'}} - última atualização: {{m.ultima_atualizacao}}</p><button onclick="ficarOnline()">Ficar ONLINE e enviar localização</button><button class="btn gray" onclick="ficarOffline()">Ficar OFFLINE</button></div><div class="card"><h2>Serviços enviados</h2><div id="servicos">Carregando...</div></div>{% endif %}</div><script>
-const MID="{{m.id if m else ''}}";function postForm(url,data){return fetch(url,{method:'POST',body:data}).then(async r=>{let txt=await r.text();try{return JSON.parse(txt)}catch(e){return {ok:r.ok,text:txt}}})}
-function ficarOnline(){if(!navigator.geolocation){alert('GPS não disponível');return}navigator.geolocation.getCurrentPosition(pos=>{fetch(`/api/motoristas/${MID}/localizacao`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lat:pos.coords.latitude,lng:pos.coords.longitude,online:true})}).then(()=>{document.getElementById('statusLoc').innerText='Online - localização enviada: '+new Date().toLocaleTimeString();carregar()})},err=>alert('Permita a localização no celular.'))}
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Área do Motorista</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="top">🚛 Área do Motorista</div>
+  <div class="center-wrap">
+    {% if not m %}
+    <div class="card"><h1>Motorista não encontrado</h1><p>Confirme o link com a central.</p></div>
+    {% else %}
+    <div class="card">
+      <h1>{{m.nome}}</h1>
+      <p id="statusLoc">{{'Online' if m.online else 'Offline'}} - última atualização: {{m.ultima_atualizacao}}</p>
+      <button onclick="ficarOnline()">Ficar ONLINE e enviar localização</button>
+      <button class="btn gray" onclick="ficarOffline()">Ficar OFFLINE</button>
+    </div>
+    <div class="card"><h2>Serviços enviados</h2><div id="servicos">Carregando...</div></div>
+    {% endif %}
+  </div>
+<script>
+const MID="{{m.id if m else ''}}";
+let motoristaInteragindo=false;
+let timerInteracao=null;
+function pausarAtualizacao(ms=30000){motoristaInteragindo=true;clearTimeout(timerInteracao);timerInteracao=setTimeout(()=>{motoristaInteragindo=false},ms)}
+function postForm(url,data){return fetch(url,{method:'POST',body:data}).then(async r=>{let txt=await r.text();try{return JSON.parse(txt)}catch(e){return {ok:r.ok,text:txt}}})}
+function ficarOnline(){if(!navigator.geolocation){alert('GPS não disponível');return}navigator.geolocation.getCurrentPosition(pos=>{fetch(`/api/motoristas/${MID}/localizacao`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lat:pos.coords.latitude,lng:pos.coords.longitude,online:true})}).then(()=>{document.getElementById('statusLoc').innerText='Online - localização enviada: '+new Date().toLocaleTimeString();carregar(true)})},err=>alert('Permita a localização no celular.'))}
 function ficarOffline(){fetch(`/api/motoristas/${MID}/offline`,{method:'POST'}).then(()=>{document.getElementById('statusLoc').innerText='Offline'})}
-function statusServico(id,status){let fd=new FormData();fd.append('status',status);postForm(`/api/servicos/${id}/status`,fd).then(j=>{if(!j.ok&&j.erro)alert(j.erro);carregar()})}
-function enviarPlaca(id){let input=document.getElementById('placa_'+id);let placa=input.value.trim();if(!placa){alert('Digite a placa');return}let fd=new FormData();fd.append('placa_veiculo',placa);postForm(`/api/servicos/${id}/placa`,fd).then(j=>{if(j.ok){alert('Placa enviada para a central');carregar()}else alert(j.erro||'Erro ao enviar placa')})}
-function enviarFotos(id){let input=document.getElementById('fotos_'+id);if(!input.files.length){alert('Escolha pelo menos uma foto');return}let fd=new FormData();for(let f of input.files){fd.append('fotos',f)}postForm(`/api/servicos/${id}/fotos`,fd).then(j=>{if(j.ok){alert('Fotos enviadas para a central');carregar()}else alert(j.erro||'Erro ao enviar fotos')})}
-function finalizar(id){if(!confirm('Finalizar serviço no destino?'))return;postForm(`/api/servicos/${id}/finalizar`,new FormData()).then(j=>{if(j.ok){alert('Serviço finalizado');carregar()}else alert(j.erro||'Erro')})}
-function card(s){let fotos=(s.fotos||[]).map((f,i)=>`<a href="${f.url}" target="_blank">foto ${i+1}</a>`).join(' ');return `<div class="service-card"><h3>${s.protocolo||''} - ${s.tipo||''}</h3><p><b>${s.seguradora||''}</b></p><p><b>Origem:</b> ${s.origem||''}</p><p><b>Destino:</b> ${s.destino||''}</p><p><b>Status:</b> <span class="pill">${s.status||''}</span></p><a class="btn dark" target="_blank" href="https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(s.origem||'')}&destination=${encodeURIComponent(s.destino||'')}">Abrir rota</a><div class="status-actions" style="margin-top:10px"><button onclick="statusServico('${s.id}','aceito')">Aceitar</button><button class="btn red" onclick="statusServico('${s.id}','recusado')">Recusar</button><button onclick="statusServico('${s.id}','a caminho')">A caminho</button><button onclick="statusServico('${s.id}','na origem')">Na origem</button><button onclick="statusServico('${s.id}','em transporte')">Em transporte</button></div><hr><label><b>Placa do veículo removido</b></label><input id="placa_${s.id}" value="${s.placa_veiculo_removido||s.placa_removida||''}" placeholder="Ex: ABC1D23"><button class="btn green" onclick="enviarPlaca('${s.id}')">Enviar placa para a central</button><hr><label><b>Fotos / checklist do veículo</b></label><input id="fotos_${s.id}" type="file" accept="image/*" multiple><button class="btn dark" onclick="enviarFotos('${s.id}')">Enviar fotos/checklist para a central</button><p class="muted">Fotos já enviadas: ${fotos||'nenhuma'}</p><hr><button class="btn gray" onclick="finalizar('${s.id}')">Finalizar serviço no destino</button></div>`}
-function carregar(){fetch(`/api/motorista/${MID}/servicos`).then(r=>r.json()).then(ss=>{document.getElementById('servicos').innerHTML=ss.length?ss.map(card).join(''):'Nenhum serviço enviado no momento.'})}if(MID){carregar();setInterval(carregar,5000)}
-</script></body></html>
+function statusServico(id,status){pausarAtualizacao(5000);let fd=new FormData();fd.append('status',status);postForm(`/api/servicos/${id}/status`,fd).then(j=>{if(!j.ok&&j.erro)alert(j.erro);motoristaInteragindo=false;carregar(true)})}
+function enviarPlaca(id){pausarAtualizacao(15000);let input=document.getElementById('placa_'+id);let placa=input.value.trim();if(!placa){alert('Digite a placa');return}let fd=new FormData();fd.append('placa_veiculo',placa);postForm(`/api/servicos/${id}/placa`,fd).then(j=>{if(j.ok){alert('Placa enviada para a central');}else alert(j.erro||'Erro ao enviar placa')}).catch(e=>alert('Erro ao enviar placa: '+e)).finally(()=>{motoristaInteragindo=false;carregar(true)})}
+function enviarFotos(id){pausarAtualizacao(90000);let input=document.getElementById('fotos_'+id);if(!input.files.length){alert('Escolha pelo menos uma foto');return}let btn=document.getElementById('btn_fotos_'+id);if(btn){btn.disabled=true;btn.innerText='Enviando fotos...'}let fd=new FormData();for(let f of input.files){fd.append('fotos',f)}postForm(`/api/servicos/${id}/fotos`,fd).then(j=>{if(j.ok){alert('Fotos enviadas para a central')}else alert(j.erro||'Erro ao enviar fotos')}).catch(e=>alert('Erro ao enviar fotos: '+e)).finally(()=>{motoristaInteragindo=false;if(btn){btn.disabled=false;btn.innerText='Enviar fotos/checklist para a central'}carregar(true)})}
+function finalizar(id){if(!confirm('Finalizar serviço no destino?'))return;pausarAtualizacao(5000);postForm(`/api/servicos/${id}/finalizar`,new FormData()).then(j=>{if(j.ok){alert('Serviço finalizado');}else alert(j.erro||'Erro')}).finally(()=>{motoristaInteragindo=false;carregar(true)})}
+function card(s){let fotos=(s.fotos||[]).map((f,i)=>`<a href="${f.url}" target="_blank">foto ${i+1}</a>`).join(' ');return `<div class="service-card"><h3>${s.protocolo||''} - ${s.tipo||''}</h3><p><b>${s.seguradora||''}</b></p><p><b>Origem:</b> ${s.origem||''}</p><p><b>Destino:</b> ${s.destino||''}</p><p><b>Status:</b> <span class="pill">${s.status||''}</span></p><a class="btn dark" target="_blank" href="https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(s.origem||'')}&destination=${encodeURIComponent(s.destino||'')}">Abrir rota</a><div class="status-actions" style="margin-top:10px"><button onclick="statusServico('${s.id}','aceito')">Aceitar</button><button class="btn red" onclick="statusServico('${s.id}','recusado')">Recusar</button><button onclick="statusServico('${s.id}','a caminho')">A caminho</button><button onclick="statusServico('${s.id}','na origem')">Na origem</button><button onclick="statusServico('${s.id}','em transporte')">Em transporte</button></div><hr><label><b>Placa do veículo removido</b></label><input id="placa_${s.id}" onfocus="pausarAtualizacao(30000)" oninput="pausarAtualizacao(30000)" value="${s.placa_veiculo_removido||s.placa_removida||''}" placeholder="Ex: ABC1D23"><button class="btn green" onclick="enviarPlaca('${s.id}')">Enviar placa para a central</button><hr><label><b>Fotos / checklist do veículo</b></label><input id="fotos_${s.id}" type="file" accept="image/*" multiple onchange="pausarAtualizacao(90000)"><button id="btn_fotos_${s.id}" class="btn dark" onclick="enviarFotos('${s.id}')">Enviar fotos/checklist para a central</button><p class="muted">Fotos já enviadas: ${fotos||'nenhuma'}</p><hr><button class="btn gray" onclick="finalizar('${s.id}')">Finalizar serviço no destino</button></div>`}
+function carregar(forcar=false){if(motoristaInteragindo&&!forcar)return;fetch(`/api/motorista/${MID}/servicos`).then(r=>r.json()).then(ss=>{document.getElementById('servicos').innerHTML=ss.length?ss.map(card).join(''):'Nenhum serviço enviado no momento.'})}
+if(MID){carregar(true);setInterval(()=>carregar(false),5000)}
+</script>
+</body>
+</html>
