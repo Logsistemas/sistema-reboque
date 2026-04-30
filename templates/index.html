@@ -15,6 +15,7 @@
     <a href="/">Central</a>
     <a href="/operacao">Operação ao vivo</a>
     <a href="/historico">Histórico / Relatórios</a>
+    <a href="/faturamento">Faturamento</a>
   </span>
 </div>
 
@@ -36,17 +37,27 @@
 
     <div class="card">
       <h3>Novo serviço</h3>
-      <form method="post" action="/servicos">
+      <form method="post" action="/servicos" id="form-servico">
         <input name="protocolo" placeholder="Protocolo" required>
         <input name="seguradora" placeholder="Seguradora">
-        <input name="tipo" placeholder="Tipo de serviço">
+        <select name="tipo" id="tipo-servico" required onchange="montarItensFinanceiros()">
+          <option value="">Selecione o tipo de serviço</option>
+          {% for t in tipos_servico %}
+          <option value="{{t}}">{{t}}</option>
+          {% endfor %}
+        </select>
         <textarea name="origem" placeholder="Origem completa" required></textarea>
         <textarea name="destino" placeholder="Destino completo" required></textarea>
         <textarea name="observacao" placeholder="Observação"></textarea>
+        <div class="finance-box">
+          <h4>Valores do serviço</h4>
+          <p class="muted">Preencha as quantidades e ajuste os valores se necessário.</p>
+          <div id="itens-financeiros"></div>
+          <div class="total-box">Total: <b id="total-servico">R$ 0,00</b></div>
+        </div>
         <button>Criar serviço</button>
       </form>
     </div>
-
     <div class="card">
       <h3>Importar Excel</h3>
       <form method="post" action="/servicos/importar" enctype="multipart/form-data">
@@ -119,6 +130,8 @@
             <th>Placa removido</th>
             <th>Fotos</th>
             <th>Último evento</th>
+            <th>Valor</th>
+            <th>Fat.</th>
             <th>Ação</th>
           </tr>
         </thead>
@@ -143,6 +156,8 @@
               {% endfor %}
             </td>
             <td class="muted">{{s.ultimo_evento}}</td>
+            <td><b>{{s.valor_total_fmt}}</b></td>
+            <td><span class="pill">{{s.status_faturamento}}</span></td>
             <td>
               <form method="post" action="/servicos/{{s.id}}/enviar">
                 <select name="motorista_id">
@@ -191,6 +206,55 @@ function ativarSom() {
   document.getElementById('somStatus').innerText = 'Som ativado';
   beep(900,220);
 }
+
+
+const PRECOS_POR_TIPO = {{ precos_por_tipo|tojson }};
+
+function brMoney(v) {
+  const n = Number(v || 0);
+  return n.toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
+}
+
+function montarItensFinanceiros() {
+  const tipo = document.getElementById('tipo-servico')?.value || '';
+  const box = document.getElementById('itens-financeiros');
+  if (!box) return;
+  const itens = PRECOS_POR_TIPO[tipo] || [];
+  if (!itens.length) {
+    box.innerHTML = '<p class="muted">Selecione um tipo para carregar os itens financeiros.</p>';
+    calcularTotalServico();
+    return;
+  }
+  box.innerHTML = itens.map(it => {
+    const nome = it.nome_item || it.nome || '';
+    const valor = Number(it.valor_padrao || 0).toFixed(2);
+    const qtd = (nome.toUpperCase() === 'SAIDA' || nome.toUpperCase() === 'SAÍDA') ? 1 : 0;
+    return `
+      <div class="item-financeiro">
+        <input type="hidden" name="item_nome" value="${nome}">
+        <label>${nome}</label>
+        <input type="number" step="0.01" min="0" name="item_qtd" value="${qtd}" oninput="calcularTotalServico()" placeholder="Qtd">
+        <input type="number" step="0.01" min="0" name="item_valor" value="${valor}" oninput="calcularTotalServico()" placeholder="Valor unit.">
+      </div>
+    `;
+  }).join('');
+  calcularTotalServico();
+}
+
+function calcularTotalServico() {
+  const box = document.getElementById('itens-financeiros');
+  const totalEl = document.getElementById('total-servico');
+  if (!box || !totalEl) return;
+  let total = 0;
+  const linhas = box.querySelectorAll('.item-financeiro');
+  linhas.forEach(l => {
+    const qtd = Number(l.querySelector('[name="item_qtd"]').value || 0);
+    const valor = Number(l.querySelector('[name="item_valor"]').value || 0);
+    total += qtd * valor;
+  });
+  totalEl.innerText = brMoney(total);
+}
+document.addEventListener('DOMContentLoaded', montarItensFinanceiros);
 
 if (localStorage.getItem('somAtivo') === '1') {
   somAtivo = true;
@@ -274,6 +338,8 @@ function renderServicos(ss) {
         <td><b>${placa || '-'}</b></td>
         <td>${fotosHtml}</td>
         <td class="muted">${safe(s.ultimo_evento)}</td>
+        <td><b>${safe(s.valor_total_fmt)}</b></td>
+        <td><span class="pill">${safe(s.status_faturamento)}</span></td>
         <td>
           <form method="post" action="/servicos/${s.id}/enviar">
             <select name="motorista_id">${opcoesMotoristas()}</select>

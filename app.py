@@ -9,11 +9,372 @@ import io, socket, os, shutil, uuid, json
 import psycopg2
 from psycopg2.extras import RealDictCursor, Json
 
-app = FastAPI(title="Sistema Interno de Reboque V9")
+app = FastAPI(title="Sistema Interno de Reboque V13 - Faturamento")
 app.mount('/static', StaticFiles(directory='static'), name='static')
 templates = Jinja2Templates(directory='templates')
 UPLOAD_DIR = os.path.join('static', 'uploads')
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+PRICE_DATA = [
+  {
+    "tipo": "C. MEC. LEVE",
+    "nome": "SAIDA",
+    "valor": 105.0
+  },
+  {
+    "tipo": "E. PATIO",
+    "nome": "ESTADIA",
+    "valor": 45.0
+  },
+  {
+    "tipo": "GUINDAUTO",
+    "nome": "SAIDA",
+    "valor": 450.89
+  },
+  {
+    "tipo": "GUINDAUTO",
+    "nome": "HORA TRABALHADA",
+    "valor": 133.0
+  },
+  {
+    "tipo": "R. 5 RODA",
+    "nome": "HORA TRABALHADA",
+    "valor": 145.0
+  },
+  {
+    "tipo": "R. 5 RODA",
+    "nome": "SAIDA",
+    "valor": 530.0
+  },
+  {
+    "tipo": "R. 5 RODA",
+    "nome": "HORA PARADA",
+    "valor": 120.0
+  },
+  {
+    "tipo": "R. 5 RODA",
+    "nome": "KM VIAGEM",
+    "valor": 5.6
+  },
+  {
+    "tipo": "R. E. PESADO",
+    "nome": "ESTADIA",
+    "valor": 100.0
+  },
+  {
+    "tipo": "R. E. PESADO",
+    "nome": "PEDAGIO",
+    "valor": 1.0
+  },
+  {
+    "tipo": "R. E. PESADO",
+    "nome": "HORA TRABALHADA",
+    "valor": 145.0
+  },
+  {
+    "tipo": "R. E. PESADO",
+    "nome": "HORA PARADA",
+    "valor": 120.0
+  },
+  {
+    "tipo": "R. E. PESADO",
+    "nome": "KM DESLOCAMENTO",
+    "valor": 6.36
+  },
+  {
+    "tipo": "R. E. PESADO",
+    "nome": "KM VIAGEM",
+    "valor": 6.36
+  },
+  {
+    "tipo": "R. E. PESADO",
+    "nome": "SAIDA",
+    "valor": 570.48
+  },
+  {
+    "tipo": "R. GARAGEM",
+    "nome": "PEDAGIO",
+    "valor": 1.0
+  },
+  {
+    "tipo": "R. GARAGEM",
+    "nome": "HORA PARADA",
+    "valor": 60.0
+  },
+  {
+    "tipo": "R. GARAGEM",
+    "nome": "HORA TRABALHADA",
+    "valor": 60.0
+  },
+  {
+    "tipo": "R. GARAGEM",
+    "nome": "KM RETORNO",
+    "valor": 3.24
+  },
+  {
+    "tipo": "R. GARAGEM",
+    "nome": "KM DESLOCAMENTO",
+    "valor": 3.24
+  },
+  {
+    "tipo": "R. GARAGEM",
+    "nome": "KM VIAGEM",
+    "valor": 3.24
+  },
+  {
+    "tipo": "R. GARAGEM",
+    "nome": "SAIDA",
+    "valor": 215.0
+  },
+  {
+    "tipo": "R. LEVE",
+    "nome": "KM VIAGEM",
+    "valor": 3.24
+  },
+  {
+    "tipo": "R. LEVE",
+    "nome": "PEDAGIO",
+    "valor": 1.0
+  },
+  {
+    "tipo": "R. LEVE",
+    "nome": "HORA TRABALHADA",
+    "valor": 60.0
+  },
+  {
+    "tipo": "R. LEVE",
+    "nome": "SAIDA",
+    "valor": 177.6
+  },
+  {
+    "tipo": "R. LEVE",
+    "nome": "HORA PARADA",
+    "valor": 60.0
+  },
+  {
+    "tipo": "R. LEVE",
+    "nome": "ESTADIA",
+    "valor": 50.0
+  },
+  {
+    "tipo": "R. MEGA PESADO",
+    "nome": "HORA PARADA",
+    "valor": 150.0
+  },
+  {
+    "tipo": "R. MEGA PESADO",
+    "nome": "KM RETORNO",
+    "valor": 7.5
+  },
+  {
+    "tipo": "R. MEGA PESADO",
+    "nome": "KM DESLOCAMENTO",
+    "valor": 7.5
+  },
+  {
+    "tipo": "R. MEGA PESADO",
+    "nome": "KM VIAGEM",
+    "valor": 7.5
+  },
+  {
+    "tipo": "R. MEGA PESADO",
+    "nome": "SAIDA",
+    "valor": 800.0
+  },
+  {
+    "tipo": "R. MEGA PESADO",
+    "nome": "PEDAGIO",
+    "valor": 1.0
+  },
+  {
+    "tipo": "R. MEGA PESADO",
+    "nome": "HORA TRABALHADA",
+    "valor": 200.0
+  },
+  {
+    "tipo": "R. MOTO",
+    "nome": "SAIDA",
+    "valor": 191.0
+  },
+  {
+    "tipo": "R. MOTO",
+    "nome": "KM DESLOCAMENTO",
+    "valor": 3.24
+  },
+  {
+    "tipo": "R. MOTO",
+    "nome": "KM RETORNO",
+    "valor": 3.24
+  },
+  {
+    "tipo": "R. MOTO",
+    "nome": "HORA PARADA",
+    "valor": 60.0
+  },
+  {
+    "tipo": "R. MOTO",
+    "nome": "HORA TRABALHADA",
+    "valor": 60.0
+  },
+  {
+    "tipo": "R. MOTO",
+    "nome": "PEDAGIO",
+    "valor": 1.0
+  },
+  {
+    "tipo": "R. MOTO",
+    "nome": "KM VIAGEM",
+    "valor": 3.24
+  },
+  {
+    "tipo": "R. MOTO",
+    "nome": "ESTADIA",
+    "valor": 45.0
+  },
+  {
+    "tipo": "R. MOTO ESP.",
+    "nome": "HORA PARADA",
+    "valor": 60.0
+  },
+  {
+    "tipo": "R. MOTO ESP.",
+    "nome": "SAIDA",
+    "valor": 308.0
+  },
+  {
+    "tipo": "R. MOTO ESP.",
+    "nome": "PEDAGIO",
+    "valor": 1.0
+  },
+  {
+    "tipo": "R. MOTO ESP.",
+    "nome": "KM VIAGEM",
+    "valor": 3.24
+  },
+  {
+    "tipo": "R. MOTO ESP.",
+    "nome": "HORA TRABALHADA",
+    "valor": 60.0
+  },
+  {
+    "tipo": "R. PATINS",
+    "nome": "ESTADIA",
+    "valor": 45.0
+  },
+  {
+    "tipo": "R. PATINS",
+    "nome": "PEDAGIO",
+    "valor": 1.0
+  },
+  {
+    "tipo": "R. PATINS",
+    "nome": "HORA TRABALHADA",
+    "valor": 60.0
+  },
+  {
+    "tipo": "R. PATINS",
+    "nome": "HORA PARADA",
+    "valor": 60.0
+  },
+  {
+    "tipo": "R. PATINS",
+    "nome": "KM RETORNO",
+    "valor": 3.24
+  },
+  {
+    "tipo": "R. PATINS",
+    "nome": "KM DESLOCAMENTO",
+    "valor": 3.24
+  },
+  {
+    "tipo": "R. PATINS",
+    "nome": "KM VIAGEM",
+    "valor": 3.24
+  },
+  {
+    "tipo": "R. PATINS",
+    "nome": "SAIDA",
+    "valor": 305.0
+  },
+  {
+    "tipo": "R. PESADO",
+    "nome": "PEDAGIO",
+    "valor": 1.0
+  },
+  {
+    "tipo": "R. PESADO",
+    "nome": "KM DESLOCAMENTO",
+    "valor": 5.17
+  },
+  {
+    "tipo": "R. PESADO",
+    "nome": "SAIDA",
+    "valor": 462.84
+  },
+  {
+    "tipo": "R. PESADO",
+    "nome": "KM VIAGEM",
+    "valor": 5.17
+  },
+  {
+    "tipo": "R. PESADO",
+    "nome": "HORA TRABALHADA",
+    "valor": 145.0
+  },
+  {
+    "tipo": "R. PESADO",
+    "nome": "ESTADIA",
+    "valor": 100.0
+  },
+  {
+    "tipo": "R. PESADO",
+    "nome": "HORA PARADA",
+    "valor": 120.0
+  },
+  {
+    "tipo": "R. UTILITARIO",
+    "nome": "ESTADIA",
+    "valor": 50.0
+  },
+  {
+    "tipo": "R. UTILITARIO",
+    "nome": "PEDAGIO",
+    "valor": 1.0
+  },
+  {
+    "tipo": "R. UTILITARIO",
+    "nome": "SAIDA",
+    "valor": 269.1
+  },
+  {
+    "tipo": "R. UTILITARIO",
+    "nome": "KM VIAGEM",
+    "valor": 3.52
+  },
+  {
+    "tipo": "R. UTILITARIO",
+    "nome": "HORA PARADA",
+    "valor": 60.0
+  },
+  {
+    "tipo": "R. UTILITARIO",
+    "nome": "HORA TRABALHADA",
+    "valor": 70.0
+  }
+]
+
+def moeda(v):
+    try:
+        return float(v or 0)
+    except Exception:
+        return 0.0
+
+def fmt_moeda(v):
+    try:
+        return f"R$ {float(v or 0):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    except Exception:
+        return "R$ 0,00"
+
 
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 if DATABASE_URL and "sslmode=" not in DATABASE_URL:
@@ -66,6 +427,28 @@ def init_db():
               id uuid primary key default uuid_generate_v4(),
               servico_id uuid, url text, filename text, created_at timestamp default now()
             );""")
+            cur.execute("""
+            create table if not exists tabela_precos (
+              id uuid primary key default uuid_generate_v4(),
+              tipo_servico text not null,
+              nome_item text not null,
+              valor_padrao numeric(12,2) default 0,
+              ativo boolean default true,
+              created_at timestamp default now(),
+              unique(tipo_servico, nome_item)
+            );""")
+            cur.execute("""
+            create table if not exists servico_itens (
+              id uuid primary key default uuid_generate_v4(),
+              servico_id uuid not null,
+              tipo_servico text,
+              nome_item text not null,
+              quantidade numeric(12,2) default 0,
+              valor_unitario numeric(12,2) default 0,
+              valor_total numeric(12,2) default 0,
+              observacao text,
+              created_at timestamp default now()
+            );""")
             alters=[
             "alter table motoristas add column if not exists tipo text;",
             "alter table motoristas add column if not exists online boolean default false;",
@@ -82,12 +465,78 @@ def init_db():
             "alter table servicos add column if not exists criado_em timestamp default now();",
             "alter table servicos add column if not exists atualizado_em timestamp default now();",
             "alter table servicos add column if not exists finalizado_em timestamp;",
-            "alter table fotos add column if not exists filename text;"]
+            "alter table fotos add column if not exists filename text;",
+            "alter table servicos add column if not exists status_faturamento text default 'para_conferir';",
+            "alter table servicos add column if not exists valor_total numeric(12,2) default 0;"]
             for a in alters: cur.execute(a)
+            cur.execute("select count(*) as total from tabela_precos")
+            total_precos = cur.fetchone()["total"]
+            if not total_precos:
+                for item in PRICE_DATA:
+                    cur.execute(
+                        "insert into tabela_precos (tipo_servico,nome_item,valor_padrao,ativo) values (%s,%s,%s,true) on conflict (tipo_servico,nome_item) do update set valor_padrao=excluded.valor_padrao, ativo=true",
+                        (item["tipo"], item["nome"], item["valor"])
+                    )
         conn.commit()
 
 @app.on_event("startup")
 def startup_event(): init_db()
+
+
+def lista_tipos_servico():
+    rows = q("select tipo_servico from tabela_precos where coalesce(ativo,true)=true group by tipo_servico order by tipo_servico", fetch=True)
+    return [r["tipo_servico"] for r in rows]
+
+def itens_padrao_tipo(tipo_servico):
+    if not tipo_servico:
+        return []
+    rows = q("select nome_item, valor_padrao from tabela_precos where tipo_servico=%s and coalesce(ativo,true)=true order by nome_item", (tipo_servico,), True)
+    return [{"nome_item": r["nome_item"], "valor_padrao": float(r["valor_padrao"] or 0)} for r in rows]
+
+def itens_do_servico(servico_id):
+    rows = q("select * from servico_itens where servico_id=%s order by nome_item", (str(servico_id),), True)
+    out = []
+    for r in rows:
+        r = dict(r)
+        r["id"] = str(r["id"])
+        r["servico_id"] = str(r["servico_id"])
+        r["quantidade"] = float(r.get("quantidade") or 0)
+        r["valor_unitario"] = float(r.get("valor_unitario") or 0)
+        r["valor_total"] = float(r.get("valor_total") or 0)
+        r["valor_unitario_fmt"] = fmt_moeda(r["valor_unitario"])
+        r["valor_total_fmt"] = fmt_moeda(r["valor_total"])
+        return_dummy = None
+        out.append(r)
+    return out
+
+def atualizar_total_servico(servico_id):
+    row = one("select coalesce(sum(valor_total),0) as total from servico_itens where servico_id=%s", (str(servico_id),))
+    total = float(row["total"] or 0) if row else 0
+    q("update servicos set valor_total=%s, atualizado_em=now() where id=%s", (total, str(servico_id)))
+    return total
+
+def criar_itens_para_servico(servico_id, tipo_servico, nomes=None, qtds=None, valores=None):
+    nomes = nomes or []
+    qtds = qtds or []
+    valores = valores or []
+    if not nomes:
+        padrao = itens_padrao_tipo(tipo_servico)
+        nomes = [i["nome_item"] for i in padrao]
+        valores = [i["valor_padrao"] for i in padrao]
+        qtds = [1 if str(i["nome_item"]).upper() in ["SAIDA", "SAÍDA"] else 0 for i in padrao]
+    q("delete from servico_itens where servico_id=%s", (str(servico_id),))
+    for idx, nome in enumerate(nomes):
+        nome = (nome or "").strip()
+        if not nome:
+            continue
+        qtd = moeda(qtds[idx] if idx < len(qtds) else 0)
+        valor = moeda(valores[idx] if idx < len(valores) else 0)
+        total = qtd * valor
+        q(
+            "insert into servico_itens (servico_id,tipo_servico,nome_item,quantidade,valor_unitario,valor_total) values (%s,%s,%s,%s,%s,%s)",
+            (str(servico_id), tipo_servico, nome, qtd, valor, total)
+        )
+    return atualizar_total_servico(servico_id)
 
 def normalizar_motorista(m):
     if not m: return None
@@ -107,6 +556,9 @@ def normalizar_servico(s, incluir_fotos=True):
         except Exception: h=[]
     s["historico"]=h
     if incluir_fotos: s["fotos"]=fotos_do_servico(s["id"])
+    s["valor_total"] = float(s.get("valor_total") or 0)
+    s["valor_total_fmt"] = fmt_moeda(s["valor_total"])
+    s["status_faturamento"] = s.get("status_faturamento") or "para_conferir"
     return s
 def lista_motoristas():
     return [normalizar_motorista(r) for r in q("select * from motoristas where coalesce(ativo,true)=true order by nome asc", fetch=True)]
@@ -140,7 +592,7 @@ def get_lan_ip():
 
 @app.get('/', response_class=HTMLResponse)
 def index(request: Request):
-    return templates.TemplateResponse('index.html', {'request':request,'motoristas':lista_motoristas(),'servicos':lista_servicos(limit=80),'lan_ip':get_lan_ip()})
+    return templates.TemplateResponse('index.html', {'request':request,'motoristas':lista_motoristas(),'servicos':lista_servicos(limit=80),'lan_ip':get_lan_ip(),'tipos_servico':lista_tipos_servico(),'precos_por_tipo':{t:itens_padrao_tipo(t) for t in lista_tipos_servico()}})
 
 @app.get('/historico', response_class=HTMLResponse)
 def historico(request: Request, data_ini: str="", data_fim: str="", seguradora: str="", tipo: str="", status: str="", motorista: str=""):
@@ -162,8 +614,21 @@ def operacao(request: Request):
 def criar_motorista(nome: str=Form(...), telefone: str=Form(''), veiculo: str=Form(''), placa: str=Form(''), tipo: str=Form('')):
     q("insert into motoristas (nome,telefone,veiculo,placa,tipo,online,ultima_atualizacao) values (%s,%s,%s,%s,%s,false,now())",(nome,telefone,veiculo,placa,tipo)); return RedirectResponse('/',303)
 @app.post('/servicos')
-def criar_servico(protocolo: str=Form(...), seguradora: str=Form(''), tipo: str=Form(''), origem: str=Form(...), destino: str=Form(...), observacao: str=Form('')):
-    row=one("insert into servicos (protocolo,seguradora,tipo,origem,destino,observacao,status,criado_em,atualizado_em) values (%s,%s,%s,%s,%s,%s,'novo',now(),now()) returning id",(protocolo,seguradora,tipo,origem,destino,observacao)); registrar_evento_db(row["id"],"novo","Serviço criado"); return RedirectResponse('/',303)
+async def criar_servico(request: Request):
+    form = await request.form()
+    protocolo = form.get('protocolo','').strip()
+    seguradora = form.get('seguradora','').strip()
+    tipo = form.get('tipo','').strip()
+    origem = form.get('origem','').strip()
+    destino = form.get('destino','').strip()
+    observacao = form.get('observacao','').strip()
+    nomes = form.getlist('item_nome')
+    qtds = form.getlist('item_qtd')
+    valores = form.getlist('item_valor')
+    row=one("insert into servicos (protocolo,seguradora,tipo,origem,destino,observacao,status,status_faturamento,criado_em,atualizado_em) values (%s,%s,%s,%s,%s,%s,'novo','para_conferir',now(),now()) returning id",(protocolo,seguradora,tipo,origem,destino,observacao))
+    criar_itens_para_servico(row["id"], tipo, nomes, qtds, valores)
+    registrar_evento_db(row["id"],"novo","Serviço criado com valores")
+    return RedirectResponse('/',303)
 
 @app.post('/servicos/importar')
 async def importar_servicos(file: UploadFile=File(...)):
@@ -325,6 +790,57 @@ async def enviar_fotos(sid: str, fotos: list[UploadFile]=File(default=[])):
 def finalizar_servico(sid: str):
     if not servico_by_id(sid): return JSONResponse({'ok':False,'erro':'Serviço não encontrado'},404)
     q("update servicos set status='finalizado',atualizado_em=now(),finalizado_em=now() where id=%s",(str(sid),)); registrar_evento_db(sid,'finalizado','Serviço finalizado pelo motorista'); return {'ok':True,'servico':servico_by_id(sid)}
+
+@app.get('/faturamento', response_class=HTMLResponse)
+def faturamento(request: Request, data_ini: str="", data_fim: str="", seguradora: str="", status_faturamento: str="", motorista: str=""):
+    filtros={k:(v or None) for k,v in dict(data_ini=data_ini,data_fim=data_fim,seguradora=seguradora,motorista=motorista).items()}
+    where=[]; params=[]
+    if filtros.get("data_ini"): where.append("date(created_at) >= %s"); params.append(filtros["data_ini"])
+    if filtros.get("data_fim"): where.append("date(created_at) <= %s"); params.append(filtros["data_fim"])
+    if filtros.get("seguradora"): where.append("seguradora ilike %s"); params.append(f"%{filtros['seguradora']}%")
+    if filtros.get("motorista"): where.append("coalesce(motorista_nome,'') ilike %s"); params.append(f"%{filtros['motorista']}%")
+    if status_faturamento: where.append("coalesce(status_faturamento,'para_conferir')=%s"); params.append(status_faturamento)
+    sql="select * from servicos" + ((" where " + " and ".join(where)) if where else "") + " order by created_at desc"
+    servs=[normalizar_servico(r) for r in q(sql, tuple(params), True)]
+    total=sum(float(s.get("valor_total") or 0) for s in servs)
+    kpis={
+      "total_servicos": len(servs),
+      "valor_total": fmt_moeda(total),
+      "para_conferir": len([s for s in servs if s.get("status_faturamento")=="para_conferir"]),
+      "para_faturar": len([s for s in servs if s.get("status_faturamento")=="para_faturar"]),
+      "negociacao": len([s for s in servs if s.get("status_faturamento")=="negociacao"]),
+      "faturado": len([s for s in servs if s.get("status_faturamento")=="faturado"]),
+    }
+    return templates.TemplateResponse('faturamento.html', {'request':request,'servicos':servs,'filtros':dict(data_ini=data_ini,data_fim=data_fim,seguradora=seguradora,status_faturamento=status_faturamento,motorista=motorista),'kpis':kpis})
+
+@app.get('/faturamento/{sid}', response_class=HTMLResponse)
+def faturamento_detalhe(sid: str, request: Request):
+    s=servico_by_id(sid)
+    if not s: return RedirectResponse('/faturamento',303)
+    itens=itens_do_servico(sid)
+    return templates.TemplateResponse('servico_financeiro.html', {'request':request,'s':s,'itens':itens,'tipos_servico':lista_tipos_servico(),'precos_por_tipo':{t:itens_padrao_tipo(t) for t in lista_tipos_servico()}})
+
+@app.post('/faturamento/{sid}/salvar')
+async def faturamento_salvar(sid: str, request: Request):
+    form=await request.form()
+    status_faturamento=form.get('status_faturamento','para_conferir')
+    nomes=form.getlist('item_nome')
+    qtds=form.getlist('item_qtd')
+    valores=form.getlist('item_valor')
+    tipo=form.get('tipo','')
+    criar_itens_para_servico(sid, tipo, nomes, qtds, valores)
+    total=atualizar_total_servico(sid)
+    q("update servicos set tipo=%s,status_faturamento=%s,valor_total=%s,atualizado_em=now() where id=%s",(tipo,status_faturamento,total,str(sid)))
+    registrar_evento_db(sid,'faturamento',f'Status: {status_faturamento} - Total: {fmt_moeda(total)}')
+    return RedirectResponse(f'/faturamento/{sid}',303)
+
+@app.post('/faturamento/{sid}/status')
+def faturamento_status(sid: str, status_faturamento: str=Form(...)):
+    q("update servicos set status_faturamento=%s,atualizado_em=now() where id=%s",(status_faturamento,str(sid)))
+    registrar_evento_db(sid,'faturamento',f'Status faturamento: {status_faturamento}')
+    return RedirectResponse('/faturamento',303)
+
+
 @app.get('/exportar')
 def exportar(data_ini: str="", data_fim: str="", seguradora: str="", tipo: str="", status: str="", motorista: str=""):
     filtros={k:(v or None) for k,v in dict(data_ini=data_ini,data_fim=data_fim,seguradora=seguradora,tipo=tipo,status=status,motorista=motorista).items()}
@@ -334,6 +850,11 @@ def exportar(data_ini: str="", data_fim: str="", seguradora: str="", tipo: str="
     output=io.BytesIO()
     with pd.ExcelWriter(output,engine='openpyxl') as writer:
         pd.DataFrame(registros).to_excel(writer,index=False,sheet_name='Servicos')
+        itens=[]
+        for s in servs:
+            for it in itens_do_servico(s["id"]):
+                itens.append({"protocolo":s.get("protocolo"),"seguradora":s.get("seguradora"),"tipo":s.get("tipo"),"item":it.get("nome_item"),"quantidade":it.get("quantidade"),"valor_unitario":it.get("valor_unitario"),"valor_total":it.get("valor_total"),"status_faturamento":s.get("status_faturamento")})
+        pd.DataFrame(itens).to_excel(writer,index=False,sheet_name='Itens_Faturamento')
         pd.DataFrame(lista_motoristas()).to_excel(writer,index=False,sheet_name='Motoristas')
     output.seek(0)
     return StreamingResponse(output,media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',headers={'Content-Disposition':'attachment; filename=sistema_reboque_relatorio.xlsx'})

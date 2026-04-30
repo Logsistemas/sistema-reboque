@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Faturamento</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="top">
+  <span>💰 Faturamento</span>
+  <span><a href="/">Central</a><a href="/operacao">Operação ao vivo</a><a href="/historico">Histórico / Relatórios</a></span>
+</div>
+<div class="page">
+  <div class="card">
+    <h2>Filtros de faturamento</h2>
+    <form method="get" action="/faturamento" class="row">
+      <input type="date" name="data_ini" value="{{filtros.data_ini}}">
+      <input type="date" name="data_fim" value="{{filtros.data_fim}}">
+      <input name="seguradora" placeholder="Seguradora" value="{{filtros.seguradora}}">
+      <input name="motorista" placeholder="Motorista" value="{{filtros.motorista}}">
+      <select name="status_faturamento">
+        <option value="">Todos status</option>
+        <option value="para_conferir" {{'selected' if filtros.status_faturamento=='para_conferir' else ''}}>Para conferir</option>
+        <option value="para_faturar" {{'selected' if filtros.status_faturamento=='para_faturar' else ''}}>Para faturar</option>
+        <option value="negociacao" {{'selected' if filtros.status_faturamento=='negociacao' else ''}}>Para negociar</option>
+        <option value="faturado" {{'selected' if filtros.status_faturamento=='faturado' else ''}}>Faturado</option>
+      </select>
+      <button>Filtrar</button>
+    </form>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi"><small>Serviços</small><br><b>{{kpis.total_servicos}}</b></div>
+    <div class="kpi"><small>Valor total</small><br><b>{{kpis.valor_total}}</b></div>
+    <div class="kpi"><small>Para conferir</small><br><b>{{kpis.para_conferir}}</b></div>
+    <div class="kpi"><small>Para faturar</small><br><b>{{kpis.para_faturar}}</b></div>
+    <div class="kpi"><small>Faturados</small><br><b>{{kpis.faturado}}</b></div>
+  </div>
+
+  <div class="card overflow">
+    <h2>Serviços para faturamento</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Protocolo</th><th>Data</th><th>Seguradora</th><th>Tipo</th><th>Status operação</th><th>Status fat.</th><th>Motorista</th><th>Placa</th><th>Valor</th><th>Ação</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in servicos %}
+        <tr>
+          <td>{{s.protocolo}}</td>
+          <td>{{s.created_at}}</td>
+          <td>{{s.seguradora}}</td>
+          <td>{{s.tipo}}</td>
+          <td><span class="pill">{{s.status}}</span></td>
+          <td><span class="badge-fat {{s.status_faturamento}}">{{s.status_faturamento}}</span></td>
+          <td>{{s.motorista_nome}}</td>
+          <td>{{s.placa_veiculo_removido or s.placa_removida}}</td>
+          <td><b>{{s.valor_total_fmt}}</b></td>
+          <td>
+            <a class="btn dark" href="/faturamento/{{s.id}}">Auditar</a>
+            <form method="post" action="/faturamento/{{s.id}}/status" style="display:inline">
+              <input type="hidden" name="status_faturamento" value="para_faturar">
+              <button>Para faturar</button>
+            </form>
+            <form method="post" action="/faturamento/{{s.id}}/status" style="display:inline">
+              <input type="hidden" name="status_faturamento" value="negociacao">
+              <button type="submit">Negociar</button>
+            </form>
+            <form method="post" action="/faturamento/{{s.id}}/status" style="display:inline">
+              <input type="hidden" name="status_faturamento" value="faturado">
+              <button type="submit">Faturado</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+</body>
+</html>

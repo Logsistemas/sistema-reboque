@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Auditoria do serviço</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="top">
+  <span>💰 Auditoria / Fechamento</span>
+  <span><a href="/">Central</a><a href="/faturamento">Faturamento</a></span>
+</div>
+<div class="page">
+  <div class="card">
+    <h2>Serviço {{s.protocolo}}</h2>
+    <p><b>Seguradora:</b> {{s.seguradora}} | <b>Motorista:</b> {{s.motorista_nome}} | <b>Placa:</b> {{s.placa_veiculo_removido or s.placa_removida}}</p>
+    <p><b>Origem:</b> {{s.origem}}<br><b>Destino:</b> {{s.destino}}</p>
+    <p><b>Status operação:</b> {{s.status}} | <b>Status faturamento:</b> {{s.status_faturamento}} | <b>Total:</b> {{s.valor_total_fmt}}</p>
+  </div>
+
+  <form class="card" method="post" action="/faturamento/{{s.id}}/salvar">
+    <h2>Itens financeiros</h2>
+    <div class="row">
+      <select name="tipo" id="tipo-servico" onchange="carregarPadrao()">
+        {% for t in tipos_servico %}
+        <option value="{{t}}" {{'selected' if t==s.tipo else ''}}>{{t}}</option>
+        {% endfor %}
+      </select>
+      <select name="status_faturamento">
+        <option value="para_conferir" {{'selected' if s.status_faturamento=='para_conferir' else ''}}>Para conferir</option>
+        <option value="para_faturar" {{'selected' if s.status_faturamento=='para_faturar' else ''}}>Para faturar</option>
+        <option value="negociacao" {{'selected' if s.status_faturamento=='negociacao' else ''}}>Para negociar</option>
+        <option value="faturado" {{'selected' if s.status_faturamento=='faturado' else ''}}>Faturado</option>
+      </select>
+    </div>
+
+    <div id="itens-financeiros">
+      {% for it in itens %}
+      <div class="item-financeiro">
+        <input type="hidden" name="item_nome" value="{{it.nome_item}}">
+        <label>{{it.nome_item}}</label>
+        <input type="number" step="0.01" min="0" name="item_qtd" value="{{it.quantidade}}" oninput="calcularTotal()">
+        <input type="number" step="0.01" min="0" name="item_valor" value="{{it.valor_unitario}}" oninput="calcularTotal()">
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="total-box">Total: <b id="total-servico">{{s.valor_total_fmt}}</b></div>
+    <br>
+    <button>Salvar auditoria / fechamento</button>
+    <a class="btn dark" href="/faturamento">Voltar</a>
+  </form>
+</div>
+
+<script>
+const PRECOS_POR_TIPO = {{ precos_por_tipo|tojson }};
+function brMoney(v){return Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});}
+function calcularTotal(){
+  let total=0;
+  document.querySelectorAll('.item-financeiro').forEach(l=>{
+    const q=Number(l.querySelector('[name="item_qtd"]').value||0);
+    const v=Number(l.querySelector('[name="item_valor"]').value||0);
+    total += q*v;
+  });
+  document.getElementById('total-servico').innerText=brMoney(total);
+}
+function carregarPadrao(){
+  if(!confirm('Carregar itens padrão deste tipo? Isso substitui os itens atuais da tela.')) return;
+  const tipo=document.getElementById('tipo-servico').value;
+  const itens=PRECOS_POR_TIPO[tipo]||[];
+  document.getElementById('itens-financeiros').innerHTML=itens.map(it=>{
+    const nome=it.nome_item||it.nome||'';
+    const valor=Number(it.valor_padrao||0).toFixed(2);
+    const qtd=(nome.toUpperCase()==='SAIDA'||nome.toUpperCase()==='SAÍDA')?1:0;
+    return `<div class="item-financeiro">
+      <input type="hidden" name="item_nome" value="${nome}">
+      <label>${nome}</label>
+      <input type="number" step="0.01" min="0" name="item_qtd" value="${qtd}" oninput="calcularTotal()">
+      <input type="number" step="0.01" min="0" name="item_valor" value="${valor}" oninput="calcularTotal()">
+    </div>`;
+  }).join('');
+  calcularTotal();
+}
+calcularTotal();
+</script>
+</body>
+</html>
