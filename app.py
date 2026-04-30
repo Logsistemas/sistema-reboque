@@ -167,21 +167,105 @@ def criar_servico(protocolo: str=Form(...), seguradora: str=Form(''), tipo: str=
 
 @app.post('/servicos/importar')
 async def importar_servicos(file: UploadFile=File(...)):
-    content=await file.read(); df=pd.read_excel(io.BytesIO(content)); cols={str(c).lower().strip():c for c in df.columns}
+    content = await file.read()
+
+    raw = pd.read_excel(io.BytesIO(content), header=None, dtype=object)
+
+    header_idx = None
+    for i in range(min(15, len(raw))):
+        valores = [str(v).strip().lower() for v in raw.iloc[i].tolist() if pd.notna(v)]
+        linha = " | ".join(valores)
+        if "protocolo" in linha and ("o. logradouro" in linha or "origem" in linha or "d. logradouro" in linha):
+            header_idx = i
+            break
+
+    if header_idx is None:
+        df = pd.read_excel(io.BytesIO(content), dtype=object)
+    else:
+        headers = []
+        usados = {}
+        for v in raw.iloc[header_idx].tolist():
+            h = str(v).strip() if pd.notna(v) and str(v).strip() else "Coluna"
+            if h in usados:
+                usados[h] += 1
+                h = f"{h}_{usados[h]}"
+            else:
+                usados[h] = 1
+            headers.append(h)
+        df = raw.iloc[header_idx + 1:].copy()
+        df.columns = headers
+
+    df = df.dropna(how="all")
+    cols = {str(c).lower().strip(): c for c in df.columns}
+
     def pick(names):
         for n in names:
-            for k,v in cols.items():
-                if n in k: return v
+            alvo = n.lower().strip()
+            for k, v in cols.items():
+                if alvo == k or alvo in k:
+                    return v
         return None
-    c_prot=pick(['protocolo','assistencia','assistência']); c_seg=pick(['seguradora','empresa']); c_tipo=pick(['tipo de serviço','tipo servico','tipo']); c_ori=pick(['origem completa','origem']); c_des=pick(['destino completo','destino'])
-    for _,row in df.iterrows():
-        origem=str(row.get(c_ori,'')).strip() if c_ori else ''; destino=str(row.get(c_des,'')).strip() if c_des else ''
-        if not origem or origem.lower()=='nan': origem=', '.join([str(row.get(x,'')).strip() for x in ['O. Logradouro','O. Bairro','O. Cidade'] if str(row.get(x,'')).strip() and str(row.get(x,'')).strip().lower()!='nan'])
-        if not destino or destino.lower()=='nan': destino=', '.join([str(row.get(x,'')).strip() for x in ['D. Logradouro','D. Bairro','D. Cidade'] if str(row.get(x,'')).strip() and str(row.get(x,'')).strip().lower()!='nan'])
-        if origem and destino and origem.lower()!='nan' and destino.lower()!='nan':
-            protocolo=str(row.get(c_prot,f'IMP-{uuid.uuid4().hex[:6]}')).strip() if c_prot else f'IMP-{uuid.uuid4().hex[:6]}'; seguradora=str(row.get(c_seg,'')).strip() if c_seg else ''; tipo=str(row.get(c_tipo,'')).strip() if c_tipo else ''
-            new=one("insert into servicos (protocolo,seguradora,tipo,origem,destino,observacao,status,criado_em,atualizado_em) values (%s,%s,%s,%s,%s,'Importado do Excel','novo',now(),now()) returning id",(protocolo,seguradora,tipo,origem,destino)); registrar_evento_db(new["id"],"novo","Importado do Excel")
-    return RedirectResponse('/',303)
+
+    def val(row, col):
+        if not col:
+            return ""
+        v = row.get(col, "")
+        if pd.isna(v):
+            return ""
+        if isinstance(v, float) and v.is_integer():
+            return str(int(v))
+        return str(v).strip()
+
+    def juntar_endereco(row, prefixo):
+        partes = []
+        for col in [f"{prefixo}. Logradouro", f"{prefixo}. Bairro", f"{prefixo}. Cidade"]:
+            v = val(row, col)
+            if v and v.lower() != "nan":
+                partes.append(v)
+        return ", ".join(partes)
+
+    c_prot = pick(["protocolo", "assistencia", "assistência"])
+    c_seg = pick(["seguradora", "empresa", "produto"])
+    c_tipo = pick(["tipo de serviço", "tipo servico", "tipo"])
+    c_ori = pick(["origem completa", "origem"])
+    c_des = pick(["destino completa", "destino completo", "destino"])
+    c_obs = pick(["comentários", "comentarios", "observação", "observacao", "beneficiário", "beneficiario"])
+
+    importados = 0
+
+    for _, row in df.iterrows():
+        origem = val(row, c_ori)
+        destino = val(row, c_des)
+
+        if not origem:
+            origem = juntar_endereco(row, "O")
+        if not destino:
+            destino = juntar_endereco(row, "D")
+
+        protocolo = val(row, c_prot) or f"IMP-{uuid.uuid4().hex[:6]}"
+        seguradora = val(row, c_seg)
+        tipo = val(row, c_tipo)
+
+        obs_partes = []
+        obs_base = val(row, c_obs)
+        if obs_base:
+            obs_partes.append(obs_base)
+        for label in ["Veículo / Objeto", "Placa", "Cor", "Beneficiário", "Telefone", "Senha", "CNPJ", "Status"]:
+            v = val(row, label)
+            if v:
+                obs_partes.append(f"{label}: {v}")
+        observacao = " | ".join(obs_partes) or "Importado do Excel AutEM"
+
+        if origem and destino and origem.lower() != "nan" and destino.lower() != "nan":
+            new = one(
+                "insert into servicos (protocolo,seguradora,tipo,origem,destino,observacao,status,criado_em,atualizado_em) values (%s,%s,%s,%s,%s,%s,'novo',now(),now()) returning id",
+                (protocolo, seguradora, tipo, origem, destino, observacao)
+            )
+            registrar_evento_db(new["id"], "novo", "Importado do Excel AutEM")
+            importados += 1
+
+    return RedirectResponse('/?importados=' + str(importados), 303)
+
 
 @app.post('/servicos/{sid}/enviar')
 def enviar_servico(sid: str, motorista_id: str=Form(...)):
