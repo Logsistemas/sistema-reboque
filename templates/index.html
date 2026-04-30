@@ -1,19 +1,67 @@
-<!doctype html><html lang="pt-br"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sistema Reboque</title><link rel="stylesheet" href="/static/style.css"><link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"><script src="https://unpkg.com/leaflet/dist/leaflet.js"></script></head>
-<body><div class="top"><span>🚛 Sistema Interno de Reboque — Operação Online</span><span><a href="/">Central</a><a href="/operacao">Operação ao vivo</a><a href="/historico">Histórico / Relatórios</a></span></div>
-<div class="layout"><aside>
-<div class="card"><h3>Cadastrar motorista</h3><form method="post" action="/motoristas"><input name="nome" placeholder="Nome" required><input name="telefone" placeholder="Telefone"><div class="row"><input name="veiculo" placeholder="Veículo"><input name="placa" placeholder="Placa"></div><input name="tipo" placeholder="Tipo: leve, pesado, moto..."><button>Cadastrar</button></form></div>
-<div class="card"><h3>Novo serviço</h3><form method="post" action="/servicos"><input name="protocolo" placeholder="Protocolo" required><input name="seguradora" placeholder="Seguradora"><input name="tipo" placeholder="Tipo de serviço"><textarea name="origem" placeholder="Origem completa" required></textarea><textarea name="destino" placeholder="Destino completo" required></textarea><textarea name="observacao" placeholder="Observação"></textarea><button>Criar serviço</button></form></div>
-<div class="card"><h3>Importar Excel</h3><form method="post" action="/servicos/importar" enctype="multipart/form-data"><input type="file" name="file" accept=".xlsx,.xls" required><button>Importar serviços</button></form><p class="muted">Importação inicial. Integração direta com seguradoras depende de API/acesso delas.</p></div>
-<div class="card"><h3>Exportar</h3><a class="btn dark" href="/exportar">Baixar relatório Excel</a></div>
-<div class="card"><h3>Som da central</h3><button class="btn green" onclick="ativarSom()">Ativar som</button><p class="muted" id="somStatus">Som desativado</p></div>
-</aside><main>
-<div class="card"><h2>Mapa dos motoristas</h2><div id="map" class="map"></div><p class="muted">O motorista precisa abrir a Área do Motorista no celular e permitir localização.</p></div>
-<div class="card overflow"><h2>Motoristas</h2><table><thead><tr><th>Nome</th><th>Veículo</th><th>Status</th><th>Última posição</th><th>Link motorista</th></tr></thead><tbody>{% for m in motoristas %}<tr><td>{{m.nome}}</td><td>{{m.veiculo}} {{m.placa}}</td><td><span class="pill {{'online' if m.online else 'offline'}}">{{'Online' if m.online else 'Offline'}}</span></td><td>{{m.ultima_atualizacao}}</td><td><a href="/motorista/{{m.id}}" target="_blank">abrir</a><br><span class="muted">Online: https://sistema-reboque.onrender.com/motorista/{{m.id}}</span></td></tr>{% endfor %}</tbody></table></div>
-<div class="card overflow"><h2>Serviços</h2><table><thead><tr><th>ID</th><th>Protocolo</th><th>Seguradora</th><th>Tipo</th><th>Origem → Destino</th><th>Status</th><th>Motorista</th><th>Placa removido</th><th>Fotos</th><th>Último evento</th><th>Ação</th></tr></thead><tbody>{% for s in servicos %}<tr><td>{{loop.index}}</td><td>{{s.protocolo}}</td><td>{{s.seguradora}}</td><td>{{s.tipo}}</td><td><b>{{s.origem}}</b><br>→ {{s.destino}}<br><a target="_blank" href="https://www.google.com/maps/dir/?api=1&origin={{s.origem|urlencode}}&destination={{s.destino|urlencode}}">rota</a></td><td><span class="pill">{{s.status}}</span></td><td>{{s.motorista_nome}}</td><td><b>{{s.placa_veiculo_removido or s.placa_removida}}</b></td><td>{% for f in s.fotos %}<a href="{{f.url}}" target="_blank">foto {{loop.index}}</a><br>{% endfor %}</td><td class="muted">{{s.ultimo_evento}}</td><td><form method="post" action="/servicos/{{s.id}}/enviar"><select name="motorista_id">{% for m in motoristas %}<option value="{{m.id}}">{{m.nome}} {{'🟢' if m.online else ''}}</option>{% endfor %}</select><button>Enviar para celular</button></form></td></tr>{% endfor %}</tbody></table></div>
-</main></div>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Sistema Reboque - Central</title>
+</head>
+<body>
+
+<h2>Serviços</h2>
+
+<table border="1">
+<thead>
+<tr>
+<th>ID</th>
+<th>Protocolo</th>
+<th>Seguradora</th>
+<th>Tipo</th>
+<th>Origem → Destino</th>
+<th>Status</th>
+<th>Motorista</th>
+<th>Placa</th>
+<th>Fotos</th>
+<th>Último evento</th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+
 <script>
-let somAtivo=false, ultimoEstado={};function beep(freq=880,duration=180){if(!somAtivo)return;try{const ctx=new (window.AudioContext||window.webkitAudioContext)();const osc=ctx.createOscillator();const gain=ctx.createGain();osc.frequency.value=freq;osc.connect(gain);gain.connect(ctx.destination);osc.start();gain.gain.exponentialRampToValueAtTime(0.0001,ctx.currentTime+duration/1000);osc.stop(ctx.currentTime+duration/1000)}catch(e){}}
-function ativarSom(){somAtivo=true;localStorage.setItem('somAtivo','1');document.getElementById('somStatus').innerText='Som ativado';beep(900,220)}if(localStorage.getItem('somAtivo')==='1'){somAtivo=true;setTimeout(()=>{let el=document.getElementById('somStatus');if(el)el.innerText='Som ativado'},300)}
-const map=L.map('map').setView([-22.90,-43.30],9);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);let markers={};
-function refresh(){fetch('/api/motoristas').then(r=>r.json()).then(ms=>{ms.forEach(m=>{if(m.lat&&m.lng){let txt=m.nome+' - '+(m.online?'Online':'Offline');if(!markers[m.id])markers[m.id]=L.marker([m.lat,m.lng]).addTo(map);markers[m.id].setLatLng([m.lat,m.lng]).bindPopup(txt)}})});fetch('/api/servicos').then(r=>r.json()).then(ss=>{ss.forEach(s=>{let key=s.id,val=(s.status||'')+'|'+(s.placa_veiculo_removido||'')+'|'+(s.fotos?s.fotos.length:0);if(ultimoEstado[key]&&ultimoEstado[key]!==val){beep(760,180);if(Notification&&Notification.permission==='granted')new Notification('Serviço atualizado',{body:(s.motorista_nome||'Motorista')+' - '+(s.status||'')})}ultimoEstado[key]=val})})}if(Notification&&Notification.permission!=='granted')Notification.requestPermission();setInterval(refresh,4000);refresh();
-</script></body></html>
+async function atualizarCentral() {
+    try {
+        const res = await fetch('/api/servicos');
+        const data = await res.json();
+
+        let tabela = document.querySelector("table tbody");
+        tabela.innerHTML = "";
+
+        data.forEach(servico => {
+            let linha = `
+                <tr>
+                    <td>${servico.id}</td>
+                    <td>${servico.protocolo}</td>
+                    <td>${servico.seguradora}</td>
+                    <td>${servico.tipo}</td>
+                    <td>${servico.origem} → ${servico.destino}</td>
+                    <td>${servico.status}</td>
+                    <td>${servico.motorista || '-'}</td>
+                    <td>${servico.placa || '-'}</td>
+                    <td>${servico.fotos ? '✔' : '-'}</td>
+                    <td>${servico.ultimo_evento || '-'}</td>
+                </tr>
+            `;
+            tabela.innerHTML += linha;
+        });
+
+    } catch (err) {
+        console.log("Erro:", err);
+    }
+}
+
+setInterval(atualizarCentral, 5000);
+atualizarCentral();
+</script>
+
+</body>
+</html>
