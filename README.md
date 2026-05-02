@@ -40,3 +40,10 @@ Novidades:
 - Distância por Google Maps no modal de envio/troca.
 - Ranking por online/livre e menor distância.
 - Fallback aproximado quando Google não retornar rota.
+
+
+## V31
+- Central mostra somente serviços do dia que não estejam finalizados.
+- Motorista envia GPS automaticamente ao entrar e a cada 30 segundos.
+- Distância exibe mensagens claras quando faltar GPS/origem/chave Google.
+- Banco ganha origem_lat/origem_lng para cache de geolocalização.

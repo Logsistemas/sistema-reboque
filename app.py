@@ -536,7 +536,9 @@ def init_db():
             "alter table servicos add column if not exists cor_cliente text;",
             "alter table servicos add column if not exists cnpj_cliente text;",
             "alter table servicos add column if not exists referencia_origem text;",
-            "alter table servicos add column if not exists referencia_destino text;"]
+            "alter table servicos add column if not exists referencia_destino text;",
+            "alter table servicos add column if not exists origem_lat double precision;",
+            "alter table servicos add column if not exists origem_lng double precision;"]
             for a in alters: cur.execute(a)
             cur.execute("select count(*) as total from tabela_precos")
             total_precos = cur.fetchone()["total"]
@@ -651,15 +653,17 @@ def lista_servicos(limit=None, ativos=False, filtros=None):
 
 def lista_servicos_hoje(limit=200):
     """
-    Central operacional: mostra somente os serviços do dia atual.
-    Usa created_at para evitar erro de tipos no PostgreSQL.
-    Histórico e relatórios continuam mostrando tudo normalmente.
+    Central operacional:
+    - mostra somente serviços do dia atual
+    - NÃO mostra serviços finalizados
+    - histórico/relatórios continuam mostrando tudo
     """
     limit = int(limit or 200)
     rows = q(f"""
         select *
         from servicos
         where created_at::date = current_date
+          and coalesce(status,'novo') <> 'finalizado'
         order by created_at desc
         limit {limit}
     """, fetch=True)
@@ -1045,11 +1049,14 @@ def obter_origem_lat_lng(servico):
 @app.get('/api/servicos/{sid}/motoristas')
 def api_motoristas_para_servico(sid: str):
     s = servico_by_id(sid)
-    ms = listar_motoristas()
+    ms = lista_motoristas()
 
     origem_lat = origem_lng = None
+    origem_status = ""
     if s:
         origem_lat, origem_lng = obter_origem_lat_lng(s)
+        if not origem_lat or not origem_lng:
+            origem_status = "origem não localizada"
 
     saida = []
     for m in ms:
@@ -1064,11 +1071,11 @@ def api_motoristas_para_servico(sid: str):
         mlng = m.get("lng")
 
         if not mlat or not mlng:
-            calculo_status = "motorista sem localização"
+            calculo_status = "motorista sem GPS"
         elif not origem_lat or not origem_lng:
-            calculo_status = "origem sem geolocalização"
+            calculo_status = origem_status or "origem sem geolocalização"
         else:
-            # 1º tenta Google por rota real de carro
+            # 1º tenta rota real do Google
             dist_txt, dur_txt, dist_metros = google_distance_matrix(mlat, mlng, origem_lat, origem_lng)
 
             # 2º fallback: distância aproximada em linha reta
@@ -1094,11 +1101,6 @@ def api_motoristas_para_servico(sid: str):
             "calculo_status": calculo_status
         })
 
-    # Ordem igual central profissional:
-    # 1) online e livre
-    # 2) menor distância
-    # 3) online ocupado
-    # 4) offline
     saida.sort(key=lambda x: (
         0 if x.get("online") and not x.get("ocupado") else 1 if x.get("online") else 2,
         999999999 if x.get("distancia_valor") is None else x.get("distancia_valor"),
@@ -1136,7 +1138,15 @@ class LocationPayload(BaseModel):
     lat: float; lng: float; online: bool=True
 @app.post('/api/motoristas/{mid}/localizacao')
 def atualizar_localizacao(mid: str, payload: LocationPayload):
-    q("update motoristas set lat=%s,lng=%s,online=%s,ultima_atualizacao=now() where id=%s",(payload.lat,payload.lng,payload.online,str(mid))); return {'ok':True,'motorista':motorista_by_id(mid)}
+    q("""
+        update motoristas
+           set lat=%s,
+               lng=%s,
+               online=true,
+               ultima_atualizacao=now()
+         where id=%s
+    """, (payload.lat, payload.lng, str(mid)))
+    return {'ok': True, 'motorista': motorista_by_id(mid)}
 @app.post('/api/motoristas/{mid}/offline')
 def motorista_offline(mid: str):
     q("update motoristas set online=false,ultima_atualizacao=now() where id=%s",(str(mid),)); return {'ok':True}

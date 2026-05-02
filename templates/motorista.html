@@ -37,6 +37,25 @@ function finalizar(id){if(!confirm('Finalizar serviço no destino?'))return;paus
 function card(s){let fotos=(s.fotos||[]).map((f,i)=>`<a href="${f.url}" target="_blank">foto ${i+1}</a>`).join(' ');return `<div class="service-card"><h3>${s.protocolo||''} - ${s.tipo||''}</h3><p><b>${s.seguradora||''}</b></p><p><b>Origem:</b> ${s.origem||''}</p><p><b>Destino:</b> ${s.destino||''}</p><p><b>Status:</b> <span class="pill">${s.status||''}</span></p><a class="btn dark" target="_blank" href="https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(s.origem||'')}&destination=${encodeURIComponent(s.destino||'')}">Abrir rota</a><div class="status-actions" style="margin-top:10px"><button onclick="statusServico('${s.id}','aceito')">Aceitar</button><button class="btn red" onclick="statusServico('${s.id}','recusado')">Recusar</button><button onclick="statusServico('${s.id}','a caminho')">A caminho</button><button onclick="statusServico('${s.id}','na origem')">Na origem</button><button onclick="statusServico('${s.id}','em transporte')">Em transporte</button></div><hr><label><b>Placa do veículo removido</b></label><input id="placa_${s.id}" onfocus="pausarAtualizacao(30000)" oninput="pausarAtualizacao(30000)" value="${s.placa_veiculo_removido||s.placa_removida||''}" placeholder="Ex: ABC1D23"><button class="btn green" onclick="enviarPlaca('${s.id}')">Enviar placa para a central</button><hr><label><b>Fotos / checklist do veículo</b></label><input id="fotos_${s.id}" type="file" accept="image/*" multiple onchange="pausarAtualizacao(90000)"><button id="btn_fotos_${s.id}" class="btn dark" onclick="enviarFotos('${s.id}')">Enviar fotos/checklist para a central</button><p class="muted">Fotos já enviadas: ${fotos||'nenhuma'}</p><hr><button class="btn gray" onclick="finalizar('${s.id}')">Finalizar serviço no destino</button></div>`}
 function carregar(forcar=false){if(motoristaInteragindo&&!forcar)return;fetch(`/api/motorista/${MID}/servicos`).then(r=>r.json()).then(ss=>{document.getElementById('servicos').innerHTML=ss.length?ss.map(card).join(''):'Nenhum serviço enviado no momento.'})}
 if(MID){carregar(true);setInterval(()=>carregar(false),5000)}
+
+function enviarLocalizacaoSilenciosa(){
+  if(!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(pos=>{
+    fetch(`/api/motoristas/${MID}/localizacao`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({lat:pos.coords.latitude,lng:pos.coords.longitude,online:true})
+    }).then(()=>{
+      const el=document.getElementById('statusLoc');
+      if(el) el.innerText='Online - GPS atualizado: '+new Date().toLocaleTimeString();
+    }).catch(()=>{});
+  },()=>{}, {enableHighAccuracy:true, timeout:12000, maximumAge:15000});
+}
+window.addEventListener('load', ()=>{
+  setTimeout(enviarLocalizacaoSilenciosa, 800);
+  setInterval(enviarLocalizacaoSilenciosa, 30000);
+});
+
 </script>
 </body>
 </html>

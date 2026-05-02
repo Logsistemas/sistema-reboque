@@ -358,7 +358,7 @@ async function abrirModalMotorista(servicoId) {
   }
 
   form.action = `/servicos/${servicoId}/enviar`;
-  lista.innerHTML = '<p class="muted">Calculando motoristas mais próximos...</p>';
+  lista.innerHTML = '<p class="muted">Calculando distância dos motoristas até a origem do serviço...</p>';
   modal.style.display = 'flex';
 
   try {
@@ -382,7 +382,7 @@ async function abrirModalMotorista(servicoId) {
   lista.innerHTML = `
     <div class="ranking-header">
       <span>Profissionais</span>
-      <span class="muted">ordenado por disponibilidade e distância</span>
+      <span class="muted">livres primeiro, depois menor distância</span>
     </div>
   ` + ms.map((m, idx) => {
     const online = !!m.online;
