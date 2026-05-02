@@ -6,18 +6,10 @@
   <title>Sistema Reboque</title>
   <link rel="stylesheet" href="/static/style.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js">
-function abrirModal(id){const el=document.getElementById(id); if(el) el.style.display='flex';}
-function fecharModal(id){const el=document.getElementById(id); if(el) el.style.display='none';}
-function abrirModalNovoServico(){abrirModal('modalNovoServico');}
-function abrirModalImportar(){abrirModal('modalImportar');}
-function abrirModalMotoristaCadastro(){abrirModal('modalMotoristaCadastro');}
-function abrirModalVeiculoCadastro(){abrirModal('modalVeiculoCadastro');}
-function abrirModalUsuarioCadastro(){abrirModal('modalUsuarioCadastro');}
-document.addEventListener('click', function(e){
-  document.querySelectorAll('.modal-sistema').forEach(m => { if(e.target === m) m.style.display='none'; });
-});
-
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script>
+function abrirModal(id){const el=document.getElementById(id); if(el) el.style.display="flex";}
+function fecharModal(id){const el=document.getElementById(id); if(el) el.style.display="none";}
 </script>
 
 <style>
@@ -337,20 +329,6 @@ async function atualizarCentral() {
   }
 }
 
-setInterval(atualizarCentral, 5000);
-atualizarCentral();
-
-
-let motoristasCache = window.motoristasCache || [];
-
-function safe(v){
-  return (v ?? '').toString()
-    .replaceAll('&','&amp;')
-    .replaceAll('<','&lt;')
-    .replaceAll('>','&gt;')
-    .replaceAll('"','&quot;')
-    .replaceAll("'","&#039;");
-}
 
 async function abrirModalMotorista(servicoId) {
   const modal = document.getElementById('modalMotorista');
@@ -358,7 +336,7 @@ async function abrirModalMotorista(servicoId) {
   const lista = document.getElementById('listaMotoristasModal');
 
   if (!modal || !form || !lista) {
-    alert('Não encontrei a janela de seleção de motorista. Atualize com Ctrl + Shift + R.');
+    alert('Janela de motoristas não encontrada. Atualize com Ctrl + Shift + R.');
     return;
   }
 
@@ -368,15 +346,12 @@ async function abrirModalMotorista(servicoId) {
 
   try {
     const resp = await fetch('/api/motoristas?ts=' + Date.now(), {cache:'no-store'});
-    if (resp.ok) {
-      motoristasCache = await resp.json();
-    }
+    if (resp.ok) motoristasCache = await resp.json();
   } catch(e) {
-    console.error(e);
+    console.log('Erro ao carregar motoristas:', e);
   }
 
   const ms = motoristasCache || [];
-
   if (!ms.length) {
     lista.innerHTML = '<p class="muted">Nenhum motorista cadastrado.</p>';
     return;
@@ -389,7 +364,7 @@ async function abrirModalMotorista(servicoId) {
     return `
       <label class="motorista-opcao">
         <span>
-          <input type="radio" name="motorista_id" value="${safe(m.id)}" ${checked}>
+          <input type="radio" name="motorista_id" value="${m.id}" ${checked}>
           <b>${safe(m.nome)}</b><br>
           <span class="muted">${online ? 'Online' : 'Offline'} — Placa atual: ${safe(placaAtual || '-')}</span>
         </span>
@@ -408,6 +383,10 @@ document.addEventListener('click', function(e){
   const modal = document.getElementById('modalMotorista');
   if (modal && e.target === modal) fecharModalMotorista();
 });
+
+setInterval(atualizarCentral, 5000);
+atualizarCentral();
+
 
 </script>
 
