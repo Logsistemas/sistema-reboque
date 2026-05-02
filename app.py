@@ -513,6 +513,11 @@ def init_db():
             "alter table motoristas add column if not exists lng double precision;",
             "alter table motoristas add column if not exists ultima_atualizacao timestamp;",
             "alter table motoristas add column if not exists ativo boolean default true;",
+            "alter table motoristas add column if not exists login text;",
+            "alter table motoristas add column if not exists senha text;",
+            "alter table motoristas add column if not exists placa_atual text;",
+            "alter table motoristas add column if not exists ultimo_login timestamp;",
+
             "alter table servicos add column if not exists observacao text;",
             "alter table servicos add column if not exists motorista_nome text;",
             "alter table servicos add column if not exists placa_removida text;",
@@ -610,7 +615,7 @@ def criar_itens_para_servico(servico_id, tipo_servico, nomes=None, qtds=None, va
 
 def normalizar_motorista(m):
     if not m: return None
-    m=dict(m); m["id"]=str(m["id"]); m["ultima_atualizacao"]=dt_str(m.get("ultima_atualizacao")); m["created_at"]=dt_str(m.get("created_at")); return m
+    m=dict(m); m["id"]=str(m["id"]); m["placa_atual"]=m.get("placa_atual") or m.get("placa"); m["ultima_atualizacao"]=dt_str(m.get("ultima_atualizacao")); m["created_at"]=dt_str(m.get("created_at")); return m
 def fotos_do_servico(servico_id):
     return [dict(r) for r in q("select url, filename, created_at from fotos where servico_id=%s order by created_at asc",(str(servico_id),), True)]
 def normalizar_servico(s, incluir_fotos=True):
@@ -726,11 +731,12 @@ def operacao(request: Request):
 @app.post('/motoristas')
 async def criar_motorista(request: Request):
     form = await request.form()
-    q("""insert into motoristas (nome,telefone,veiculo,placa,tipo,cpf,cnh,vencimento_cnh,nascimento,estado_civil,endereco,online,ultima_atualizacao)
-         values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,false,now())""", (
+    q("""insert into motoristas (nome,telefone,veiculo,placa,placa_atual,tipo,cpf,cnh,vencimento_cnh,nascimento,estado_civil,endereco,login,senha,online,ultima_atualizacao)
+         values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,false,now())""", (
         form.get('nome','').strip(), form.get('telefone','').strip(), form.get('veiculo','').strip(), form.get('placa','').strip(),
-        form.get('tipo','').strip(), form.get('cpf','').strip(), form.get('cnh','').strip(), form.get('vencimento_cnh','').strip(),
-        form.get('nascimento','').strip(), form.get('estado_civil','').strip(), form.get('endereco','').strip()
+        form.get('placa','').strip().upper(), form.get('tipo','').strip(), form.get('cpf','').strip(), form.get('cnh','').strip(), form.get('vencimento_cnh','').strip(),
+        form.get('nascimento','').strip(), form.get('estado_civil','').strip(), form.get('endereco','').strip(),
+        form.get('login','').strip(), form.get('senha','').strip()
     ))
     return RedirectResponse('/',303)
 @app.post('/servicos')
@@ -899,6 +905,37 @@ def motorista_offline(mid: str):
 def api_motoristas(): return lista_motoristas()
 @app.get('/api/servicos')
 def api_servicos(): return lista_servicos(limit=200)
+
+@app.get('/motorista/login', response_class=HTMLResponse)
+def motorista_login_page(request: Request):
+    return templates.TemplateResponse('motorista_login.html', {'request': request, 'erro': None})
+
+@app.post('/motorista/login')
+async def motorista_login(request: Request):
+    form = await request.form()
+    login = (form.get('login') or '').strip()
+    senha = (form.get('senha') or '').strip()
+    placa = (form.get('placa') or '').upper().replace('-', '').replace(' ', '').strip()
+
+    if not login or not senha or not placa:
+        return templates.TemplateResponse('motorista_login.html', {'request': request, 'erro': 'Preencha login, senha e placa do veículo do dia.'})
+
+    m = one("""
+        select * from motoristas
+        where coalesce(ativo,true)=true
+          and (lower(coalesce(login,''))=lower(%s) or regexp_replace(coalesce(cpf,''),'[^0-9]','','g')=regexp_replace(%s,'[^0-9]','','g'))
+          and coalesce(senha,'')=%s
+        limit 1
+    """, (login, login, senha))
+
+    if not m:
+        return templates.TemplateResponse('motorista_login.html', {'request': request, 'erro': 'Login ou senha inválidos.'})
+
+    mid = str(m['id'])
+    q("update motoristas set placa_atual=%s, placa=%s, online=true, ultima_atualizacao=now(), ultimo_login=now() where id=%s", (placa, placa, mid))
+    return RedirectResponse(f'/motorista/{mid}', 303)
+
+
 @app.get('/motorista/{mid}', response_class=HTMLResponse)
 def tela_motorista(mid: str, request: Request):
     return templates.TemplateResponse('motorista.html', {'request':request,'m':motorista_by_id(mid)})
