@@ -15,3 +15,7 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#f3f6fa;color:#0
 .badge-fat.para_faturar{background:#e0f2fe}
 .badge-fat.para_conferir{background:#fef3c7}
 @media(max-width:900px){.kpi-grid{grid-template-columns:1fr 1fr}.item-financeiro{grid-template-columns:1fr}}
+
+.clickable-row{cursor:pointer}
+.clickable-row:hover{background:#f8fbff}
+.clickable-row a,.clickable-row button,.clickable-row select,.clickable-row input{cursor:pointer}

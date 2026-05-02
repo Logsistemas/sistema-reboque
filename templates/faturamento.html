@@ -47,8 +47,8 @@
       </thead>
       <tbody>
         {% for s in servicos %}
-        <tr>
-          <td><a href="/faturamento/{{s.id}}">{{s.protocolo}}</a></td>
+        <tr class="clickable-row" onclick="window.location.href='/faturamento/{{s.id}}'">
+          <td>{{s.protocolo}}</td>
           <td>{{s.created_at}}</td>
           <td>{{s.seguradora}}</td>
           <td>{{s.tipo}}</td>
@@ -57,7 +57,7 @@
           <td>{{s.motorista_nome}}</td>
           <td>{{s.placa_veiculo_removido or s.placa_removida}}</td>
           <td><b>{{s.valor_total_fmt}}</b></td>
-          <td>
+          <td onclick="event.stopPropagation()">
             <a class="btn dark" href="/faturamento/{{s.id}}">Auditar</a>
             <form method="post" action="/faturamento/{{s.id}}/status" style="display:inline">
               <input type="hidden" name="status_faturamento" value="para_faturar">

@@ -137,7 +137,7 @@
         </thead>
         <tbody id="servicos-body">
           {% for s in servicos %}
-          <tr>
+          <tr class="clickable-row" onclick="abrirDetalhes('{{s.id}}')">
             <td>{{loop.index}}</td>
             <td><a href="/faturamento/{{s.id}}">{{s.protocolo}}</a></td>
             <td>{{s.seguradora}}</td>
@@ -145,21 +145,21 @@
             <td>
               <b>{{s.origem}}</b><br>
               → {{s.destino}}<br>
-              <a target="_blank" href="https://www.google.com/maps/dir/?api=1&origin={{s.origem|urlencode}}&destination={{s.destino|urlencode}}">rota</a>
+              <a onclick="event.stopPropagation()" target="_blank" href="https://www.google.com/maps/dir/?api=1&origin={{s.origem|urlencode}}&destination={{s.destino|urlencode}}">rota</a>
             </td>
             <td><span class="pill">{{s.status}}</span></td>
             <td>{{s.motorista_nome}}</td>
             <td><b>{{s.placa_veiculo_removido or s.placa_removida}}</b></td>
             <td>
               {% for f in s.fotos %}
-              <a href="{{f.url}}" target="_blank">foto {{loop.index}}</a><br>
+              <a onclick="event.stopPropagation()" href="{{f.url}}" target="_blank">foto {{loop.index}}</a><br>
               {% endfor %}
             </td>
             <td class="muted">{{s.ultimo_evento}}</td>
             <td><b>{{s.valor_total_fmt}}</b></td>
             <td><span class="pill">{{s.status_faturamento}}</span></td>
             <td>
-              <form method="post" action="/servicos/{{s.id}}/enviar">
+              <form onclick="event.stopPropagation()" method="post" action="/servicos/{{s.id}}/enviar">
                 <select name="motorista_id">
                   {% for m in motoristas %}
                   <option value="{{m.id}}">{{m.nome}} {{'🟢' if m.online else ''}}</option>
@@ -180,6 +180,7 @@
 let somAtivo = false;
 let ultimoEstado = {};
 let motoristasCache = [];
+function abrirDetalhes(id) { if (id) window.location.href = `/faturamento/${id}`; }
 
 function safe(v) {
   return (v === null || v === undefined || v === '') ? '-' : String(v);
@@ -318,12 +319,12 @@ function renderServicos(ss) {
     const placa = s.placa_veiculo_removido || s.placa_removida || '';
     const fotos = Array.isArray(s.fotos) ? s.fotos : [];
     const fotosHtml = fotos.length
-      ? fotos.map((f, i) => `<a href="${f.url}" target="_blank">foto ${i+1}</a><br>`).join('')
+      ? fotos.map((f, i) => `<a onclick="event.stopPropagation()" href="${f.url}" target="_blank">foto ${i+1}</a><br>`).join('')
       : '';
     const rota = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(s.origem || '')}&destination=${encodeURIComponent(s.destino || '')}`;
 
     return `
-      <tr>
+      <tr class="clickable-row" onclick="abrirDetalhes('${s.id}')">
         <td>${idx + 1}</td>
         <td>${safe(s.protocolo)}</td>
         <td>${safe(s.seguradora)}</td>
@@ -331,7 +332,7 @@ function renderServicos(ss) {
         <td>
           <b>${safe(s.origem)}</b><br>
           → ${safe(s.destino)}<br>
-          <a target="_blank" href="${rota}">rota</a>
+          <a onclick="event.stopPropagation()" target="_blank" href="${rota}">rota</a>
         </td>
         <td><span class="pill">${safe(s.status)}</span></td>
         <td>${safe(s.motorista_nome)}</td>
@@ -341,7 +342,7 @@ function renderServicos(ss) {
         <td><b>${safe(s.valor_total_fmt)}</b></td>
         <td><span class="pill">${safe(s.status_faturamento)}</span></td>
         <td>
-          <form method="post" action="/servicos/${s.id}/enviar">
+          <form onclick="event.stopPropagation()" method="post" action="/servicos/${s.id}/enviar">
             <select name="motorista_id">${opcoesMotoristas()}</select>
             <button>Enviar para celular</button>
           </form>

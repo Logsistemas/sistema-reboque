@@ -11,3 +11,8 @@ Novidades:
 - Nova aba `/faturamento` para auditoria e fechamento.
 - Status de faturamento: para_conferir, para_faturar, negociacao, faturado.
 - Exportação Excel inclui aba Itens_Faturamento.
+
+
+## V15
+- Linhas de serviços clicáveis na Central, Histórico e Faturamento.
+- Serviço importado continua editável no faturamento/detalhes.
