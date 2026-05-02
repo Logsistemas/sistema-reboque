@@ -6,112 +6,76 @@
   <title>Sistema Reboque</title>
   <link rel="stylesheet" href="/static/style.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js">
+function abrirModal(id){const el=document.getElementById(id); if(el) el.style.display='flex';}
+function fecharModal(id){const el=document.getElementById(id); if(el) el.style.display='none';}
+function abrirModalNovoServico(){abrirModal('modalNovoServico');}
+function abrirModalImportar(){abrirModal('modalImportar');}
+function abrirModalMotoristaCadastro(){abrirModal('modalMotoristaCadastro');}
+function abrirModalVeiculoCadastro(){abrirModal('modalVeiculoCadastro');}
+function abrirModalUsuarioCadastro(){abrirModal('modalUsuarioCadastro');}
+document.addEventListener('click', function(e){
+  document.querySelectorAll('.modal-sistema').forEach(m => { if(e.target === m) m.style.display='none'; });
+});
+
+</script>
 
 <style>
-.modal-motorista{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:20px}
-.modal-motorista-box{background:#fff;border-radius:14px;max-width:560px;width:100%;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
-.modal-motorista-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
-.motorista-opcao{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin:8px 0;cursor:pointer}
-.motorista-opcao:hover{background:#f8fafc}
-.motorista-opcao input{width:auto}
-.status-dot{font-size:12px;border-radius:999px;padding:4px 8px;background:#eee}
-.status-dot.online{background:#dcfce7;color:#166534}
-.status-dot.offline{background:#fee2e2;color:#991b1b}
-.btn-enviar-motorista{white-space:nowrap}
-</style>
-
-
-<style>
+.app-top{display:flex!important;align-items:center;justify-content:space-between;gap:18px;padding:0 16px;height:42px;overflow:visible!important;position:sticky;top:0;z-index:1000}
+.main-menu{display:flex;align-items:center;gap:8px;height:100%}
+.main-menu a,.main-menu button{color:#fff;text-decoration:none;background:transparent;border:0;font-weight:700;font-size:13px;padding:12px 10px;cursor:pointer}
+.main-menu a:hover,.main-menu button:hover{background:rgba(255,255,255,.12)}
+.menu-item{position:relative;height:100%;display:flex;align-items:center}
+.submenu{display:none;position:absolute;top:40px;left:0;min-width:190px;background:#111827;border-radius:0 0 8px 8px;box-shadow:0 12px 28px rgba(0,0,0,.25);padding:6px 0;z-index:2000}
+.menu-item:hover .submenu{display:block}
+.submenu a{display:block;color:#fff;padding:10px 14px;white-space:nowrap}
+.submenu a:hover{background:#f97316;color:#fff}
+.sound-btn{background:#16a34a!important;border-radius:8px!important;padding:8px 12px!important}
+.sound-btn.off{background:#dc2626!important}
 .layout{display:block!important}
 .layout main{width:100%!important;max-width:none!important}
-.top-actions{margin:14px 18px;background:#fff;border-radius:14px;box-shadow:0 2px 10px rgba(15,23,42,.08);padding:10px 14px}
-.top-actions details{margin-bottom:8px;border:1px solid #e5e7eb;border-radius:10px;padding:8px;background:#f8fafc}
-.top-actions details:last-child{margin-bottom:0}
-.top-actions summary{font-weight:800;cursor:pointer;color:#0b2f57}
-.details-content{padding-top:10px}
-.details-content .card{box-shadow:none;border:1px solid #e5e7eb;margin:8px 0}
-.details-content form{display:grid;gap:8px}
-.details-content .row{display:flex;gap:8px}
-.services-clean th,.services-clean td{vertical-align:middle}
+.top-actions{display:none!important}
+.modal-sistema{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:22px}
+.modal-box{background:#fff;border-radius:14px;max-width:520px;width:100%;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+.modal-box.grande{max-width:760px}
+.modal-head{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:12px}
+.modal-box form{display:grid;gap:10px}
+.modal-box .row{display:flex;gap:10px}
+.modal-box input,.modal-box textarea,.modal-box select{width:100%}
 .services-clean tbody tr{cursor:pointer}
 .services-clean tbody tr:hover{background:#f8fafc}
 </style>
 
 </head>
 <body>
-<div class="top">
+<div class="top app-top">
   <span>🚛 Sistema Interno de Reboque — Operação Online</span>
-  <span>
+  <nav class="main-menu">
+    <div class="menu-item">
+      <button type="button">Serviços ▾</button>
+      <div class="submenu">
+        <a href="#" onclick="abrirModalNovoServico();return false;">Cadastrar manualmente</a>
+        <a href="#" onclick="abrirModalImportar();return false;">Importar Excel/PDF</a>
+      </div>
+    </div>
+    <div class="menu-item">
+      <button type="button">Cadastros ▾</button>
+      <div class="submenu">
+        <a href="#" onclick="abrirModalMotoristaCadastro();return false;">Cadastrar motorista</a>
+        <a href="#" onclick="abrirModalVeiculoCadastro();return false;">Cadastrar veículo</a>
+        <a href="#" onclick="abrirModalUsuarioCadastro();return false;">Cadastrar usuário</a>
+      </div>
+    </div>
     <a href="/">Central</a>
     <a href="/operacao">Operação ao vivo</a>
     <a href="/historico">Histórico / Relatórios</a>
     <a href="/faturamento">Faturamento</a>
-  </span>
+    <button type="button" id="btnSomTopo" class="sound-btn" onclick="ativarSom()">Ativar som</button>
+  </nav>
 </div>
 
 <div class="layout">
   
-<section class="top-actions">
-  <details>
-    <summary>➕ Novo serviço</summary>
-    <div class="details-content">
-      
-    <div class="card">
-      <h3>Cadastrar motorista</h3>
-      <form method="post" action="/motoristas">
-        <input name="nome" placeholder="Nome" required>
-        <input name="telefone" placeholder="Telefone">
-        <div class="row">
-          <input name="veiculo" placeholder="Veículo">
-          <input name="placa" placeholder="Placa">
-        </div>
-        <input name="tipo" placeholder="Tipo: leve, pesado, moto...">
-        <button>Cadastrar</button>
-      </form>
-    </div>
-
-    <div class="card">
-      <h3>Novo serviço</h3>
-      <form method="post" action="/servicos" id="form-servico">
-        <input name="protocolo" placeholder="Protocolo" required>
-        <input name="seguradora" placeholder="Seguradora">
-        <select name="tipo" id="tipo-servico" required onchange="montarItensFinanceiros()">
-          <option value="">Selecione o tipo de serviço</option>
-          {% for t in tipos_servico %}
-          <option value="{{t}}">{{t}}</option>
-          {% endfor %}
-        </select>
-        <textarea name="origem" placeholder="Origem completa" required></textarea>
-        <textarea name="destino" placeholder="Destino completo" required></textarea>
-        <textarea name="observacao" placeholder="Observação"></textarea>
-        <button>Criar serviço</button>
-      </form>
-    </div>
-    <div class="card">
-      <h3>Importar Excel</h3>
-      <form method="post" action="/servicos/importar" enctype="multipart/form-data">
-        <input type="file" name="file" accept=".xlsx,.xls" required>
-        <button>Importar serviços</button>
-      </form>
-      <p class="muted">Importação inicial. Integração direta com seguradoras depende de API/acesso delas.</p>
-    </div>
-
-    <div class="card">
-      <h3>Exportar</h3>
-      <a class="btn dark" href="/exportar">Baixar relatório Excel</a>
-    </div>
-
-    <div class="card">
-      <h3>Som da central</h3>
-      <button class="btn green" onclick="ativarSom()">Ativar som</button>
-      <p class="muted" id="somStatus">Som desativado</p>
-    </div>
-  
-    </div>
-  </details>
-</section>
-
 
   <main>
     <div class="card">
@@ -119,38 +83,88 @@
       <div id="map" class="map"></div>
       <p class="muted">O motorista precisa abrir a Área do Motorista no celular e permitir localização.</p>
     </div>
+
     <div class="card overflow">
-      <h2>Serviços</h2>
-      <p class="muted">Clique em qualquer linha para abrir fotos, valores, histórico e faturamento do serviço.</p>
-      <table class="services-clean">
+      <h2>Motoristas</h2>
+      <table>
         <thead>
           <tr>
+            <th>Nome</th>
+            <th>Veículo</th>
+            <th>Status</th>
+            <th>Última posição</th>
+            <th>Link motorista</th>
+          </tr>
+        </thead>
+        <tbody id="motoristas-body">
+          {% for m in motoristas %}
+          <tr>
+            <td>{{m.nome}}</td>
+            <td>{{m.veiculo}} {{m.placa}}</td>
+            <td><span class="pill {{'online' if m.online else 'offline'}}">{{'Online' if m.online else 'Offline'}}</span></td>
+            <td>{{m.ultima_atualizacao}}</td>
+            <td>
+              <a href="/motorista/{{m.id}}" target="_blank">abrir</a><br>
+              <span class="muted">Online: https://sistema-reboque.onrender.com/motorista/{{m.id}}</span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card overflow">
+      <h2>Serviços</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
             <th>Protocolo</th>
             <th>Seguradora</th>
-            <th>Tipo de serviço</th>
+            <th>Tipo</th>
             <th>Origem → Destino</th>
             <th>Status</th>
             <th>Motorista</th>
-            <th>Placa</th>
+            <th>Placa removido</th>
+            <th>Fotos</th>
+            <th>Último evento</th>
+            <th>Valor</th>
+            <th>Fat.</th>
             <th>Ação</th>
           </tr>
         </thead>
         <tbody id="servicos-body">
           {% for s in servicos %}
-          <tr onclick="window.location.href='/faturamento/{{s.id}}'">
-            <td><a href="/faturamento/{{s.id}}" onclick="event.stopPropagation()">{{s.protocolo}}</a></td>
+          <tr>
+            <td>{{loop.index}}</td>
+            <td>{{s.protocolo}}</td>
             <td>{{s.seguradora}}</td>
             <td>{{s.tipo}}</td>
             <td>
               <b>{{s.origem}}</b><br>
               → {{s.destino}}<br>
-              <a target="_blank" onclick="event.stopPropagation()" href="https://www.google.com/maps/dir/?api=1&origin={{s.origem|urlencode}}&destination={{s.destino|urlencode}}">rota</a>
+              <a target="_blank" href="https://www.google.com/maps/dir/?api=1&origin={{s.origem|urlencode}}&destination={{s.destino|urlencode}}">rota</a>
             </td>
             <td><span class="pill">{{s.status}}</span></td>
             <td>{{s.motorista_nome}}</td>
             <td><b>{{s.placa_veiculo_removido or s.placa_removida}}</b></td>
             <td>
-              <button type="button" class="btn-enviar-motorista" onclick="event.stopPropagation();abrirModalMotorista('{{s.id}}')">Enviar para motorista</button>
+              {% for f in s.fotos %}
+              <a href="{{f.url}}" target="_blank">foto {{loop.index}}</a><br>
+              {% endfor %}
+            </td>
+            <td class="muted">{{s.ultimo_evento}}</td>
+            <td><b>{{s.valor_total_fmt}}</b></td>
+            <td><span class="pill">{{s.status_faturamento}}</span></td>
+            <td>
+              <form method="post" action="/servicos/{{s.id}}/enviar">
+                <select name="motorista_id">
+                  {% for m in motoristas %}
+                  <option value="{{m.id}}">{{m.nome}} {{'🟢' if m.online else ''}}</option>
+                  {% endfor %}
+                </select>
+                <button>Enviar para celular</button>
+              </form>
             </td>
           </tr>
           {% endfor %}
@@ -189,11 +203,10 @@ function ativarSom() {
   localStorage.setItem('somAtivo', somAtivo ? '1' : '0');
   const el = document.getElementById('somStatus');
   if (el) el.innerText = somAtivo ? 'Som ativado' : 'Som desativado';
-  const btn = document.querySelector('button[onclick="ativarSom()"]');
+  const btn = document.getElementById('btnSomTopo') || document.querySelector('button[onclick="ativarSom()"]');
   if (btn) {
     btn.innerText = somAtivo ? 'Desativar som' : 'Ativar som';
-    btn.classList.toggle('red', somAtivo);
-    btn.classList.toggle('green', !somAtivo);
+    btn.classList.toggle('off', somAtivo);
   }
   if (somAtivo) beep(900,220);
 }
@@ -252,8 +265,8 @@ if (localStorage.getItem('somAtivo') === '1') {
   setTimeout(() => {
     let el = document.getElementById('somStatus');
     if (el) el.innerText = 'Som ativado';
-    const btn = document.querySelector('button[onclick="ativarSom()"]');
-    if (btn) { btn.innerText = 'Desativar som'; btn.classList.add('red'); btn.classList.remove('green'); }
+    const btn = document.getElementById('btnSomTopo') || document.querySelector('button[onclick="ativarSom()"]');
+    if (btn) { btn.innerText = 'Desativar som'; btn.classList.add('off'); }
   }, 300);
 }
 
@@ -307,25 +320,37 @@ function renderServicos(ss) {
   const tbody = document.getElementById('servicos-body');
   if (!tbody) return;
 
-  tbody.innerHTML = (ss || []).map((s) => {
+  tbody.innerHTML = (ss || []).map((s, idx) => {
     const placa = s.placa_veiculo_removido || s.placa_removida || '';
+    const fotos = Array.isArray(s.fotos) ? s.fotos : [];
+    const fotosHtml = fotos.length
+      ? fotos.map((f, i) => `<a href="${f.url}" target="_blank">foto ${i+1}</a><br>`).join('')
+      : '';
     const rota = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(s.origem || '')}&destination=${encodeURIComponent(s.destino || '')}`;
 
     return `
-      <tr onclick="window.location.href='/faturamento/${s.id}'">
-        <td><a href="/faturamento/${s.id}" onclick="event.stopPropagation()">${safe(s.protocolo)}</a></td>
+      <tr>
+        <td>${idx + 1}</td>
+        <td>${safe(s.protocolo)}</td>
         <td>${safe(s.seguradora)}</td>
         <td>${safe(s.tipo)}</td>
         <td>
           <b>${safe(s.origem)}</b><br>
           → ${safe(s.destino)}<br>
-          <a target="_blank" onclick="event.stopPropagation()" href="${rota}">rota</a>
+          <a target="_blank" href="${rota}">rota</a>
         </td>
         <td><span class="pill">${safe(s.status)}</span></td>
         <td>${safe(s.motorista_nome)}</td>
         <td><b>${placa || '-'}</b></td>
+        <td>${fotosHtml}</td>
+        <td class="muted">${safe(s.ultimo_evento)}</td>
+        <td><b>${safe(s.valor_total_fmt)}</b></td>
+        <td><span class="pill">${safe(s.status_faturamento)}</span></td>
         <td>
-          <button type="button" class="btn-enviar-motorista" onclick="event.stopPropagation();abrirModalMotorista('${s.id}')">Enviar para motorista</button>
+          <form method="post" action="/servicos/${s.id}/enviar">
+            <select name="motorista_id">${opcoesMotoristas()}</select>
+            <button>Enviar para celular</button>
+          </form>
         </td>
       </tr>
     `;
@@ -366,63 +391,80 @@ async function atualizarCentral() {
   }
 }
 
-
-function abrirModalMotorista(servicoId) {
-  const modal = document.getElementById('modalMotorista');
-  const form = document.getElementById('formEnviarMotorista');
-  const lista = document.getElementById('listaMotoristasModal');
-  if (!modal || !form || !lista) return;
-
-  form.action = `/servicos/${servicoId}/enviar`;
-
-  const ms = motoristasCache || [];
-  if (!ms.length) {
-    lista.innerHTML = '<p class="muted">Nenhum motorista cadastrado.</p>';
-  } else {
-    lista.innerHTML = ms.map((m, idx) => {
-      const online = !!m.online;
-      const checked = idx === 0 ? 'checked' : '';
-      return `
-        <label class="motorista-opcao">
-          <span>
-            <input type="radio" name="motorista_id" value="${m.id}" ${checked}>
-            <b>${safe(m.nome)}</b><br>
-            <span class="muted">${safe(m.veiculo)} ${m.placa ? m.placa : ''}</span>
-          </span>
-          <span class="status-dot ${online ? 'online' : 'offline'}">${online ? 'Online' : 'Offline'}</span>
-        </label>
-      `;
-    }).join('');
-  }
-
-  modal.style.display = 'flex';
-}
-
-function fecharModalMotorista() {
-  const modal = document.getElementById('modalMotorista');
-  if (modal) modal.style.display = 'none';
-}
-
-document.addEventListener('click', function(e){
-  const modal = document.getElementById('modalMotorista');
-  if (modal && e.target === modal) fecharModalMotorista();
-});
-
 setInterval(atualizarCentral, 5000);
 atualizarCentral();
 </script>
 
-<div id="modalMotorista" class="modal-motorista" style="display:none;">
-  <div class="modal-motorista-box">
-    <div class="modal-motorista-head">
-      <h2>Enviar para motorista</h2>
-      <button type="button" class="btn gray" onclick="fecharModalMotorista()">Fechar</button>
-    </div>
-    <p class="muted">Selecione o motorista para receber este serviço no celular.</p>
-    <form id="formEnviarMotorista" method="post">
-      <div id="listaMotoristasModal"></div>
-      <br>
-      <button type="submit">Enviar serviço</button>
+<div id="modalNovoServico" class="modal-sistema">
+  <div class="modal-box grande">
+    <div class="modal-head"><h2>Cadastrar serviço manualmente</h2><button type="button" class="btn gray" onclick="fecharModal('modalNovoServico')">Fechar</button></div>
+    <form method="post" action="/servicos" id="form-servico">
+        <input name="protocolo" placeholder="Protocolo" required>
+        <input name="seguradora" placeholder="Seguradora">
+        <select name="tipo" id="tipo-servico" required onchange="montarItensFinanceiros()">
+          <option value="">Selecione o tipo de serviço</option>
+          {% for t in tipos_servico %}
+          <option value="{{t}}">{{t}}</option>
+          {% endfor %}
+        </select>
+        <textarea name="origem" placeholder="Origem completa" required></textarea>
+        <textarea name="destino" placeholder="Destino completo" required></textarea>
+        <textarea name="observacao" placeholder="Observação"></textarea>
+<button>Criar serviço</button>
+      </form>
+  </div>
+</div>
+<div id="modalImportar" class="modal-sistema">
+  <div class="modal-box">
+    <div class="modal-head"><h2>Importar serviços</h2><button type="button" class="btn gray" onclick="fecharModal('modalImportar')">Fechar</button></div>
+    <form method="post" action="/servicos/importar" enctype="multipart/form-data">
+        <input type="file" name="file" accept=".xlsx,.xls" required>
+        <button>Importar serviços</button>
+      </form>
+      <p class="muted">Importação inicial. Integração direta com seguradoras depende de API/acesso delas.</p>
+  </div>
+</div>
+<div id="modalMotoristaCadastro" class="modal-sistema">
+  <div class="modal-box grande">
+    <div class="modal-head"><h2>Cadastrar motorista</h2><button type="button" class="btn gray" onclick="fecharModal('modalMotoristaCadastro')">Fechar</button></div>
+    <form method="post" action="/motoristas">
+        <input name="nome" placeholder="Nome" required>
+        <input name="telefone" placeholder="Telefone">
+        <div class="row">
+          <input name="veiculo" placeholder="Veículo">
+          <input name="placa" placeholder="Placa">
+        </div>
+        <input name="tipo" placeholder="Tipo: leve, pesado, moto...">
+        <button>Cadastrar</button>
+      </form>
+    <p class="muted">Na próxima etapa, vamos ampliar para CPF, CNH, vencimento da CNH, nascimento, estado civil e endereço completo.</p>
+  </div>
+</div>
+<div id="modalVeiculoCadastro" class="modal-sistema">
+  <div class="modal-box grande">
+    <div class="modal-head"><h2>Cadastrar veículo</h2><button type="button" class="btn gray" onclick="fecharModal('modalVeiculoCadastro')">Fechar</button></div>
+    <form method="post" action="#">
+      <input name="placa" placeholder="Placa">
+      <input name="modelo" placeholder="Modelo / veículo">
+      <input name="tipo" placeholder="Tipo: leve, pesado, moto, apoio...">
+      <input name="ano" placeholder="Ano">
+      <input name="renavam" placeholder="Renavam">
+      <textarea name="observacao" placeholder="Observações"></textarea>
+      <button type="button" onclick="alert('Cadastro completo de veículos será ligado ao banco na próxima etapa.')">Salvar veículo</button>
+    </form>
+  </div>
+</div>
+<div id="modalUsuarioCadastro" class="modal-sistema">
+  <div class="modal-box grande">
+    <div class="modal-head"><h2>Cadastrar usuário interno</h2><button type="button" class="btn gray" onclick="fecharModal('modalUsuarioCadastro')">Fechar</button></div>
+    <form method="post" action="#">
+      <input name="nome" placeholder="Nome completo">
+      <input name="cpf" placeholder="CPF">
+      <input name="telefone" placeholder="Telefone">
+      <input name="email" placeholder="E-mail / login">
+      <input name="senha" type="password" placeholder="Senha">
+      <select name="perfil"><option value="operador">Operador central</option><option value="faturamento">Faturamento</option><option value="gestor">Gestor</option></select>
+      <button type="button" onclick="alert('Cadastro de usuários com login/senha será ligado ao banco na próxima etapa.')">Salvar usuário</button>
     </form>
   </div>
 </div>
