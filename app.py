@@ -648,6 +648,22 @@ def lista_servicos(limit=None, ativos=False, filtros=None):
     sql="select * from servicos" + ((" where " + " and ".join(where)) if where else "") + " order by created_at desc"
     if limit: sql += f" limit {int(limit)}"
     return [normalizar_servico(r) for r in q(sql, tuple(params), True)]
+
+def lista_servicos_hoje(limit=200):
+    """
+    Central operacional: mostra somente os serviços do dia atual.
+    O histórico e relatórios continuam mostrando tudo normalmente.
+    """
+    limit = int(limit or 200)
+    rows = q(f"""
+        select *
+        from servicos
+        where date(coalesce(criado_em, created_at)) = current_date
+        order by coalesce(criado_em, created_at) desc
+        limit {limit}
+    """, fetch=True)
+    return [normalizar_servico(r) for r in rows]
+
 def motorista_by_id(mid): return normalizar_motorista(one("select * from motoristas where id=%s",(str(mid),)))
 def servico_by_id(sid): return normalizar_servico(one("select * from servicos where id=%s",(str(sid),)))
 def registrar_evento_db(sid, status, detalhe=''):
@@ -667,7 +683,7 @@ def get_lan_ip():
 
 @app.get('/', response_class=HTMLResponse)
 def index(request: Request):
-    return templates.TemplateResponse('index.html', {'request':request,'motoristas':lista_motoristas(),'servicos':lista_servicos(limit=80),'lan_ip':get_lan_ip(),'tipos_servico':lista_tipos_servico(),'precos_por_tipo':{t:itens_padrao_tipo(t) for t in lista_tipos_servico()}})
+    return templates.TemplateResponse('index.html', {'request':request,'motoristas':lista_motoristas(),'servicos': lista_servicos_hoje(limit=200),'lan_ip':get_lan_ip(),'tipos_servico':lista_tipos_servico(),'precos_por_tipo':{t:itens_padrao_tipo(t) for t in lista_tipos_servico()}})
 
 
 @app.get('/servicos/novo', response_class=HTMLResponse)
@@ -904,7 +920,7 @@ def motorista_offline(mid: str):
 @app.get('/api/motoristas')
 def api_motoristas(): return lista_motoristas()
 @app.get('/api/servicos')
-def api_servicos(): return lista_servicos(limit=200)
+def api_servicos(): return lista_servicos_hoje(limit=200)
 
 @app.get('/motorista/login', response_class=HTMLResponse)
 def motorista_login_page(request: Request):

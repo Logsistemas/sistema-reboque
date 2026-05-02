@@ -11,3 +11,8 @@ Novidades:
 - Nova aba `/faturamento` para auditoria e fechamento.
 - Status de faturamento: para_conferir, para_faturar, negociacao, faturado.
 - Exportação Excel inclui aba Itens_Faturamento.
+
+
+## V23
+- Central mostra somente serviços do dia atual.
+- Histórico/Relatórios continuam com todos os serviços.
