@@ -905,9 +905,27 @@ async def importar_servicos(file: UploadFile=File(...)):
 
 @app.post('/servicos/{sid}/enviar')
 def enviar_servico(sid: str, motorista_id: str=Form(...)):
-    m=motorista_by_id(motorista_id)
+    s = servico_by_id(sid)
+    if not s:
+        return RedirectResponse('/', 303)
+
+    # Só bloqueia troca de motorista quando o serviço já foi finalizado.
+    if (s.get("status") or "").lower() == "finalizado":
+        registrar_evento_db(sid, 'troca bloqueada', 'Serviço finalizado não permite troca de motorista')
+        return RedirectResponse('/', 303)
+
+    m = motorista_by_id(motorista_id)
     if m:
-        q("update servicos set motorista_id=%s,motorista_nome=%s,status='enviado',atualizado_em=now() where id=%s",(str(motorista_id),m["nome"],str(sid))); registrar_evento_db(sid,'enviado',f"Enviado para {m['nome']}")
+        placa_trabalho = m.get("placa_atual") or m.get("placa") or ""
+        q("""
+            update servicos
+               set motorista_id=%s,
+                   motorista_nome=%s,
+                   status='enviado',
+                   atualizado_em=now()
+             where id=%s
+        """, (str(motorista_id), m["nome"], str(sid)))
+        registrar_evento_db(sid, 'enviado', f"Enviado/reencaminhado para {m['nome']} - placa atual: {placa_trabalho}")
     return RedirectResponse('/',303)
 
 class LocationPayload(BaseModel):

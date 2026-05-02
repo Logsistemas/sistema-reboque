@@ -53,6 +53,7 @@ document.addEventListener('click', function(e){
 .btn-enviar-motorista{white-space:nowrap}
 </style>
 
+<style>.btn[disabled]{opacity:.65;cursor:not-allowed}.btn-enviar-motorista{white-space:nowrap}</style>
 </head>
 <body>
 <div class="top app-top">
@@ -121,7 +122,11 @@ document.addEventListener('click', function(e){
             <td>{{s.motorista_nome}}</td>
             <td><b>{{s.placa_veiculo_removido or s.placa_removida or '-'}}</b></td>
             <td>
-              <button type="button" class="btn-enviar-motorista" onclick="event.stopPropagation();abrirModalMotorista('{{s.id}}')">Enviar para motorista</button>
+              {% if s.status == 'finalizado' %}
+                <button type="button" class="btn gray" disabled>Finalizado</button>
+              {% else %}
+                <button type="button" class="btn-enviar-motorista" onclick="event.stopPropagation();abrirModalMotorista('{{s.id}}')">Enviar / trocar motorista</button>
+              {% endif %}
             </td>
           </tr>
           {% endfor %}
@@ -275,7 +280,9 @@ function renderServicos(ss) {
         <td>${safe(s.motorista_nome)}</td>
         <td><b>${placa || '-'}</b></td>
         <td>
-          <button type="button" class="btn-enviar-motorista" onclick="event.stopPropagation();abrirModalMotorista('${s.id}')">Enviar para motorista</button>
+          ${(s.status === 'finalizado') 
+            ? '<button type="button" class="btn gray" disabled>Finalizado</button>' 
+            : `<button type="button" class="btn-enviar-motorista" onclick="event.stopPropagation();abrirModalMotorista('${s.id}')">Enviar / trocar motorista</button>`}
         </td>
       </tr>
     `;
