@@ -666,6 +666,32 @@ def lista_servicos_hoje(limit=200):
     return [normalizar_servico(r) for r in rows]
 
 def motorista_by_id(mid): return normalizar_motorista(one("select * from motoristas where id=%s",(str(mid),)))
+
+def distancia_km(lat1, lon1, lat2, lon2):
+    try:
+        lat1, lon1, lat2, lon2 = map(float, [lat1, lon1, lat2, lon2])
+        r = 6371.0
+        p1 = math.radians(lat1)
+        p2 = math.radians(lat2)
+        dp = math.radians(lat2-lat1)
+        dl = math.radians(lon2-lon1)
+        a = math.sin(dp/2)**2 + math.cos(p1)*math.cos(p2)*math.sin(dl/2)**2
+        return round(2*r*math.atan2(math.sqrt(a), math.sqrt(1-a)), 1)
+    except Exception:
+        return None
+
+def motorista_ocupado(mid):
+    row = one("""
+        select id, protocolo, status
+        from servicos
+        where motorista_id=%s
+          and status not in ('finalizado','recusado')
+        order by coalesce(created_at, now()) desc
+        limit 1
+    """, (str(mid),))
+    return row
+
+
 def servico_by_id(sid): return normalizar_servico(one("select * from servicos where id=%s",(str(sid),)))
 def registrar_evento_db(sid, status, detalhe=''):
     s=one("select historico from servicos where id=%s",(str(sid),)); historico=s.get("historico") if s else []
@@ -901,6 +927,29 @@ async def importar_servicos(file: UploadFile=File(...)):
             importados += 1
 
     return RedirectResponse('/?importados=' + str(importados), 303)
+
+
+
+@app.get('/api/servicos/{sid}/motoristas')
+def api_motoristas_para_servico(sid: str):
+    s = servico_by_id(sid)
+    ms = listar_motoristas()
+    saida = []
+    for m in ms:
+        ocupado = motorista_ocupado(m.get("id"))
+        saida.append({
+            **m,
+            "ocupado": bool(ocupado),
+            "servico_ocupado": ocupado.get("protocolo") if ocupado else None,
+            "distancia_km": None
+        })
+
+    # Primeiro online + livre; depois online ocupado; depois offline.
+    saida.sort(key=lambda x: (
+        0 if x.get("online") and not x.get("ocupado") else 1 if x.get("online") else 2,
+        x.get("nome") or ""
+    ))
+    return saida
 
 
 @app.post('/servicos/{sid}/enviar')

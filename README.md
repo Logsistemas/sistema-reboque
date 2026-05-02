@@ -22,3 +22,9 @@ Novidades:
 - Permite reenviar/trocar motorista enquanto o serviço não estiver finalizado.
 - Bloqueia troca apenas quando o status for finalizado.
 - Atualiza lista de motoristas online/offline antes de abrir a janela de envio.
+
+
+## V28
+- Remove mapa da Central e Operação ao Vivo para melhorar performance.
+- Envio/troca de motorista lista motoristas livres, ocupados e offline.
+- Estrutura pronta para cálculo de distância quando geocoding/Google Maps for ativado.

@@ -5,8 +5,6 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Sistema Reboque</title>
   <link rel="stylesheet" href="/static/style.css">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script>
 function abrirModal(id){const el=document.getElementById(id); if(el) el.style.display="flex";}
 function fecharModal(id){const el=document.getElementById(id); if(el) el.style.display="none";}
@@ -60,6 +58,13 @@ function fecharModal(id){const el=document.getElementById(id); if(el) el.style.d
 .btn-enviar-motorista{white-space:nowrap}
 </style>
 
+
+<style>
+.status-dot.ocupado{background:#fef3c7;color:#92400e}
+.motorista-opcao.bloqueado{opacity:.72;background:#f8fafc}
+.motorista-opcao.bloqueado input{cursor:not-allowed}
+</style>
+
 </head>
 <body>
 <div class="top app-top">
@@ -93,11 +98,6 @@ function fecharModal(id){const el=document.getElementById(id); if(el) el.style.d
   
 
   <main>
-    <div class="card">
-      <h2>Mapa dos motoristas</h2>
-      <div id="map" class="map"></div>
-      <p class="muted">O motorista precisa abrir a Área do Motorista no celular e permitir localização.</p>
-    </div>
 <div class="card overflow">
       <h2>Serviços</h2>
       <table>
@@ -242,20 +242,10 @@ if (window.Notification && Notification.permission !== 'granted') {
   Notification.requestPermission();
 }
 
-const map = L.map('map').setView([-22.90,-43.30],9);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
 let markers = {};
 
 function renderMotoristas(ms) {
   motoristasCache = ms || [];
-
-  motoristasCache.forEach(m => {
-    if (m.lat && m.lng) {
-      let txt = `${safe(m.nome)} - ${m.online ? 'Online' : 'Offline'}`;
-      if (!markers[m.id]) markers[m.id] = L.marker([m.lat, m.lng]).addTo(map);
-      markers[m.id].setLatLng([m.lat, m.lng]).bindPopup(txt);
-    }
-  });
 }
 
 function opcoesMotoristas() {
@@ -341,37 +331,58 @@ async function abrirModalMotorista(servicoId) {
   }
 
   form.action = `/servicos/${servicoId}/enviar`;
-  lista.innerHTML = '<p class="muted">Carregando motoristas...</p>';
+  lista.innerHTML = '<p class="muted">Carregando motoristas disponíveis...</p>';
   modal.style.display = 'flex';
 
   try {
-    const resp = await fetch('/api/motoristas?ts=' + Date.now(), {cache:'no-store'});
-    if (resp.ok) motoristasCache = await resp.json();
+    const resp = await fetch(`/api/servicos/${servicoId}/motoristas?ts=` + Date.now(), {cache:'no-store'});
+    if (resp.ok) {
+      motoristasCache = await resp.json();
+    } else {
+      const resp2 = await fetch('/api/motoristas?ts=' + Date.now(), {cache:'no-store'});
+      if (resp2.ok) motoristasCache = await resp2.json();
+    }
   } catch(e) {
     console.log('Erro ao carregar motoristas:', e);
   }
 
   const ms = motoristasCache || [];
+
   if (!ms.length) {
     lista.innerHTML = '<p class="muted">Nenhum motorista cadastrado.</p>';
     return;
   }
 
+  const primeiroLivre = ms.findIndex(x => x.online && !x.ocupado);
+
   lista.innerHTML = ms.map((m, idx) => {
     const online = !!m.online;
+    const ocupado = !!m.ocupado;
     const placaAtual = m.placa_atual || m.placa || '';
-    const checked = idx === 0 ? 'checked' : '';
+    const distancia = (m.distancia_km !== null && m.distancia_km !== undefined) ? `${m.distancia_km} km` : 'distância a calcular';
+    const disabled = (!online || ocupado) ? 'disabled' : '';
+    const checked = (!disabled && idx === primeiroLivre) ? 'checked' : '';
+    const statusTxt = !online ? 'Offline' : ocupado ? `Ocupado${m.servico_ocupado ? ' - ' + m.servico_ocupado : ''}` : 'Livre';
+    const cls = !online ? 'offline' : ocupado ? 'ocupado' : 'online';
+
     return `
-      <label class="motorista-opcao">
+      <label class="motorista-opcao ${disabled ? 'bloqueado' : ''}">
         <span>
-          <input type="radio" name="motorista_id" value="${m.id}" ${checked}>
+          <input type="radio" name="motorista_id" value="${m.id}" ${checked} ${disabled}>
           <b>${safe(m.nome)}</b><br>
-          <span class="muted">${online ? 'Online' : 'Offline'} — Placa atual: ${safe(placaAtual || '-')}</span>
+          <span class="muted">Placa atual: ${safe(placaAtual || '-')} — ${distancia}</span>
         </span>
-        <span class="status-dot ${online ? 'online' : 'offline'}">${online ? 'Online' : 'Offline'}</span>
+        <span class="status-dot ${cls}">${statusTxt}</span>
       </label>
     `;
   }).join('');
+
+  const temLivre = ms.some(m => m.online && !m.ocupado);
+  const btn = form.querySelector('button[type="submit"]');
+  if (btn) {
+    btn.disabled = !temLivre;
+    btn.innerText = temLivre ? 'Confirmar envio' : 'Nenhum motorista livre online';
+  }
 }
 
 function fecharModalMotorista() {
