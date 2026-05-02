@@ -21,6 +21,23 @@
 .btn-enviar-motorista{white-space:nowrap}
 </style>
 
+
+<style>
+.layout{display:block!important}
+.layout main{width:100%!important;max-width:none!important}
+.top-actions{margin:14px 18px;background:#fff;border-radius:14px;box-shadow:0 2px 10px rgba(15,23,42,.08);padding:10px 14px}
+.top-actions details{margin-bottom:8px;border:1px solid #e5e7eb;border-radius:10px;padding:8px;background:#f8fafc}
+.top-actions details:last-child{margin-bottom:0}
+.top-actions summary{font-weight:800;cursor:pointer;color:#0b2f57}
+.details-content{padding-top:10px}
+.details-content .card{box-shadow:none;border:1px solid #e5e7eb;margin:8px 0}
+.details-content form{display:grid;gap:8px}
+.details-content .row{display:flex;gap:8px}
+.services-clean th,.services-clean td{vertical-align:middle}
+.services-clean tbody tr{cursor:pointer}
+.services-clean tbody tr:hover{background:#f8fafc}
+</style>
+
 </head>
 <body>
 <div class="top">
@@ -34,7 +51,12 @@
 </div>
 
 <div class="layout">
-  <aside>
+  
+<section class="top-actions">
+  <details>
+    <summary>➕ Novo serviço</summary>
+    <div class="details-content">
+      
     <div class="card">
       <h3>Cadastrar motorista</h3>
       <form method="post" action="/motoristas">
@@ -63,12 +85,6 @@
         <textarea name="origem" placeholder="Origem completa" required></textarea>
         <textarea name="destino" placeholder="Destino completo" required></textarea>
         <textarea name="observacao" placeholder="Observação"></textarea>
-        <div class="finance-box">
-          <h4>Valores do serviço</h4>
-          <p class="muted">Preencha as quantidades e ajuste os valores se necessário.</p>
-          <div id="itens-financeiros"></div>
-          <div class="total-box">Total: <b id="total-servico">R$ 0,00</b></div>
-        </div>
         <button>Criar serviço</button>
       </form>
     </div>
@@ -91,7 +107,11 @@
       <button class="btn green" onclick="ativarSom()">Ativar som</button>
       <p class="muted" id="somStatus">Som desativado</p>
     </div>
-  </aside>
+  
+    </div>
+  </details>
+</section>
+
 
   <main>
     <div class="card">
@@ -101,47 +121,34 @@
     </div>
     <div class="card overflow">
       <h2>Serviços</h2>
-      <table>
+      <p class="muted">Clique em qualquer linha para abrir fotos, valores, histórico e faturamento do serviço.</p>
+      <table class="services-clean">
         <thead>
           <tr>
-            <th>ID</th>
             <th>Protocolo</th>
             <th>Seguradora</th>
-            <th>Tipo</th>
+            <th>Tipo de serviço</th>
             <th>Origem → Destino</th>
             <th>Status</th>
             <th>Motorista</th>
-            <th>Placa removido</th>
-            <th>Fotos</th>
-            <th>Último evento</th>
-            <th>Valor</th>
-            <th>Fat.</th>
+            <th>Placa</th>
             <th>Ação</th>
           </tr>
         </thead>
         <tbody id="servicos-body">
           {% for s in servicos %}
-          <tr>
-            <td>{{loop.index}}</td>
-            <td>{{s.protocolo}}</td>
+          <tr onclick="window.location.href='/faturamento/{{s.id}}'">
+            <td><a href="/faturamento/{{s.id}}" onclick="event.stopPropagation()">{{s.protocolo}}</a></td>
             <td>{{s.seguradora}}</td>
             <td>{{s.tipo}}</td>
             <td>
               <b>{{s.origem}}</b><br>
               → {{s.destino}}<br>
-              <a target="_blank" href="https://www.google.com/maps/dir/?api=1&origin={{s.origem|urlencode}}&destination={{s.destino|urlencode}}">rota</a>
+              <a target="_blank" onclick="event.stopPropagation()" href="https://www.google.com/maps/dir/?api=1&origin={{s.origem|urlencode}}&destination={{s.destino|urlencode}}">rota</a>
             </td>
             <td><span class="pill">{{s.status}}</span></td>
             <td>{{s.motorista_nome}}</td>
             <td><b>{{s.placa_veiculo_removido or s.placa_removida}}</b></td>
-            <td>
-              {% for f in s.fotos %}
-              <a href="{{f.url}}" target="_blank">foto {{loop.index}}</a><br>
-              {% endfor %}
-            </td>
-            <td class="muted">{{s.ultimo_evento}}</td>
-            <td><b>{{s.valor_total_fmt}}</b></td>
-            <td><span class="pill">{{s.status_faturamento}}</span></td>
             <td>
               <button type="button" class="btn-enviar-motorista" onclick="event.stopPropagation();abrirModalMotorista('{{s.id}}')">Enviar para motorista</button>
             </td>
@@ -178,10 +185,17 @@ function beep(freq=880, duration=180) {
 }
 
 function ativarSom() {
-  somAtivo = true;
-  localStorage.setItem('somAtivo','1');
-  document.getElementById('somStatus').innerText = 'Som ativado';
-  beep(900,220);
+  somAtivo = !somAtivo;
+  localStorage.setItem('somAtivo', somAtivo ? '1' : '0');
+  const el = document.getElementById('somStatus');
+  if (el) el.innerText = somAtivo ? 'Som ativado' : 'Som desativado';
+  const btn = document.querySelector('button[onclick="ativarSom()"]');
+  if (btn) {
+    btn.innerText = somAtivo ? 'Desativar som' : 'Ativar som';
+    btn.classList.toggle('red', somAtivo);
+    btn.classList.toggle('green', !somAtivo);
+  }
+  if (somAtivo) beep(900,220);
 }
 
 
@@ -238,6 +252,8 @@ if (localStorage.getItem('somAtivo') === '1') {
   setTimeout(() => {
     let el = document.getElementById('somStatus');
     if (el) el.innerText = 'Som ativado';
+    const btn = document.querySelector('button[onclick="ativarSom()"]');
+    if (btn) { btn.innerText = 'Desativar som'; btn.classList.add('red'); btn.classList.remove('green'); }
   }, 300);
 }
 
@@ -291,32 +307,23 @@ function renderServicos(ss) {
   const tbody = document.getElementById('servicos-body');
   if (!tbody) return;
 
-  tbody.innerHTML = (ss || []).map((s, idx) => {
+  tbody.innerHTML = (ss || []).map((s) => {
     const placa = s.placa_veiculo_removido || s.placa_removida || '';
-    const fotos = Array.isArray(s.fotos) ? s.fotos : [];
-    const fotosHtml = fotos.length
-      ? fotos.map((f, i) => `<a href="${f.url}" target="_blank">foto ${i+1}</a><br>`).join('')
-      : '';
     const rota = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(s.origem || '')}&destination=${encodeURIComponent(s.destino || '')}`;
 
     return `
-      <tr>
-        <td>${idx + 1}</td>
-        <td>${safe(s.protocolo)}</td>
+      <tr onclick="window.location.href='/faturamento/${s.id}'">
+        <td><a href="/faturamento/${s.id}" onclick="event.stopPropagation()">${safe(s.protocolo)}</a></td>
         <td>${safe(s.seguradora)}</td>
         <td>${safe(s.tipo)}</td>
         <td>
           <b>${safe(s.origem)}</b><br>
           → ${safe(s.destino)}<br>
-          <a target="_blank" href="${rota}">rota</a>
+          <a target="_blank" onclick="event.stopPropagation()" href="${rota}">rota</a>
         </td>
         <td><span class="pill">${safe(s.status)}</span></td>
         <td>${safe(s.motorista_nome)}</td>
         <td><b>${placa || '-'}</b></td>
-        <td>${fotosHtml}</td>
-        <td class="muted">${safe(s.ultimo_evento)}</td>
-        <td><b>${safe(s.valor_total_fmt)}</b></td>
-        <td><span class="pill">${safe(s.status_faturamento)}</span></td>
         <td>
           <button type="button" class="btn-enviar-motorista" onclick="event.stopPropagation();abrirModalMotorista('${s.id}')">Enviar para motorista</button>
         </td>
