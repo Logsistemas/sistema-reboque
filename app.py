@@ -652,14 +652,15 @@ def lista_servicos(limit=None, ativos=False, filtros=None):
 def lista_servicos_hoje(limit=200):
     """
     Central operacional: mostra somente os serviços do dia atual.
-    O histórico e relatórios continuam mostrando tudo normalmente.
+    Usa created_at para evitar erro de tipos no PostgreSQL.
+    Histórico e relatórios continuam mostrando tudo normalmente.
     """
     limit = int(limit or 200)
     rows = q(f"""
         select *
         from servicos
-        where date(coalesce(criado_em, created_at)) = current_date
-        order by coalesce(criado_em, created_at) desc
+        where created_at::date = current_date
+        order by created_at desc
         limit {limit}
     """, fetch=True)
     return [normalizar_servico(r) for r in rows]
