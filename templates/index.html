@@ -46,6 +46,13 @@ document.addEventListener('click', function(e){
 .services-clean tbody tr:hover{background:#f8fafc}
 </style>
 
+
+<style>
+#servicos-body tr{cursor:pointer}
+#servicos-body tr:hover{background:#f8fafc}
+.btn-enviar-motorista{white-space:nowrap}
+</style>
+
 </head>
 <body>
 <div class="top app-top">
@@ -83,88 +90,37 @@ document.addEventListener('click', function(e){
       <div id="map" class="map"></div>
       <p class="muted">O motorista precisa abrir a Área do Motorista no celular e permitir localização.</p>
     </div>
-
-    <div class="card overflow">
-      <h2>Motoristas</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>Nome</th>
-            <th>Veículo</th>
-            <th>Status</th>
-            <th>Última posição</th>
-            <th>Link motorista</th>
-          </tr>
-        </thead>
-        <tbody id="motoristas-body">
-          {% for m in motoristas %}
-          <tr>
-            <td>{{m.nome}}</td>
-            <td>{{m.veiculo}} {{m.placa}}</td>
-            <td><span class="pill {{'online' if m.online else 'offline'}}">{{'Online' if m.online else 'Offline'}}</span></td>
-            <td>{{m.ultima_atualizacao}}</td>
-            <td>
-              <a href="/motorista/{{m.id}}" target="_blank">abrir</a><br>
-              <span class="muted">Online: https://sistema-reboque.onrender.com/motorista/{{m.id}}</span>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-
-    <div class="card overflow">
+<div class="card overflow">
       <h2>Serviços</h2>
       <table>
         <thead>
           <tr>
-            <th>ID</th>
             <th>Protocolo</th>
             <th>Seguradora</th>
-            <th>Tipo</th>
+            <th>Tipo de serviço</th>
             <th>Origem → Destino</th>
             <th>Status</th>
             <th>Motorista</th>
-            <th>Placa removido</th>
-            <th>Fotos</th>
-            <th>Último evento</th>
-            <th>Valor</th>
-            <th>Fat.</th>
+            <th>Placa</th>
             <th>Ação</th>
           </tr>
         </thead>
         <tbody id="servicos-body">
           {% for s in servicos %}
-          <tr>
-            <td>{{loop.index}}</td>
-            <td>{{s.protocolo}}</td>
+          <tr onclick="window.location.href='/faturamento/{{s.id}}'">
+            <td><a href="/faturamento/{{s.id}}" onclick="event.stopPropagation()">{{s.protocolo}}</a></td>
             <td>{{s.seguradora}}</td>
             <td>{{s.tipo}}</td>
             <td>
               <b>{{s.origem}}</b><br>
               → {{s.destino}}<br>
-              <a target="_blank" href="https://www.google.com/maps/dir/?api=1&origin={{s.origem|urlencode}}&destination={{s.destino|urlencode}}">rota</a>
+              <a target="_blank" onclick="event.stopPropagation()" href="https://www.google.com/maps/dir/?api=1&origin={{s.origem|urlencode}}&destination={{s.destino|urlencode}}">rota</a>
             </td>
             <td><span class="pill">{{s.status}}</span></td>
             <td>{{s.motorista_nome}}</td>
-            <td><b>{{s.placa_veiculo_removido or s.placa_removida}}</b></td>
+            <td><b>{{s.placa_veiculo_removido or s.placa_removida or '-'}}</b></td>
             <td>
-              {% for f in s.fotos %}
-              <a href="{{f.url}}" target="_blank">foto {{loop.index}}</a><br>
-              {% endfor %}
-            </td>
-            <td class="muted">{{s.ultimo_evento}}</td>
-            <td><b>{{s.valor_total_fmt}}</b></td>
-            <td><span class="pill">{{s.status_faturamento}}</span></td>
-            <td>
-              <form method="post" action="/servicos/{{s.id}}/enviar">
-                <select name="motorista_id">
-                  {% for m in motoristas %}
-                  <option value="{{m.id}}">{{m.nome}} {{'🟢' if m.online else ''}}</option>
-                  {% endfor %}
-                </select>
-                <button>Enviar para celular</button>
-              </form>
+              <button type="button" class="btn-enviar-motorista" onclick="event.stopPropagation();abrirModalMotorista('{{s.id}}')">Enviar para motorista</button>
             </td>
           </tr>
           {% endfor %}
@@ -280,26 +236,6 @@ let markers = {};
 
 function renderMotoristas(ms) {
   motoristasCache = ms || [];
-  const tbody = document.getElementById('motoristas-body');
-  if (!tbody) return;
-
-  tbody.innerHTML = motoristasCache.map(m => {
-    const online = !!m.online;
-    const veiculo = `${safe(m.veiculo)} ${m.placa ? m.placa : ''}`.trim();
-    const link = `/motorista/${m.id}`;
-    return `
-      <tr>
-        <td>${safe(m.nome)}</td>
-        <td>${veiculo || '-'}</td>
-        <td><span class="pill ${online ? 'online' : 'offline'}">${online ? 'Online' : 'Offline'}</span></td>
-        <td>${safe(m.ultima_atualizacao)}</td>
-        <td>
-          <a href="${link}" target="_blank">abrir</a><br>
-          <span class="muted">Online: https://sistema-reboque.onrender.com${link}</span>
-        </td>
-      </tr>
-    `;
-  }).join('');
 
   motoristasCache.forEach(m => {
     if (m.lat && m.lng) {
@@ -320,37 +256,25 @@ function renderServicos(ss) {
   const tbody = document.getElementById('servicos-body');
   if (!tbody) return;
 
-  tbody.innerHTML = (ss || []).map((s, idx) => {
+  tbody.innerHTML = (ss || []).map((s) => {
     const placa = s.placa_veiculo_removido || s.placa_removida || '';
-    const fotos = Array.isArray(s.fotos) ? s.fotos : [];
-    const fotosHtml = fotos.length
-      ? fotos.map((f, i) => `<a href="${f.url}" target="_blank">foto ${i+1}</a><br>`).join('')
-      : '';
     const rota = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(s.origem || '')}&destination=${encodeURIComponent(s.destino || '')}`;
 
     return `
-      <tr>
-        <td>${idx + 1}</td>
-        <td>${safe(s.protocolo)}</td>
+      <tr onclick="window.location.href='/faturamento/${s.id}'">
+        <td><a href="/faturamento/${s.id}" onclick="event.stopPropagation()">${safe(s.protocolo)}</a></td>
         <td>${safe(s.seguradora)}</td>
         <td>${safe(s.tipo)}</td>
         <td>
           <b>${safe(s.origem)}</b><br>
           → ${safe(s.destino)}<br>
-          <a target="_blank" href="${rota}">rota</a>
+          <a target="_blank" onclick="event.stopPropagation()" href="${rota}">rota</a>
         </td>
         <td><span class="pill">${safe(s.status)}</span></td>
         <td>${safe(s.motorista_nome)}</td>
         <td><b>${placa || '-'}</b></td>
-        <td>${fotosHtml}</td>
-        <td class="muted">${safe(s.ultimo_evento)}</td>
-        <td><b>${safe(s.valor_total_fmt)}</b></td>
-        <td><span class="pill">${safe(s.status_faturamento)}</span></td>
         <td>
-          <form method="post" action="/servicos/${s.id}/enviar">
-            <select name="motorista_id">${opcoesMotoristas()}</select>
-            <button>Enviar para celular</button>
-          </form>
+          <button type="button" class="btn-enviar-motorista" onclick="event.stopPropagation();abrirModalMotorista('${s.id}')">Enviar para motorista</button>
         </td>
       </tr>
     `;
