@@ -139,7 +139,7 @@
           {% for s in servicos %}
           <tr>
             <td>{{loop.index}}</td>
-            <td>{{s.protocolo}}</td>
+            <td><a href="/faturamento/{{s.id}}">{{s.protocolo}}</a></td>
             <td>{{s.seguradora}}</td>
             <td>{{s.tipo}}</td>
             <td>

@@ -48,7 +48,7 @@
       <tbody>
         {% for s in servicos %}
         <tr>
-          <td>{{s.protocolo}}</td>
+          <td><a href="/faturamento/{{s.id}}">{{s.protocolo}}</a></td>
           <td>{{s.created_at}}</td>
           <td>{{s.seguradora}}</td>
           <td>{{s.tipo}}</td>

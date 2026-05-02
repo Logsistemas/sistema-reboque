@@ -363,6 +363,43 @@ PRICE_DATA = [
   }
 ]
 
+DEFAULT_FINANCE_ITEMS = [
+    "SAIDA",
+    "KM DESLOCAMENTO",
+    "KM RETORNO",
+    "KM VIAGEM",
+    "PEDAGIO",
+    "HORA PARADA",
+    "HORA TRABALHADA",
+    "ESTADIA",
+]
+
+def normalizar_tipo_importado(tipo):
+    """Ajusta nomes vindos do AutEM/Excel para bater com a tabela de preços."""
+    t = (tipo or "").strip().upper()
+    mapa = {
+        "REBOQUE LEVE": "R. LEVE",
+        "R LEVE": "R. LEVE",
+        "LEVE": "R. LEVE",
+        "REBOQUE MOTO": "R. MOTO",
+        "R MOTO": "R. MOTO",
+        "MOTO": "R. MOTO",
+        "REBOQUE MOTO ESPECIAL": "R. MOTO ESP.",
+        "MOTO ESPECIAL": "R. MOTO ESP.",
+        "REBOQUE PESADO": "R. PESADO",
+        "R PESADO": "R. PESADO",
+        "PESADO": "R. PESADO",
+        "REBOQUE PATINS": "R. PATINS",
+        "PATINS": "R. PATINS",
+        "REBOQUE UTILITARIO": "R. UTILITARIO",
+        "REBOQUE UTILITÁRIO": "R. UTILITARIO",
+        "UTILITARIO": "R. UTILITARIO",
+        "UTILITÁRIO": "R. UTILITARIO",
+        "REBOQUE GARAGEM": "R. GARAGEM",
+        "GARAGEM": "R. GARAGEM",
+    }
+    return mapa.get(t, tipo)
+
 def moeda(v):
     try:
         return float(v or 0)
@@ -467,7 +504,14 @@ def init_db():
             "alter table servicos add column if not exists finalizado_em timestamp;",
             "alter table fotos add column if not exists filename text;",
             "alter table servicos add column if not exists status_faturamento text default 'para_conferir';",
-            "alter table servicos add column if not exists valor_total numeric(12,2) default 0;"]
+            "alter table servicos add column if not exists valor_total numeric(12,2) default 0;",
+            "alter table servicos add column if not exists beneficiario text;",
+            "alter table servicos add column if not exists telefone_cliente text;",
+            "alter table servicos add column if not exists veiculo_cliente text;",
+            "alter table servicos add column if not exists cor_cliente text;",
+            "alter table servicos add column if not exists cnpj_cliente text;",
+            "alter table servicos add column if not exists referencia_origem text;",
+            "alter table servicos add column if not exists referencia_destino text;"]
             for a in alters: cur.execute(a)
             cur.execute("select count(*) as total from tabela_precos")
             total_precos = cur.fetchone()["total"]
@@ -488,6 +532,7 @@ def lista_tipos_servico():
     return [r["tipo_servico"] for r in rows]
 
 def itens_padrao_tipo(tipo_servico):
+    tipo_servico = normalizar_tipo_importado(tipo_servico)
     if not tipo_servico:
         return []
     rows = q("select nome_item, valor_padrao from tabela_precos where tipo_servico=%s and coalesce(ativo,true)=true order by nome_item", (tipo_servico,), True)
@@ -516,11 +561,16 @@ def atualizar_total_servico(servico_id):
     return total
 
 def criar_itens_para_servico(servico_id, tipo_servico, nomes=None, qtds=None, valores=None):
+    tipo_servico = normalizar_tipo_importado(tipo_servico)
     nomes = nomes or []
     qtds = qtds or []
     valores = valores or []
     if not nomes:
         padrao = itens_padrao_tipo(tipo_servico)
+        # Se o tipo importado não existir na tabela, cria os itens básicos zerados
+        # para o faturamento conseguir editar manualmente.
+        if not padrao:
+            padrao = [{"nome_item": nome, "valor_padrao": 0} for nome in DEFAULT_FINANCE_ITEMS]
         nomes = [i["nome_item"] for i in padrao]
         valores = [i["valor_padrao"] for i in padrao]
         qtds = [1 if str(i["nome_item"]).upper() in ["SAIDA", "SAÍDA"] else 0 for i in padrao]
@@ -618,7 +668,7 @@ async def criar_servico(request: Request):
     form = await request.form()
     protocolo = form.get('protocolo','').strip()
     seguradora = form.get('seguradora','').strip()
-    tipo = form.get('tipo','').strip()
+    tipo = normalizar_tipo_importado(form.get('tipo','').strip())
     origem = form.get('origem','').strip()
     destino = form.get('destino','').strip()
     observacao = form.get('observacao','').strip()
@@ -695,6 +745,14 @@ async def importar_servicos(file: UploadFile=File(...)):
     c_ori = pick(["origem completa", "origem"])
     c_des = pick(["destino completa", "destino completo", "destino"])
     c_obs = pick(["comentários", "comentarios", "observação", "observacao", "beneficiário", "beneficiario"])
+    c_beneficiario = pick(["beneficiário", "beneficiario", "cliente", "nome cliente"])
+    c_telefone = pick(["telefone", "telefone 01", "telefone 1", "celular"])
+    c_veiculo = pick(["veículo / objeto", "veiculo / objeto", "veículo", "veiculo", "modelo"])
+    c_placa_cliente = pick(["placa"])
+    c_cor = pick(["cor"])
+    c_cnpj = pick(["cnpj", "cnpj / filial"])
+    c_ref_origem = pick(["o. referência", "o. referencia", "referência origem", "referencia origem"])
+    c_ref_destino = pick(["d. referência", "d. referencia", "referência destino", "referencia destino"])
 
     importados = 0
 
@@ -709,7 +767,7 @@ async def importar_servicos(file: UploadFile=File(...)):
 
         protocolo = val(row, c_prot) or f"IMP-{uuid.uuid4().hex[:6]}"
         seguradora = val(row, c_seg)
-        tipo = val(row, c_tipo)
+        tipo = normalizar_tipo_importado(val(row, c_tipo))
 
         obs_partes = []
         obs_base = val(row, c_obs)
@@ -722,11 +780,31 @@ async def importar_servicos(file: UploadFile=File(...)):
         observacao = " | ".join(obs_partes) or "Importado do Excel AutEM"
 
         if origem and destino and origem.lower() != "nan" and destino.lower() != "nan":
+            beneficiario = val(row, c_beneficiario)
+            telefone_cliente = val(row, c_telefone)
+            veiculo_cliente = val(row, c_veiculo)
+            placa_cliente = val(row, c_placa_cliente)
+            cor_cliente = val(row, c_cor)
+            cnpj_cliente = val(row, c_cnpj)
+            referencia_origem = val(row, c_ref_origem)
+            referencia_destino = val(row, c_ref_destino)
+
             new = one(
-                "insert into servicos (protocolo,seguradora,tipo,origem,destino,observacao,status,criado_em,atualizado_em) values (%s,%s,%s,%s,%s,%s,'novo',now(),now()) returning id",
-                (protocolo, seguradora, tipo, origem, destino, observacao)
+                """insert into servicos (
+                    protocolo, seguradora, tipo, origem, destino, observacao,
+                    status, status_faturamento, placa_veiculo_removido, placa_removida,
+                    beneficiario, telefone_cliente, veiculo_cliente, cor_cliente, cnpj_cliente,
+                    referencia_origem, referencia_destino, criado_em, atualizado_em
+                ) values (%s,%s,%s,%s,%s,%s,'novo','para_conferir',%s,%s,%s,%s,%s,%s,%s,%s,%s,now(),now()) returning id""",
+                (
+                    protocolo, seguradora, tipo, origem, destino, observacao,
+                    placa_cliente, placa_cliente, beneficiario, telefone_cliente, veiculo_cliente,
+                    cor_cliente, cnpj_cliente, referencia_origem, referencia_destino
+                )
             )
-            registrar_evento_db(new["id"], "novo", "Importado do Excel AutEM")
+            # CRÍTICO: serviços importados também ganham itens financeiros editáveis.
+            criar_itens_para_servico(new["id"], tipo)
+            registrar_evento_db(new["id"], "novo", "Importado do Excel AutEM com itens financeiros")
             importados += 1
 
     return RedirectResponse('/?importados=' + str(importados), 303)
@@ -818,6 +896,12 @@ def faturamento_detalhe(sid: str, request: Request):
     s=servico_by_id(sid)
     if not s: return RedirectResponse('/faturamento',303)
     itens=itens_do_servico(sid)
+    # Fallback: se for serviço importado antigo sem itens, cria automaticamente
+    # para liberar edição no faturamento.
+    if not itens:
+        criar_itens_para_servico(sid, s.get("tipo"))
+        s = servico_by_id(sid)
+        itens = itens_do_servico(sid)
     return templates.TemplateResponse('servico_financeiro.html', {'request':request,'s':s,'itens':itens,'tipos_servico':lista_tipos_servico(),'precos_por_tipo':{t:itens_padrao_tipo(t) for t in lista_tipos_servico()}})
 
 @app.post('/faturamento/{sid}/salvar')

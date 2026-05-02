@@ -13,9 +13,30 @@
 <div class="page">
   <div class="card">
     <h2>Serviço {{s.protocolo}}</h2>
-    <p><b>Seguradora:</b> {{s.seguradora}} | <b>Motorista:</b> {{s.motorista_nome}} | <b>Placa:</b> {{s.placa_veiculo_removido or s.placa_removida}}</p>
-    <p><b>Origem:</b> {{s.origem}}<br><b>Destino:</b> {{s.destino}}</p>
-    <p><b>Status operação:</b> {{s.status}} | <b>Status faturamento:</b> {{s.status_faturamento}} | <b>Total:</b> {{s.valor_total_fmt}}</p>
+    <div class="grid2">
+      <div>
+        <h3>Informações gerais</h3>
+        <p><b>Seguradora:</b> {{s.seguradora}}</p>
+        <p><b>Tipo / Produto:</b> {{s.tipo}}</p>
+        <p><b>Motorista:</b> {{s.motorista_nome}}</p>
+        <p><b>Status operação:</b> {{s.status}}</p>
+        <p><b>Status faturamento:</b> {{s.status_faturamento}}</p>
+        <p><b>Total:</b> {{s.valor_total_fmt}}</p>
+      </div>
+      <div>
+        <h3>Beneficiário / veículo</h3>
+        <p><b>Beneficiário:</b> {{s.beneficiario or '-'}}</p>
+        <p><b>Telefone:</b> {{s.telefone_cliente or '-'}}</p>
+        <p><b>Veículo:</b> {{s.veiculo_cliente or '-'}}</p>
+        <p><b>Cor:</b> {{s.cor_cliente or '-'}}</p>
+        <p><b>Placa:</b> {{s.placa_veiculo_removido or s.placa_removida or '-'}}</p>
+      </div>
+    </div>
+    <hr>
+    <p><b>Origem:</b> {{s.origem}} {% if s.referencia_origem %}<br><b>Referência origem:</b> {{s.referencia_origem}}{% endif %}</p>
+    <p><b>Destino:</b> {{s.destino}} {% if s.referencia_destino %}<br><b>Referência destino:</b> {{s.referencia_destino}}{% endif %}</p>
+    {% if s.observacao %}<p><b>Observação:</b> {{s.observacao}}</p>{% endif %}
+    {% if s.fotos %}<p><b>Fotos/checklist:</b> {% for f in s.fotos %}<a target="_blank" href="{{f.url}}">foto {{loop.index}}</a> {% endfor %}</p>{% endif %}
   </div>
 
   <form class="card" method="post" action="/faturamento/{{s.id}}/salvar">
