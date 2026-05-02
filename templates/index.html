@@ -54,6 +54,20 @@ document.addEventListener('click', function(e){
 </style>
 
 <style>.btn[disabled]{opacity:.65;cursor:not-allowed}.btn-enviar-motorista{white-space:nowrap}</style>
+
+<style>
+.modal-motorista{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:20px}
+.modal-motorista-box{background:#fff;border-radius:14px;max-width:560px;width:100%;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+.modal-motorista-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+.motorista-opcao{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin:8px 0;cursor:pointer}
+.motorista-opcao:hover{background:#f8fafc}
+.motorista-opcao input{width:auto}
+.status-dot{font-size:12px;border-radius:999px;padding:4px 8px;background:#eee}
+.status-dot.online{background:#dcfce7;color:#166534}
+.status-dot.offline{background:#fee2e2;color:#991b1b}
+.btn-enviar-motorista{white-space:nowrap}
+</style>
+
 </head>
 <body>
 <div class="top app-top">
@@ -325,6 +339,76 @@ async function atualizarCentral() {
 
 setInterval(atualizarCentral, 5000);
 atualizarCentral();
+
+
+let motoristasCache = window.motoristasCache || [];
+
+function safe(v){
+  return (v ?? '').toString()
+    .replaceAll('&','&amp;')
+    .replaceAll('<','&lt;')
+    .replaceAll('>','&gt;')
+    .replaceAll('"','&quot;')
+    .replaceAll("'","&#039;");
+}
+
+async function abrirModalMotorista(servicoId) {
+  const modal = document.getElementById('modalMotorista');
+  const form = document.getElementById('formEnviarMotorista');
+  const lista = document.getElementById('listaMotoristasModal');
+
+  if (!modal || !form || !lista) {
+    alert('Não encontrei a janela de seleção de motorista. Atualize com Ctrl + Shift + R.');
+    return;
+  }
+
+  form.action = `/servicos/${servicoId}/enviar`;
+  lista.innerHTML = '<p class="muted">Carregando motoristas...</p>';
+  modal.style.display = 'flex';
+
+  try {
+    const resp = await fetch('/api/motoristas?ts=' + Date.now(), {cache:'no-store'});
+    if (resp.ok) {
+      motoristasCache = await resp.json();
+    }
+  } catch(e) {
+    console.error(e);
+  }
+
+  const ms = motoristasCache || [];
+
+  if (!ms.length) {
+    lista.innerHTML = '<p class="muted">Nenhum motorista cadastrado.</p>';
+    return;
+  }
+
+  lista.innerHTML = ms.map((m, idx) => {
+    const online = !!m.online;
+    const placaAtual = m.placa_atual || m.placa || '';
+    const checked = idx === 0 ? 'checked' : '';
+    return `
+      <label class="motorista-opcao">
+        <span>
+          <input type="radio" name="motorista_id" value="${safe(m.id)}" ${checked}>
+          <b>${safe(m.nome)}</b><br>
+          <span class="muted">${online ? 'Online' : 'Offline'} — Placa atual: ${safe(placaAtual || '-')}</span>
+        </span>
+        <span class="status-dot ${online ? 'online' : 'offline'}">${online ? 'Online' : 'Offline'}</span>
+      </label>
+    `;
+  }).join('');
+}
+
+function fecharModalMotorista() {
+  const modal = document.getElementById('modalMotorista');
+  if (modal) modal.style.display = 'none';
+}
+
+document.addEventListener('click', function(e){
+  const modal = document.getElementById('modalMotorista');
+  if (modal && e.target === modal) fecharModalMotorista();
+});
+
 </script>
 
 <div id="modalNovoServico" class="modal-sistema">
@@ -397,6 +481,22 @@ atualizarCentral();
       <input name="senha" type="password" placeholder="Senha">
       <select name="perfil"><option value="operador">Operador central</option><option value="faturamento">Faturamento</option><option value="gestor">Gestor</option></select>
       <button type="button" onclick="alert('Cadastro de usuários com login/senha será ligado ao banco na próxima etapa.')">Salvar usuário</button>
+    </form>
+  </div>
+</div>
+
+
+<div id="modalMotorista" class="modal-motorista" style="display:none;">
+  <div class="modal-motorista-box">
+    <div class="modal-motorista-head">
+      <h2>Enviar / trocar motorista</h2>
+      <button type="button" class="btn gray" onclick="fecharModalMotorista()">Fechar</button>
+    </div>
+    <p class="muted">Selecione o motorista para receber este serviço no celular.</p>
+    <form id="formEnviarMotorista" method="post">
+      <div id="listaMotoristasModal"></div>
+      <br>
+      <button type="submit">Confirmar envio</button>
     </form>
   </div>
 </div>
