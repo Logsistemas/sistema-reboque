@@ -486,8 +486,28 @@ def init_db():
               observacao text,
               created_at timestamp default now()
             );""")
+            cur.execute("""
+            create table if not exists veiculos (
+              id uuid primary key default uuid_generate_v4(),
+              placa text, modelo text, tipo text, ano text, renavam text, observacao text,
+              ativo boolean default true,
+              created_at timestamp default now()
+            );""")
+            cur.execute("""
+            create table if not exists usuarios_sistema (
+              id uuid primary key default uuid_generate_v4(),
+              nome text, cpf text, telefone text, email text, senha text, perfil text,
+              ativo boolean default true,
+              created_at timestamp default now()
+            );""")
             alters=[
             "alter table motoristas add column if not exists tipo text;",
+            "alter table motoristas add column if not exists cpf text;",
+            "alter table motoristas add column if not exists cnh text;",
+            "alter table motoristas add column if not exists vencimento_cnh text;",
+            "alter table motoristas add column if not exists nascimento text;",
+            "alter table motoristas add column if not exists estado_civil text;",
+            "alter table motoristas add column if not exists endereco text;",
             "alter table motoristas add column if not exists online boolean default false;",
             "alter table motoristas add column if not exists lat double precision;",
             "alter table motoristas add column if not exists lng double precision;",
@@ -644,6 +664,49 @@ def get_lan_ip():
 def index(request: Request):
     return templates.TemplateResponse('index.html', {'request':request,'motoristas':lista_motoristas(),'servicos':lista_servicos(limit=80),'lan_ip':get_lan_ip(),'tipos_servico':lista_tipos_servico(),'precos_por_tipo':{t:itens_padrao_tipo(t) for t in lista_tipos_servico()}})
 
+
+@app.get('/servicos/novo', response_class=HTMLResponse)
+def pagina_novo_servico(request: Request):
+    return templates.TemplateResponse('novo_servico.html', {
+        'request': request,
+        'tipos_servico': lista_tipos_servico(),
+        'precos_por_tipo': {t: itens_padrao_tipo(t) for t in lista_tipos_servico()}
+    })
+
+@app.get('/servicos/importar', response_class=HTMLResponse)
+def pagina_importar_servicos(request: Request):
+    return templates.TemplateResponse('importar_servicos.html', {'request': request})
+
+@app.get('/cadastros/motoristas/novo', response_class=HTMLResponse)
+def pagina_cadastro_motorista(request: Request):
+    return templates.TemplateResponse('cadastro_motorista.html', {'request': request})
+
+@app.get('/cadastros/veiculos/novo', response_class=HTMLResponse)
+def pagina_cadastro_veiculo(request: Request):
+    return templates.TemplateResponse('cadastro_veiculo.html', {'request': request})
+
+@app.get('/cadastros/usuarios/novo', response_class=HTMLResponse)
+def pagina_cadastro_usuario(request: Request):
+    return templates.TemplateResponse('cadastro_usuario.html', {'request': request})
+
+@app.post('/cadastros/veiculos')
+async def salvar_veiculo(request: Request):
+    form = await request.form()
+    q("insert into veiculos (placa,modelo,tipo,ano,renavam,observacao,ativo) values (%s,%s,%s,%s,%s,%s,true)", (
+        form.get('placa','').strip(), form.get('modelo','').strip(), form.get('tipo','').strip(),
+        form.get('ano','').strip(), form.get('renavam','').strip(), form.get('observacao','').strip()
+    ))
+    return RedirectResponse('/', 303)
+
+@app.post('/cadastros/usuarios')
+async def salvar_usuario(request: Request):
+    form = await request.form()
+    q("insert into usuarios_sistema (nome,cpf,telefone,email,senha,perfil,ativo) values (%s,%s,%s,%s,%s,%s,true)", (
+        form.get('nome','').strip(), form.get('cpf','').strip(), form.get('telefone','').strip(),
+        form.get('email','').strip(), form.get('senha','').strip(), form.get('perfil','').strip()
+    ))
+    return RedirectResponse('/', 303)
+
 @app.get('/historico', response_class=HTMLResponse)
 def historico(request: Request, data_ini: str="", data_fim: str="", seguradora: str="", tipo: str="", status: str="", motorista: str=""):
     filtros={k:(v or None) for k,v in dict(data_ini=data_ini,data_fim=data_fim,seguradora=seguradora,tipo=tipo,status=status,motorista=motorista).items()}
@@ -661,8 +724,15 @@ def operacao(request: Request):
     return templates.TemplateResponse('operacao.html', {'request':request,'motoristas':ms,'servicos':servs,'ultimos':ultimos,'online':online,'total_motoristas':len(ms)})
 
 @app.post('/motoristas')
-def criar_motorista(nome: str=Form(...), telefone: str=Form(''), veiculo: str=Form(''), placa: str=Form(''), tipo: str=Form('')):
-    q("insert into motoristas (nome,telefone,veiculo,placa,tipo,online,ultima_atualizacao) values (%s,%s,%s,%s,%s,false,now())",(nome,telefone,veiculo,placa,tipo)); return RedirectResponse('/',303)
+async def criar_motorista(request: Request):
+    form = await request.form()
+    q("""insert into motoristas (nome,telefone,veiculo,placa,tipo,cpf,cnh,vencimento_cnh,nascimento,estado_civil,endereco,online,ultima_atualizacao)
+         values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,false,now())""", (
+        form.get('nome','').strip(), form.get('telefone','').strip(), form.get('veiculo','').strip(), form.get('placa','').strip(),
+        form.get('tipo','').strip(), form.get('cpf','').strip(), form.get('cnh','').strip(), form.get('vencimento_cnh','').strip(),
+        form.get('nascimento','').strip(), form.get('estado_civil','').strip(), form.get('endereco','').strip()
+    ))
+    return RedirectResponse('/',303)
 @app.post('/servicos')
 async def criar_servico(request: Request):
     form = await request.form()
