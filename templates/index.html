@@ -78,6 +78,20 @@ function fecharModal(id){const el=document.getElementById(id); if(el) el.style.d
 .motorista-opcao.bloqueado input{cursor:not-allowed}
 </style>
 
+
+<style>
+.ranking-header{display:flex;justify-content:space-between;gap:12px;align-items:center;margin:8px 0 10px;font-weight:900;color:#0b2f57}
+.motorista-opcao.ranking{display:grid;grid-template-columns:34px 1fr auto;align-items:center;gap:10px}
+.rank-num{width:26px;height:26px;border-radius:999px;background:#e5e7eb;color:#0f172a;display:flex;align-items:center;justify-content:center;font-weight:900}
+.rank-main input{margin-right:8px}
+.rank-badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:5px}
+.badge-dist,.badge-time{display:inline-block;border-radius:8px;padding:4px 7px;background:#e0f2fe;color:#075985;font-size:12px;font-weight:800}
+.badge-time{background:#dcfce7;color:#166534}
+.status-dot.ocupado{background:#fef3c7;color:#92400e}
+.motorista-opcao.bloqueado{opacity:.70;background:#f8fafc}
+.motorista-opcao.bloqueado input{cursor:not-allowed}
+</style>
+
 </head>
 <body>
 <div class="top app-top">
@@ -344,7 +358,7 @@ async function abrirModalMotorista(servicoId) {
   }
 
   form.action = `/servicos/${servicoId}/enviar`;
-  lista.innerHTML = '<p class="muted">Buscando motoristas mais próximos...</p>';
+  lista.innerHTML = '<p class="muted">Calculando motoristas mais próximos...</p>';
   modal.style.display = 'flex';
 
   try {
@@ -365,7 +379,12 @@ async function abrirModalMotorista(servicoId) {
 
   const primeiroLivre = ms.findIndex(x => x.online && !x.ocupado);
 
-  lista.innerHTML = ms.map((m, idx) => {
+  lista.innerHTML = `
+    <div class="ranking-header">
+      <span>Profissionais</span>
+      <span class="muted">ordenado por disponibilidade e distância</span>
+    </div>
+  ` + ms.map((m, idx) => {
     const online = !!m.online;
     const ocupado = !!m.ocupado;
     const placaAtual = m.placa_atual || m.placa || '';
@@ -380,15 +399,18 @@ async function abrirModalMotorista(servicoId) {
     return `
       <label class="motorista-opcao ranking ${disabled ? 'bloqueado' : ''}">
         <span class="rank-num">${idx + 1}</span>
+
         <span class="rank-main">
           <input type="radio" name="motorista_id" value="${m.id}" ${checked} ${disabled}>
           <b>${safe(m.nome)}</b>
           <span class="muted">(${safe(placaAtual || '-')})</span><br>
+
           <span class="rank-badges">
             <span class="badge-dist">📍 ${safe(distancia)}</span>
             ${duracao ? `<span class="badge-time">⏱ ${safe(duracao)}</span>` : ''}
           </span>
         </span>
+
         <span class="status-dot ${cls}">${statusTxt}</span>
       </label>
     `;

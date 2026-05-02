@@ -34,3 +34,9 @@ Novidades:
 - Modal de envio/troca mostra ranking de motoristas no estilo AutEM.
 - Preparado para Google Maps Distance Matrix via variável GOOGLE_MAPS_API_KEY.
 - Mostra distância/tempo quando a chave estiver configurada; sem chave, mantém lista por disponibilidade.
+
+
+## V30
+- Distância por Google Maps no modal de envio/troca.
+- Ranking por online/livre e menor distância.
+- Fallback aproximado quando Google não retornar rota.

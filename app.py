@@ -964,11 +964,36 @@ def google_geocode_endereco(endereco):
 def google_distance_matrix(origem_lat, origem_lng, destino_lat, destino_lng):
     """
     Retorna (distancia_texto, duracao_texto, distancia_valor_metros).
-    Usa Google Distance Matrix quando a chave estiver configurada.
+    Usa Google Distance Matrix quando GOOGLE_MAPS_API_KEY estiver configurada.
     """
     key = google_api_key()
     if not key:
         return None, None, None
+
+    try:
+        params = urllib.parse.urlencode({
+            "origins": f"{origem_lat},{origem_lng}",
+            "destinations": f"{destino_lat},{destino_lng}",
+            "mode": "driving",
+            "language": "pt-BR",
+            "region": "br",
+            "key": key
+        })
+        url = "https://maps.googleapis.com/maps/api/distancematrix/json?" + params
+        with urllib.request.urlopen(url, timeout=8) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+
+        rows = data.get("rows") or []
+        if rows and rows[0].get("elements"):
+            el = rows[0]["elements"][0]
+            if el.get("status") == "OK":
+                dist = el.get("distance", {})
+                dur = el.get("duration", {})
+                return dist.get("text"), dur.get("text"), dist.get("value")
+    except Exception:
+        pass
+
+    return None, None, None
 
     try:
         params = urllib.parse.urlencode({
@@ -1029,36 +1054,51 @@ def api_motoristas_para_servico(sid: str):
     saida = []
     for m in ms:
         ocupado = motorista_ocupado(m.get("id"))
+
         dist_txt = None
         dur_txt = None
         dist_metros = None
+        calculo_status = ""
 
-        # Motorista precisa ter localização atual.
         mlat = m.get("lat")
         mlng = m.get("lng")
 
-        if origem_lat and origem_lng and mlat and mlng:
-            # Google: distância por rota de carro.
+        if not mlat or not mlng:
+            calculo_status = "motorista sem localização"
+        elif not origem_lat or not origem_lng:
+            calculo_status = "origem sem geolocalização"
+        else:
+            # 1º tenta Google por rota real de carro
             dist_txt, dur_txt, dist_metros = google_distance_matrix(mlat, mlng, origem_lat, origem_lng)
 
-            # Fallback: distância em linha reta, caso Google não esteja configurado.
+            # 2º fallback: distância aproximada em linha reta
             if not dist_txt:
                 dk = distancia_km(mlat, mlng, origem_lat, origem_lng)
                 if dk is not None:
-                    dist_txt = f"{dk} km"
+                    dist_txt = f"{dk} km aprox."
                     dur_txt = "tempo a calcular"
                     dist_metros = int(dk * 1000)
+                    calculo_status = "aproximado"
+                else:
+                    calculo_status = "distância indisponível"
+            else:
+                calculo_status = "rota Google"
 
         saida.append({
             **m,
             "ocupado": bool(ocupado),
             "servico_ocupado": ocupado.get("protocolo") if ocupado else None,
-            "distancia_texto": dist_txt or "sem localização",
+            "distancia_texto": dist_txt or calculo_status or "sem localização",
             "duracao_texto": dur_txt or "",
-            "distancia_valor": dist_metros
+            "distancia_valor": dist_metros,
+            "calculo_status": calculo_status
         })
 
-    # Primeiro online + livre por menor distância; depois online ocupado; depois offline.
+    # Ordem igual central profissional:
+    # 1) online e livre
+    # 2) menor distância
+    # 3) online ocupado
+    # 4) offline
     saida.sort(key=lambda x: (
         0 if x.get("online") and not x.get("ocupado") else 1 if x.get("online") else 2,
         999999999 if x.get("distancia_valor") is None else x.get("distancia_valor"),
