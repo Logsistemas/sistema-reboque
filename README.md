@@ -16,3 +16,8 @@ Novidades:
 ## V15
 - Linhas de serviços clicáveis na Central, Histórico e Faturamento.
 - Serviço importado continua editável no faturamento/detalhes.
+
+
+## V16
+- Central simplificada: Protocolo, Seguradora, Tipo, Status, Motorista, Placa e Ação.
+- Fotos, valores, faturamento, histórico e detalhes ficam dentro da tela de auditoria ao clicar na linha do serviço.
