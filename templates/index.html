@@ -7,6 +7,20 @@
   <link rel="stylesheet" href="/static/style.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<style>
+.modal-motorista{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:20px}
+.modal-motorista-box{background:#fff;border-radius:14px;max-width:560px;width:100%;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+.modal-motorista-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+.motorista-opcao{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin:8px 0;cursor:pointer}
+.motorista-opcao:hover{background:#f8fafc}
+.motorista-opcao input{width:auto}
+.status-dot{font-size:12px;border-radius:999px;padding:4px 8px;background:#eee}
+.status-dot.online{background:#dcfce7;color:#166534}
+.status-dot.offline{background:#fee2e2;color:#991b1b}
+.btn-enviar-motorista{white-space:nowrap}
+</style>
+
 </head>
 <body>
 <div class="top">
@@ -85,69 +99,51 @@
       <div id="map" class="map"></div>
       <p class="muted">O motorista precisa abrir a Área do Motorista no celular e permitir localização.</p>
     </div>
-
-    <div class="card overflow">
-      <h2>Motoristas</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>Nome</th>
-            <th>Veículo</th>
-            <th>Status</th>
-            <th>Última posição</th>
-            <th>Link motorista</th>
-          </tr>
-        </thead>
-        <tbody id="motoristas-body">
-          {% for m in motoristas %}
-          <tr>
-            <td>{{m.nome}}</td>
-            <td>{{m.veiculo}} {{m.placa}}</td>
-            <td><span class="pill {{'online' if m.online else 'offline'}}">{{'Online' if m.online else 'Offline'}}</span></td>
-            <td>{{m.ultima_atualizacao}}</td>
-            <td>
-              <a href="/motorista/{{m.id}}" target="_blank">abrir</a><br>
-              <span class="muted">Online: https://sistema-reboque.onrender.com/motorista/{{m.id}}</span>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-
     <div class="card overflow">
       <h2>Serviços</h2>
-      <p class="muted">Clique em qualquer linha para abrir fotos, valores, histórico e faturamento do serviço.</p>
       <table>
         <thead>
           <tr>
+            <th>ID</th>
             <th>Protocolo</th>
             <th>Seguradora</th>
-            <th>Tipo de serviço</th>
+            <th>Tipo</th>
+            <th>Origem → Destino</th>
             <th>Status</th>
             <th>Motorista</th>
-            <th>Placa</th>
+            <th>Placa removido</th>
+            <th>Fotos</th>
+            <th>Último evento</th>
+            <th>Valor</th>
+            <th>Fat.</th>
             <th>Ação</th>
           </tr>
         </thead>
         <tbody id="servicos-body">
           {% for s in servicos %}
-          <tr class="clickable-row" onclick="abrirDetalhes('{{s.id}}')">
-            <td><a onclick="event.stopPropagation()" href="/faturamento/{{s.id}}"><b>{{s.protocolo}}</b></a></td>
+          <tr>
+            <td>{{loop.index}}</td>
+            <td>{{s.protocolo}}</td>
             <td>{{s.seguradora}}</td>
             <td>{{s.tipo}}</td>
+            <td>
+              <b>{{s.origem}}</b><br>
+              → {{s.destino}}<br>
+              <a target="_blank" href="https://www.google.com/maps/dir/?api=1&origin={{s.origem|urlencode}}&destination={{s.destino|urlencode}}">rota</a>
+            </td>
             <td><span class="pill">{{s.status}}</span></td>
             <td>{{s.motorista_nome}}</td>
             <td><b>{{s.placa_veiculo_removido or s.placa_removida}}</b></td>
             <td>
-              <form onclick="event.stopPropagation()" method="post" action="/servicos/{{s.id}}/enviar">
-                <select name="motorista_id">
-                  {% for m in motoristas %}
-                  <option value="{{m.id}}">{{m.nome}} {{'🟢' if m.online else ''}}</option>
-                  {% endfor %}
-                </select>
-                <button>Enviar para celular</button>
-              </form>
+              {% for f in s.fotos %}
+              <a href="{{f.url}}" target="_blank">foto {{loop.index}}</a><br>
+              {% endfor %}
+            </td>
+            <td class="muted">{{s.ultimo_evento}}</td>
+            <td><b>{{s.valor_total_fmt}}</b></td>
+            <td><span class="pill">{{s.status_faturamento}}</span></td>
+            <td>
+              <button type="button" class="btn-enviar-motorista" onclick="event.stopPropagation();abrirModalMotorista('{{s.id}}')">Enviar para motorista</button>
             </td>
           </tr>
           {% endfor %}
@@ -161,7 +157,6 @@
 let somAtivo = false;
 let ultimoEstado = {};
 let motoristasCache = [];
-function abrirDetalhes(id) { if (id) window.location.href = `/faturamento/${id}`; }
 
 function safe(v) {
   return (v === null || v === undefined || v === '') ? '-' : String(v);
@@ -298,19 +293,32 @@ function renderServicos(ss) {
 
   tbody.innerHTML = (ss || []).map((s, idx) => {
     const placa = s.placa_veiculo_removido || s.placa_removida || '';
+    const fotos = Array.isArray(s.fotos) ? s.fotos : [];
+    const fotosHtml = fotos.length
+      ? fotos.map((f, i) => `<a href="${f.url}" target="_blank">foto ${i+1}</a><br>`).join('')
+      : '';
+    const rota = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(s.origem || '')}&destination=${encodeURIComponent(s.destino || '')}`;
+
     return `
-      <tr class="clickable-row" onclick="abrirDetalhes('${s.id}')">
-        <td><a onclick="event.stopPropagation()" href="/faturamento/${s.id}"><b>${safe(s.protocolo)}</b></a></td>
+      <tr>
+        <td>${idx + 1}</td>
+        <td>${safe(s.protocolo)}</td>
         <td>${safe(s.seguradora)}</td>
         <td>${safe(s.tipo)}</td>
+        <td>
+          <b>${safe(s.origem)}</b><br>
+          → ${safe(s.destino)}<br>
+          <a target="_blank" href="${rota}">rota</a>
+        </td>
         <td><span class="pill">${safe(s.status)}</span></td>
         <td>${safe(s.motorista_nome)}</td>
         <td><b>${placa || '-'}</b></td>
+        <td>${fotosHtml}</td>
+        <td class="muted">${safe(s.ultimo_evento)}</td>
+        <td><b>${safe(s.valor_total_fmt)}</b></td>
+        <td><span class="pill">${safe(s.status_faturamento)}</span></td>
         <td>
-          <form onclick="event.stopPropagation()" method="post" action="/servicos/${s.id}/enviar">
-            <select name="motorista_id">${opcoesMotoristas()}</select>
-            <button>Enviar para celular</button>
-          </form>
+          <button type="button" class="btn-enviar-motorista" onclick="event.stopPropagation();abrirModalMotorista('${s.id}')">Enviar para motorista</button>
         </td>
       </tr>
     `;
@@ -351,8 +359,66 @@ async function atualizarCentral() {
   }
 }
 
+
+function abrirModalMotorista(servicoId) {
+  const modal = document.getElementById('modalMotorista');
+  const form = document.getElementById('formEnviarMotorista');
+  const lista = document.getElementById('listaMotoristasModal');
+  if (!modal || !form || !lista) return;
+
+  form.action = `/servicos/${servicoId}/enviar`;
+
+  const ms = motoristasCache || [];
+  if (!ms.length) {
+    lista.innerHTML = '<p class="muted">Nenhum motorista cadastrado.</p>';
+  } else {
+    lista.innerHTML = ms.map((m, idx) => {
+      const online = !!m.online;
+      const checked = idx === 0 ? 'checked' : '';
+      return `
+        <label class="motorista-opcao">
+          <span>
+            <input type="radio" name="motorista_id" value="${m.id}" ${checked}>
+            <b>${safe(m.nome)}</b><br>
+            <span class="muted">${safe(m.veiculo)} ${m.placa ? m.placa : ''}</span>
+          </span>
+          <span class="status-dot ${online ? 'online' : 'offline'}">${online ? 'Online' : 'Offline'}</span>
+        </label>
+      `;
+    }).join('');
+  }
+
+  modal.style.display = 'flex';
+}
+
+function fecharModalMotorista() {
+  const modal = document.getElementById('modalMotorista');
+  if (modal) modal.style.display = 'none';
+}
+
+document.addEventListener('click', function(e){
+  const modal = document.getElementById('modalMotorista');
+  if (modal && e.target === modal) fecharModalMotorista();
+});
+
 setInterval(atualizarCentral, 5000);
 atualizarCentral();
 </script>
+
+<div id="modalMotorista" class="modal-motorista" style="display:none;">
+  <div class="modal-motorista-box">
+    <div class="modal-motorista-head">
+      <h2>Enviar para motorista</h2>
+      <button type="button" class="btn gray" onclick="fecharModalMotorista()">Fechar</button>
+    </div>
+    <p class="muted">Selecione o motorista para receber este serviço no celular.</p>
+    <form id="formEnviarMotorista" method="post">
+      <div id="listaMotoristasModal"></div>
+      <br>
+      <button type="submit">Enviar serviço</button>
+    </form>
+  </div>
+</div>
+
 </body>
 </html>
