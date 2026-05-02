@@ -930,23 +930,138 @@ async def importar_servicos(file: UploadFile=File(...)):
 
 
 
+
+def google_api_key():
+    return os.environ.get("GOOGLE_MAPS_API_KEY") or os.environ.get("GOOGLE_API_KEY") or ""
+
+def google_geocode_endereco(endereco):
+    """
+    Retorna (lat, lng) usando Google Geocoding, se GOOGLE_MAPS_API_KEY estiver configurada.
+    """
+    key = google_api_key()
+    if not key or not endereco:
+        return None, None
+
+    try:
+        params = urllib.parse.urlencode({
+            "address": endereco,
+            "key": key,
+            "region": "br",
+            "language": "pt-BR"
+        })
+        url = "https://maps.googleapis.com/maps/api/geocode/json?" + params
+        with urllib.request.urlopen(url, timeout=6) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+
+        if data.get("status") == "OK" and data.get("results"):
+            loc = data["results"][0]["geometry"]["location"]
+            return loc.get("lat"), loc.get("lng")
+    except Exception:
+        pass
+
+    return None, None
+
+def google_distance_matrix(origem_lat, origem_lng, destino_lat, destino_lng):
+    """
+    Retorna (distancia_texto, duracao_texto, distancia_valor_metros).
+    Usa Google Distance Matrix quando a chave estiver configurada.
+    """
+    key = google_api_key()
+    if not key:
+        return None, None, None
+
+    try:
+        params = urllib.parse.urlencode({
+            "origins": f"{origem_lat},{origem_lng}",
+            "destinations": f"{destino_lat},{destino_lng}",
+            "mode": "driving",
+            "language": "pt-BR",
+            "key": key
+        })
+        url = "https://maps.googleapis.com/maps/api/distancematrix/json?" + params
+        with urllib.request.urlopen(url, timeout=6) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+
+        rows = data.get("rows") or []
+        if rows and rows[0].get("elements"):
+            el = rows[0]["elements"][0]
+            if el.get("status") == "OK":
+                dist = el.get("distance", {})
+                dur = el.get("duration", {})
+                return dist.get("text"), dur.get("text"), dist.get("value")
+    except Exception:
+        pass
+
+    return None, None, None
+
+def obter_origem_lat_lng(servico):
+    """
+    Busca/coleta latitude e longitude da origem do serviço.
+    Salva no banco para não ficar chamando o Google toda hora.
+    """
+    lat = servico.get("origem_lat")
+    lng = servico.get("origem_lng")
+
+    if lat and lng:
+        return lat, lng
+
+    endereco = servico.get("origem") or ""
+    lat, lng = google_geocode_endereco(endereco)
+
+    if lat and lng:
+        try:
+            q("update servicos set origem_lat=%s, origem_lng=%s where id=%s", (lat, lng, str(servico.get("id"))))
+        except Exception:
+            pass
+
+    return lat, lng
+
+
 @app.get('/api/servicos/{sid}/motoristas')
 def api_motoristas_para_servico(sid: str):
     s = servico_by_id(sid)
     ms = listar_motoristas()
+
+    origem_lat = origem_lng = None
+    if s:
+        origem_lat, origem_lng = obter_origem_lat_lng(s)
+
     saida = []
     for m in ms:
         ocupado = motorista_ocupado(m.get("id"))
+        dist_txt = None
+        dur_txt = None
+        dist_metros = None
+
+        # Motorista precisa ter localização atual.
+        mlat = m.get("lat")
+        mlng = m.get("lng")
+
+        if origem_lat and origem_lng and mlat and mlng:
+            # Google: distância por rota de carro.
+            dist_txt, dur_txt, dist_metros = google_distance_matrix(mlat, mlng, origem_lat, origem_lng)
+
+            # Fallback: distância em linha reta, caso Google não esteja configurado.
+            if not dist_txt:
+                dk = distancia_km(mlat, mlng, origem_lat, origem_lng)
+                if dk is not None:
+                    dist_txt = f"{dk} km"
+                    dur_txt = "tempo a calcular"
+                    dist_metros = int(dk * 1000)
+
         saida.append({
             **m,
             "ocupado": bool(ocupado),
             "servico_ocupado": ocupado.get("protocolo") if ocupado else None,
-            "distancia_km": None
+            "distancia_texto": dist_txt or "sem localização",
+            "duracao_texto": dur_txt or "",
+            "distancia_valor": dist_metros
         })
 
-    # Primeiro online + livre; depois online ocupado; depois offline.
+    # Primeiro online + livre por menor distância; depois online ocupado; depois offline.
     saida.sort(key=lambda x: (
         0 if x.get("online") and not x.get("ocupado") else 1 if x.get("online") else 2,
+        999999999 if x.get("distancia_valor") is None else x.get("distancia_valor"),
         x.get("nome") or ""
     ))
     return saida

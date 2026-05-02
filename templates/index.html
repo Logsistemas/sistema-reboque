@@ -65,6 +65,19 @@ function fecharModal(id){const el=document.getElementById(id); if(el) el.style.d
 .motorista-opcao.bloqueado input{cursor:not-allowed}
 </style>
 
+
+<style>
+.motorista-opcao.ranking{display:grid;grid-template-columns:34px 1fr auto;align-items:center}
+.rank-num{width:26px;height:26px;border-radius:999px;background:#e5e7eb;color:#0f172a;display:flex;align-items:center;justify-content:center;font-weight:800}
+.rank-main input{margin-right:8px}
+.rank-badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:5px}
+.badge-dist,.badge-time{display:inline-block;border-radius:8px;padding:4px 7px;background:#e0f2fe;color:#075985;font-size:12px;font-weight:700}
+.badge-time{background:#dcfce7;color:#166534}
+.status-dot.ocupado{background:#fef3c7;color:#92400e}
+.motorista-opcao.bloqueado{opacity:.72;background:#f8fafc}
+.motorista-opcao.bloqueado input{cursor:not-allowed}
+</style>
+
 </head>
 <body>
 <div class="top app-top">
@@ -331,16 +344,13 @@ async function abrirModalMotorista(servicoId) {
   }
 
   form.action = `/servicos/${servicoId}/enviar`;
-  lista.innerHTML = '<p class="muted">Carregando motoristas disponíveis...</p>';
+  lista.innerHTML = '<p class="muted">Buscando motoristas mais próximos...</p>';
   modal.style.display = 'flex';
 
   try {
     const resp = await fetch(`/api/servicos/${servicoId}/motoristas?ts=` + Date.now(), {cache:'no-store'});
     if (resp.ok) {
       motoristasCache = await resp.json();
-    } else {
-      const resp2 = await fetch('/api/motoristas?ts=' + Date.now(), {cache:'no-store'});
-      if (resp2.ok) motoristasCache = await resp2.json();
     }
   } catch(e) {
     console.log('Erro ao carregar motoristas:', e);
@@ -359,18 +369,25 @@ async function abrirModalMotorista(servicoId) {
     const online = !!m.online;
     const ocupado = !!m.ocupado;
     const placaAtual = m.placa_atual || m.placa || '';
-    const distancia = (m.distancia_km !== null && m.distancia_km !== undefined) ? `${m.distancia_km} km` : 'distância a calcular';
+    const distancia = m.distancia_texto || 'sem localização';
+    const duracao = m.duracao_texto || '';
     const disabled = (!online || ocupado) ? 'disabled' : '';
     const checked = (!disabled && idx === primeiroLivre) ? 'checked' : '';
+
     const statusTxt = !online ? 'Offline' : ocupado ? `Ocupado${m.servico_ocupado ? ' - ' + m.servico_ocupado : ''}` : 'Livre';
     const cls = !online ? 'offline' : ocupado ? 'ocupado' : 'online';
 
     return `
-      <label class="motorista-opcao ${disabled ? 'bloqueado' : ''}">
-        <span>
+      <label class="motorista-opcao ranking ${disabled ? 'bloqueado' : ''}">
+        <span class="rank-num">${idx + 1}</span>
+        <span class="rank-main">
           <input type="radio" name="motorista_id" value="${m.id}" ${checked} ${disabled}>
-          <b>${safe(m.nome)}</b><br>
-          <span class="muted">Placa atual: ${safe(placaAtual || '-')} — ${distancia}</span>
+          <b>${safe(m.nome)}</b>
+          <span class="muted">(${safe(placaAtual || '-')})</span><br>
+          <span class="rank-badges">
+            <span class="badge-dist">📍 ${safe(distancia)}</span>
+            ${duracao ? `<span class="badge-time">⏱ ${safe(duracao)}</span>` : ''}
+          </span>
         </span>
         <span class="status-dot ${cls}">${statusTxt}</span>
       </label>
@@ -482,7 +499,7 @@ atualizarCentral();
       <h2>Enviar / trocar motorista</h2>
       <button type="button" class="btn gray" onclick="fecharModalMotorista()">Fechar</button>
     </div>
-    <p class="muted">Selecione o motorista para receber este serviço no celular.</p>
+    <p class="muted">Selecione o motorista mais próximo e disponível para receber este serviço.</p>
     <form id="formEnviarMotorista" method="post">
       <div id="listaMotoristasModal"></div>
       <br>
