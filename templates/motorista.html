@@ -5,8 +5,6 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Área do Motorista</title>
   <link rel="stylesheet" href="/static/style.css">
-  <link rel="manifest" href="/static/manifest.json">
-  <meta name="theme-color" content="#0b2f57">
 </head>
 <body>
   <div class="top"><span>🚛 Área do Motorista</span><span><a href="/motorista/login">Trocar login/placa</a></span></div>
@@ -27,14 +25,6 @@
       <p id="statusSireneMotorista">Clique em ativar para liberar a sirene no celular.</p>
       <button type="button" id="btnAtivarSireneMotorista" onclick="ativarSireneMotorista()">Ativar sirene</button>
       <button type="button" class="btn gray" onclick="testarSireneMotorista()">Testar som</button>
-    </div>
-
-    
-    <div class="card" style="margin-bottom:12px;border-left:5px solid #0b2f57;">
-      <h2>📲 Notificação na tela bloqueada</h2>
-      <p id="statusPushMotorista">Ative para receber aviso mesmo com o celular bloqueado.</p>
-      <button type="button" id="btnAtivarPushMotorista" onclick="ativarPushMotorista()">Ativar notificação</button>
-      <button type="button" class="btn gray" onclick="testarPushMotorista()">Testar notificação</button>
     </div>
 
     <div class="card"><h2>Serviços enviados</h2><div id="servicos">Carregando...</div></div>
@@ -187,78 +177,6 @@ document.addEventListener('click', function(){
     audioCtxMotorista.resume();
   }
 }, {once:false});
-
-
-
-function urlBase64ToUint8Array(base64String) {
-  const padding = '='.repeat((4 - base64String.length % 4) % 4);
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-  for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
-  return outputArray;
-}
-
-async function ativarPushMotorista(){
-  const status = document.getElementById('statusPushMotorista');
-  try {
-    if(!('serviceWorker' in navigator) || !('PushManager' in window)){
-      status.innerText = 'Este navegador não suporta Push Notification. No iPhone, instale como app na Tela de Início.';
-      return;
-    }
-
-    const reg = await navigator.serviceWorker.register('/static/sw.js');
-    const perm = await Notification.requestPermission();
-
-    if(perm !== 'granted'){
-      status.innerText = 'Permissão negada. Ative notificações nas configurações do navegador/app.';
-      return;
-    }
-
-    const keyResp = await fetch('/api/push/public-key');
-    const keyData = await keyResp.json();
-    if(!keyData.enabled || !keyData.publicKey){
-      status.innerText = 'Push ainda não configurado no Render. Falta VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY.';
-      return;
-    }
-
-    let sub = await reg.pushManager.getSubscription();
-    if(!sub){
-      sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(keyData.publicKey)
-      });
-    }
-
-    const resp = await fetch(`/api/motoristas/${MID}/push-subscribe`, {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(sub)
-    });
-    const j = await resp.json();
-
-    if(j.ok){
-      localStorage.setItem('pushMotoristaAtivo','1');
-      status.innerText = 'Notificação ativa. Pode bloquear a tela.';
-    } else {
-      status.innerText = j.erro || 'Erro ao ativar notificação.';
-    }
-  } catch(e) {
-    status.innerText = 'Erro ao ativar: ' + e.message;
-  }
-}
-
-async function testarPushMotorista(){
-  await ativarPushMotorista();
-  fetch(`/api/motoristas/${MID}/push-test`, {method:'POST'});
-}
-
-window.addEventListener('load', ()=>{
-  const status = document.getElementById('statusPushMotorista');
-  if(status && localStorage.getItem('pushMotoristaAtivo') === '1'){
-    status.innerText = 'Notificação já ativada neste aparelho.';
-  }
-});
 
 </script>
 </body>
