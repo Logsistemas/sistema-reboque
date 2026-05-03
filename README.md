@@ -63,3 +63,9 @@ Novidades:
 - Área do motorista tem aviso sonoro tipo sirene quando novo serviço chega.
 - Motorista pode ativar/testar sirene no celular.
 - Também vibra o celular quando suportado.
+
+
+## V35
+- Corrige exibição do card de sirene na Área do Motorista.
+- Sirene precisa ser ativada uma vez no celular por regra do navegador.
+- Toca também se já houver serviço enviado ao abrir a tela.
