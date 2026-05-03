@@ -53,3 +53,7 @@ Novidades:
 - Distância usa Google Distance Matrix direto com o endereço da origem do serviço.
 - Evita depender primeiro do geocoding/cache da origem.
 - Adiciona diagnóstico /api/servicos/{id}/debug-distancia para validar chave/endereço/GPS.
+
+
+## V33
+- Corrige erro `name 'urllib' is not defined` no cálculo de distância Google.
