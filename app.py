@@ -2,6 +2,12 @@ import urllib
 import urllib.request
 import urllib.parse
 import json
+try:
+    from pywebpush import webpush, WebPushException
+except Exception:
+    webpush = None
+    WebPushException = Exception
+
 from fastapi import FastAPI, Request, UploadFile, File, Form
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -504,7 +510,17 @@ def init_db():
               ativo boolean default true,
               created_at timestamp default now()
             );""")
-            alters=[
+            conn.execute("""
+        create table if not exists push_subscriptions (
+            id text primary key,
+            motorista_id text not null,
+            endpoint text not null unique,
+            p256dh text not null,
+            auth text not null,
+            created_at timestamptz default now()
+        );
+    """)
+        alters=[
             "alter table motoristas add column if not exists tipo text;",
             "alter table motoristas add column if not exists cpf text;",
             "alter table motoristas add column if not exists cnh text;",
@@ -1189,6 +1205,91 @@ def api_debug_distancia(sid: str):
         "status": st
     }
 
+
+def vapid_public_key():
+    return os.environ.get("VAPID_PUBLIC_KEY", "")
+
+def vapid_private_key():
+    return os.environ.get("VAPID_PRIVATE_KEY", "")
+
+def push_enabled():
+    return bool(vapid_public_key() and vapid_private_key() and webpush is not None)
+
+def enviar_push_motorista(motorista_id, titulo, corpo, url="/motorista/login"):
+    if not push_enabled():
+        return {"ok": False, "erro": "VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY não configuradas ou pywebpush ausente"}
+
+    subs = q("""
+        select *
+        from push_subscriptions
+        where motorista_id=%s
+        order by created_at desc
+    """, (str(motorista_id),), fetch=True)
+
+    enviados = 0
+    erros = []
+    payload = json.dumps({
+        "title": titulo,
+        "body": corpo,
+        "url": url
+    })
+
+    for sub in subs:
+        try:
+            webpush(
+                subscription_info={
+                    "endpoint": sub["endpoint"],
+                    "keys": {
+                        "p256dh": sub["p256dh"],
+                        "auth": sub["auth"]
+                    }
+                },
+                data=payload,
+                vapid_private_key=vapid_private_key(),
+                vapid_claims={"sub": "mailto:suporte@sistema-reboque.local"}
+            )
+            enviados += 1
+        except Exception as e:
+            erros.append(str(e)[:120])
+
+    return {"ok": enviados > 0, "enviados": enviados, "erros": erros}
+
+@app.get("/api/push/public-key")
+def api_push_public_key():
+    return {"publicKey": vapid_public_key(), "enabled": push_enabled()}
+
+class PushSubscriptionPayload(BaseModel):
+    endpoint: str
+    keys: dict
+
+@app.post("/api/motoristas/{mid}/push-subscribe")
+def api_push_subscribe(mid: str, payload: PushSubscriptionPayload):
+    p256dh = (payload.keys or {}).get("p256dh")
+    auth = (payload.keys or {}).get("auth")
+    if not payload.endpoint or not p256dh or not auth:
+        return {"ok": False, "erro": "Assinatura inválida"}
+
+    q("""
+        insert into push_subscriptions (id, motorista_id, endpoint, p256dh, auth)
+        values (%s,%s,%s,%s,%s)
+        on conflict (endpoint) do update
+        set motorista_id=excluded.motorista_id,
+            p256dh=excluded.p256dh,
+            auth=excluded.auth,
+            created_at=now()
+    """, (str(uuid.uuid4()), str(mid), payload.endpoint, p256dh, auth))
+    return {"ok": True}
+
+@app.post("/api/motoristas/{mid}/push-test")
+def api_push_test(mid: str):
+    return enviar_push_motorista(
+        mid,
+        "🚨 Teste de notificação",
+        "Se você recebeu isso, a notificação está funcionando.",
+        f"/motorista/{mid}"
+    )
+
+
 @app.post('/servicos/{sid}/enviar')
 def enviar_servico(sid: str, motorista_id: str=Form(...)):
     s = servico_by_id(sid)
@@ -1212,6 +1313,18 @@ def enviar_servico(sid: str, motorista_id: str=Form(...)):
              where id=%s
         """, (str(motorista_id), m["nome"], str(sid)))
         registrar_evento_db(sid, 'enviado', f"Enviado/reencaminhado para {m['nome']} - placa atual: {placa_trabalho}")
+        try:
+            protocolo = s.get("protocolo") or ""
+            tipo = s.get("tipo") or ""
+            origem = s.get("origem") or ""
+            enviar_push_motorista(
+                motorista_id,
+                "🚨 Novo serviço recebido",
+                f"{protocolo} - {tipo} | Origem: {origem}",
+                f"/motorista/{motorista_id}"
+            )
+        except Exception:
+            pass
     return RedirectResponse('/',303)
 
 class LocationPayload(BaseModel):

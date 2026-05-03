@@ -69,3 +69,11 @@ Novidades:
 - Corrige exibição do card de sirene na Área do Motorista.
 - Sirene precisa ser ativada uma vez no celular por regra do navegador.
 - Toca também se já houver serviço enviado ao abrir a tela.
+
+## V36
+- Adiciona PWA + Push Notification para a Área do Motorista.
+- Motorista pode ativar notificação para receber aviso com celular bloqueado.
+- Para funcionar no Render, configurar:
+  - VAPID_PUBLIC_KEY
+  - VAPID_PRIVATE_KEY
+- Gerar chaves com: python -m pywebpush --gen-vapid
