@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Motoristas</title>
+<link rel="stylesheet" href="/static/style.css">
+<style>
+body{background:#f3f6fb}
+.page{max-width:1500px;margin:18px auto;padding:0 16px}
+.top{display:flex;align-items:center;justify-content:space-between;background:#0b2f57;color:#fff;padding:10px 16px;font-weight:800}
+.top a{color:#fff;text-decoration:none;margin-left:16px;font-weight:700}
+.card{background:#fff;border-radius:14px;padding:18px;box-shadow:0 10px 30px rgba(15,23,42,.08);margin-bottom:14px}
+.header-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.btn{border:0;border-radius:10px;padding:9px 13px;font-weight:800;cursor:pointer;text-decoration:none;display:inline-block}
+.btn-primary{background:#ff6b00;color:#fff}
+.btn-dark{background:#0b2f57;color:#fff}
+.btn-red{background:#dc2626;color:#fff}
+.btn-gray{background:#64748b;color:#fff}
+.badge{display:inline-block;padding:4px 9px;border-radius:999px;font-size:12px;font-weight:800}
+.badge.on{background:#dcfce7;color:#166534}
+.badge.off{background:#fee2e2;color:#991b1b}
+.badge.ok{background:#dbeafe;color:#1d4ed8}
+.badge.no{background:#f1f5f9;color:#475569}
+table{width:100%;border-collapse:collapse}
+th,td{padding:10px;border-bottom:1px solid #e5e7eb;text-align:left;font-size:13px;vertical-align:top}
+th{color:#0f172a;background:#f8fafc;font-size:12px;text-transform:uppercase}
+.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;align-items:center;justify-content:center;padding:20px}
+.modal:target{display:flex}
+.modal-box{background:#fff;border-radius:18px;width:min(980px,96vw);max-height:92vh;overflow:auto;padding:20px;box-shadow:0 24px 80px rgba(0,0,0,.3)}
+.modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.form-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.form-grid .full{grid-column:1/-1}
+label{font-size:12px;font-weight:800;color:#334155}
+input,select,textarea{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:10px;padding:10px;margin-top:4px}
+textarea{min-height:70px}
+.checks{display:flex;gap:18px;align-items:center;margin:10px 0}
+.checks label{display:flex;align-items:center;gap:8px;font-size:14px}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.small{font-size:12px;color:#64748b}
+@media(max-width:900px){.form-grid{grid-template-columns:1fr} table{font-size:12px}}
+</style>
+</head>
+<body>
+<div class="top">
+  <span>🚚 Sistema Interno de Reboque — Motoristas</span>
+  <span>
+    <a href="/">Central</a>
+    <a href="/cadastros/motoristas/novo">Cadastrar motorista</a>
+    <a href="/operacao">Operação ao vivo</a>
+    <a href="/historico">Histórico / Relatórios</a>
+  </span>
+</div>
+
+<div class="page">
+  <div class="card">
+    <div class="header-row">
+      <div>
+        <h2 style="margin:0">Motoristas cadastrados</h2>
+        <div class="small">Aqui você consulta e altera login, senha, placa atual, dados cadastrais, status online/offline e ativo/inativo.</div>
+      </div>
+      <a class="btn btn-primary" href="/cadastros/motoristas/novo">+ Cadastrar motorista</a>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Nome</th>
+          <th>Login / CPF</th>
+          <th>Senha</th>
+          <th>Veículo / Placa</th>
+          <th>Status</th>
+          <th>Última atualização</th>
+          <th>Ação</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for m in motoristas %}
+        <tr>
+          <td><strong>{{ m.nome or '-' }}</strong><br><span class="small">{{ m.telefone or '' }}</span></td>
+          <td>{{ m.login or '-' }}<br><span class="small">CPF: {{ m.cpf or '-' }}</span></td>
+          <td>{{ m.senha or '-' }}</td>
+          <td>{{ m.veiculo or '-' }}<br><strong>{{ m.placa_atual or m.placa or '-' }}</strong></td>
+          <td>
+            {% if m.online %}<span class="badge on">Online</span>{% else %}<span class="badge off">Offline</span>{% endif %}
+            {% if m.ativo %}<span class="badge ok">Ativo</span>{% else %}<span class="badge no">Inativo</span>{% endif %}
+          </td>
+          <td>{{ m.ultima_atualizacao or '-' }}</td>
+          <td>
+            <a class="btn btn-dark" href="#editar-{{ m.id }}">Alterar</a>
+            <form action="/motoristas/{{ m.id }}/offline" method="post" style="display:inline">
+              <button class="btn btn-gray" type="submit">Forçar offline</button>
+            </form>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="7">Nenhum motorista cadastrado ainda.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% for m in motoristas %}
+<div id="editar-{{ m.id }}" class="modal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2 style="margin:0">Alterar motorista</h2>
+      <a class="btn btn-gray" href="#">Fechar</a>
+    </div>
+
+    <form method="post" action="/motoristas/{{ m.id }}/editar">
+      <div class="form-grid">
+        <label>Nome completo
+          <input name="nome" value="{{ m.nome or '' }}">
+        </label>
+        <label>Telefone
+          <input name="telefone" value="{{ m.telefone or '' }}">
+        </label>
+        <label>CPF
+          <input name="cpf" value="{{ m.cpf or '' }}">
+        </label>
+
+        <label>Login do app
+          <input name="login" value="{{ m.login or '' }}">
+        </label>
+        <label>Senha do app
+          <input name="senha" value="{{ m.senha or '' }}">
+        </label>
+        <label>Tipo
+          <input name="tipo" value="{{ m.tipo or '' }}" placeholder="leve, pesado, moto...">
+        </label>
+
+        <label>Veículo
+          <input name="veiculo" value="{{ m.veiculo or '' }}">
+        </label>
+        <label>Placa padrão
+          <input name="placa" value="{{ m.placa or '' }}">
+        </label>
+        <label>Placa atual / do dia
+          <input name="placa_atual" value="{{ m.placa_atual or m.placa or '' }}">
+        </label>
+
+        <label>CNH
+          <input name="cnh" value="{{ m.cnh or '' }}">
+        </label>
+        <label>Vencimento CNH
+          <input name="vencimento_cnh" value="{{ m.vencimento_cnh or '' }}">
+        </label>
+        <label>Data de nascimento
+          <input name="nascimento" value="{{ m.nascimento or '' }}">
+        </label>
+
+        <label>Estado civil
+          <input name="estado_civil" value="{{ m.estado_civil or '' }}">
+        </label>
+        <label class="full">Endereço
+          <textarea name="endereco">{{ m.endereco or '' }}</textarea>
+        </label>
+      </div>
+
+      <div class="checks">
+        <label><input type="checkbox" name="ativo" {% if m.ativo %}checked{% endif %}> Motorista ativo</label>
+        <label><input type="checkbox" name="online" {% if m.online %}checked{% endif %}> Marcar como online</label>
+      </div>
+
+      <div class="actions">
+        <button class="btn btn-primary" type="submit">Salvar alterações</button>
+        <a class="btn btn-gray" href="#">Cancelar</a>
+      </div>
+    </form>
+
+    <form method="post" action="/motoristas/{{ m.id }}/excluir" onsubmit="return confirm('Deseja inativar este motorista?')" style="margin-top:10px">
+      <button class="btn btn-red" type="submit">Inativar motorista</button>
+    </form>
+  </div>
+</div>
+{% endfor %}
+</body>
+</html>

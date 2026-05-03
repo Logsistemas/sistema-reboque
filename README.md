@@ -75,3 +75,10 @@ Novidades:
 - Adiciona APIs JSON para o app Android Essência Logística.
 - Login separado por motorista: login/senha/placa do dia.
 - Endpoints para serviços, status, GPS, online/offline e token futuro de Firebase.
+
+
+## V38 - Menu Motoristas
+- Adiciona botão "Motoristas" no cabeçalho da central.
+- Nova tela /motoristas com todos os motoristas cadastrados.
+- Permite alterar login, senha, placa atual, dados do cadastro, ativo/inativo e online/offline.
+- Mantém histórico: inativar motorista não apaga serviços antigos.

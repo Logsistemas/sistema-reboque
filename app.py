@@ -763,6 +763,75 @@ async def salvar_usuario(request: Request):
     ))
     return RedirectResponse('/', 303)
 
+
+@app.get('/motoristas', response_class=HTMLResponse)
+def pagina_motoristas(request: Request):
+    motoristas = q("""
+        select *
+          from motoristas
+         order by coalesce(ativo,true) desc, nome asc
+    """, fetch=True)
+    return templates.TemplateResponse('motoristas_lista.html', {'request': request, 'motoristas': motoristas})
+
+@app.post('/motoristas/{mid}/editar')
+async def editar_motorista(mid: str, request: Request):
+    form = await request.form()
+    ativo = True if form.get('ativo') == 'on' else False
+    online = True if form.get('online') == 'on' else False
+
+    q("""
+        update motoristas
+           set nome=%s,
+               telefone=%s,
+               veiculo=%s,
+               placa=%s,
+               placa_atual=%s,
+               tipo=%s,
+               cpf=%s,
+               cnh=%s,
+               vencimento_cnh=%s,
+               nascimento=%s,
+               estado_civil=%s,
+               endereco=%s,
+               login=%s,
+               senha=%s,
+               ativo=%s,
+               online=%s,
+               ultima_atualizacao=now()
+         where id=%s
+    """, (
+        form.get('nome','').strip(),
+        form.get('telefone','').strip(),
+        form.get('veiculo','').strip(),
+        form.get('placa','').strip().upper(),
+        form.get('placa_atual','').strip().upper() or form.get('placa','').strip().upper(),
+        form.get('tipo','').strip(),
+        form.get('cpf','').strip(),
+        form.get('cnh','').strip(),
+        form.get('vencimento_cnh','').strip(),
+        form.get('nascimento','').strip(),
+        form.get('estado_civil','').strip(),
+        form.get('endereco','').strip(),
+        form.get('login','').strip(),
+        form.get('senha','').strip(),
+        ativo,
+        online,
+        str(mid)
+    ))
+    return RedirectResponse('/motoristas', 303)
+
+@app.post('/motoristas/{mid}/offline')
+def forcar_motorista_offline(mid: str):
+    q("update motoristas set online=false, ultima_atualizacao=now() where id=%s", (str(mid),))
+    return RedirectResponse('/motoristas', 303)
+
+@app.post('/motoristas/{mid}/excluir')
+def excluir_motorista(mid: str):
+    # Não apaga histórico; apenas inativa o motorista.
+    q("update motoristas set ativo=false, online=false, ultima_atualizacao=now() where id=%s", (str(mid),))
+    return RedirectResponse('/motoristas', 303)
+
+
 @app.get('/historico', response_class=HTMLResponse)
 def historico(request: Request, data_ini: str="", data_fim: str="", seguradora: str="", tipo: str="", status: str="", motorista: str=""):
     filtros={k:(v or None) for k,v in dict(data_ini=data_ini,data_fim=data_fim,seguradora=seguradora,tipo=tipo,status=status,motorista=motorista).items()}
