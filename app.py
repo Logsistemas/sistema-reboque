@@ -1214,6 +1214,23 @@ def enviar_servico(sid: str, motorista_id: str=Form(...)):
         registrar_evento_db(sid, 'enviado', f"Enviado/reencaminhado para {m['nome']} - placa atual: {placa_trabalho}")
     return RedirectResponse('/',303)
 
+
+class AppLoginPayload(BaseModel):
+    login: str
+    senha: str
+    placa: str
+
+class AppLocationPayload(BaseModel):
+    lat: float
+    lng: float
+
+class AppStatusPayload(BaseModel):
+    status: str
+    detalhe: str = ""
+
+class AppFcmPayload(BaseModel):
+    token: str
+
 class LocationPayload(BaseModel):
     lat: float; lng: float; online: bool=True
 @app.post('/api/motoristas/{mid}/localizacao')
@@ -1234,6 +1251,115 @@ def motorista_offline(mid: str):
 def api_motoristas(): return lista_motoristas()
 @app.get('/api/servicos')
 def api_servicos(): return lista_servicos_hoje(limit=200)
+
+
+# ============================================================
+# API DO APP ANDROID - ESSÊNCIA LOGÍSTICA / MOTORISTA
+# ============================================================
+
+@app.post("/api/app/motorista/login")
+def api_app_motorista_login(payload: AppLoginPayload):
+    login = (payload.login or "").strip()
+    senha = (payload.senha or "").strip()
+    placa = (payload.placa or "").upper().replace("-", "").replace(" ", "").strip()
+
+    if not login or not senha or not placa:
+        return JSONResponse({"ok": False, "erro": "Preencha login, senha e placa."}, status_code=400)
+
+    m = one("""
+        select * from motoristas
+        where coalesce(ativo,true)=true
+          and (
+            lower(coalesce(login,''))=lower(%s)
+            or regexp_replace(coalesce(cpf,''),'[^0-9]','','g')=regexp_replace(%s,'[^0-9]','','g')
+          )
+          and coalesce(senha,'')=%s
+        limit 1
+    """, (login, login, senha))
+
+    if not m:
+        return JSONResponse({"ok": False, "erro": "Login ou senha inválidos."}, status_code=401)
+
+    mid = str(m["id"])
+    q("""
+        update motoristas
+           set placa_atual=%s,
+               placa=%s,
+               online=true,
+               ultima_atualizacao=now(),
+               ultimo_login=now()
+         where id=%s
+    """, (placa, placa, mid))
+
+    m = motorista_by_id(mid)
+    return {
+        "ok": True,
+        "motorista": {
+            "id": str(m.get("id")),
+            "nome": m.get("nome"),
+            "placa_atual": m.get("placa_atual") or m.get("placa"),
+            "veiculo": m.get("veiculo"),
+            "online": m.get("online")
+        }
+    }
+
+@app.get("/api/app/motorista/{mid}/servicos")
+def api_app_motorista_servicos(mid: str):
+    rows = q("""
+        select *
+          from servicos
+         where motorista_id=%s
+           and coalesce(status,'novo') not in ('finalizado')
+         order by coalesce(created_at, criado_em, now()) desc
+         limit 50
+    """, (str(mid),), fetch=True)
+    return {"ok": True, "servicos": [normalizar_servico(r) for r in rows]}
+
+@app.post("/api/app/motorista/{mid}/localizacao")
+def api_app_motorista_localizacao(mid: str, payload: AppLocationPayload):
+    q("""
+        update motoristas
+           set lat=%s,
+               lng=%s,
+               online=true,
+               ultima_atualizacao=now()
+         where id=%s
+    """, (payload.lat, payload.lng, str(mid)))
+    return {"ok": True}
+
+@app.post("/api/app/motorista/{mid}/offline")
+def api_app_motorista_offline(mid: str):
+    q("update motoristas set online=false, ultima_atualizacao=now() where id=%s", (str(mid),))
+    return {"ok": True}
+
+@app.post("/api/app/servicos/{sid}/status")
+def api_app_servico_status(sid: str, payload: AppStatusPayload):
+    status = (payload.status or "").strip().lower()
+    permitidos = ["aceito", "recusado", "a caminho", "na origem", "em transporte", "finalizado"]
+    if status not in permitidos:
+        return JSONResponse({"ok": False, "erro": "Status inválido."}, status_code=400)
+
+    extra = ""
+    if status == "finalizado":
+        extra = ", finalizado_em=now()"
+
+    q(f"update servicos set status=%s, atualizado_em=now(){extra} where id=%s", (status, str(sid)))
+    registrar_evento_db(sid, status, payload.detalhe or f"Status atualizado pelo App do Motorista: {status}")
+    return {"ok": True, "servico": servico_by_id(sid)}
+
+@app.post("/api/app/motorista/{mid}/fcm-token")
+def api_app_motorista_fcm_token(mid: str, payload: AppFcmPayload):
+    # Nesta V1 apenas registra o token no cadastro do motorista.
+    # A próxima etapa conecta com Firebase Admin para push real.
+    token = (payload.token or "").strip()
+    if not token:
+        return {"ok": False, "erro": "Token vazio"}
+    try:
+        q("alter table motoristas add column if not exists fcm_token text")
+    except Exception:
+        pass
+    q("update motoristas set fcm_token=%s where id=%s", (token, str(mid)))
+    return {"ok": True}
 
 @app.get('/motorista/login', response_class=HTMLResponse)
 def motorista_login_page(request: Request):

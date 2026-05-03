@@ -69,3 +69,9 @@ Novidades:
 - Corrige exibição do card de sirene na Área do Motorista.
 - Sirene precisa ser ativada uma vez no celular por regra do navegador.
 - Toca também se já houver serviço enviado ao abrir a tela.
+
+## V37 - API App Motorista
+- Mantém a V35 estável como base.
+- Adiciona APIs JSON para o app Android Essência Logística.
+- Login separado por motorista: login/senha/placa do dia.
+- Endpoints para serviços, status, GPS, online/offline e token futuro de Firebase.
