@@ -19,6 +19,14 @@
       <button onclick="ficarOnline()">Ficar ONLINE e enviar localização</button>
       <button class="btn gray" onclick="ficarOffline()">Ficar OFFLINE</button>
     </div>
+    
+<div class="card" style="margin-bottom:12px;border-left:5px solid #ff6b00;">
+  <b>🔊 Aviso sonoro de serviço</b><br>
+  <small id="statusSireneMotorista">Clique em ativar para liberar a sirene no celular.</small><br><br>
+  <button type="button" id="btnAtivarSireneMotorista" onclick="ativarSireneMotorista()">Ativar sirene</button>
+  <button type="button" class="btn gray" onclick="testarSireneMotorista()">Testar som</button>
+</div>
+
     <div class="card"><h2>Serviços enviados</h2><div id="servicos">Carregando...</div></div>
     {% endif %}
   </div>
@@ -35,7 +43,7 @@ function enviarPlaca(id){pausarAtualizacao(15000);let input=document.getElementB
 function enviarFotos(id){pausarAtualizacao(90000);let input=document.getElementById('fotos_'+id);if(!input.files.length){alert('Escolha pelo menos uma foto');return}let btn=document.getElementById('btn_fotos_'+id);if(btn){btn.disabled=true;btn.innerText='Enviando fotos...'}let fd=new FormData();for(let f of input.files){fd.append('fotos',f)}postForm(`/api/servicos/${id}/fotos`,fd).then(j=>{if(j.ok){alert('Fotos enviadas para a central')}else alert(j.erro||'Erro ao enviar fotos')}).catch(e=>alert('Erro ao enviar fotos: '+e)).finally(()=>{motoristaInteragindo=false;if(btn){btn.disabled=false;btn.innerText='Enviar fotos/checklist para a central'}carregar(true)})}
 function finalizar(id){if(!confirm('Finalizar serviço no destino?'))return;pausarAtualizacao(5000);postForm(`/api/servicos/${id}/finalizar`,new FormData()).then(j=>{if(j.ok){alert('Serviço finalizado');}else alert(j.erro||'Erro')}).finally(()=>{motoristaInteragindo=false;carregar(true)})}
 function card(s){let fotos=(s.fotos||[]).map((f,i)=>`<a href="${f.url}" target="_blank">foto ${i+1}</a>`).join(' ');return `<div class="service-card"><h3>${s.protocolo||''} - ${s.tipo||''}</h3><p><b>${s.seguradora||''}</b></p><p><b>Origem:</b> ${s.origem||''}</p><p><b>Destino:</b> ${s.destino||''}</p><p><b>Status:</b> <span class="pill">${s.status||''}</span></p><a class="btn dark" target="_blank" href="https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(s.origem||'')}&destination=${encodeURIComponent(s.destino||'')}">Abrir rota</a><div class="status-actions" style="margin-top:10px"><button onclick="statusServico('${s.id}','aceito')">Aceitar</button><button class="btn red" onclick="statusServico('${s.id}','recusado')">Recusar</button><button onclick="statusServico('${s.id}','a caminho')">A caminho</button><button onclick="statusServico('${s.id}','na origem')">Na origem</button><button onclick="statusServico('${s.id}','em transporte')">Em transporte</button></div><hr><label><b>Placa do veículo removido</b></label><input id="placa_${s.id}" onfocus="pausarAtualizacao(30000)" oninput="pausarAtualizacao(30000)" value="${s.placa_veiculo_removido||s.placa_removida||''}" placeholder="Ex: ABC1D23"><button class="btn green" onclick="enviarPlaca('${s.id}')">Enviar placa para a central</button><hr><label><b>Fotos / checklist do veículo</b></label><input id="fotos_${s.id}" type="file" accept="image/*" multiple onchange="pausarAtualizacao(90000)"><button id="btn_fotos_${s.id}" class="btn dark" onclick="enviarFotos('${s.id}')">Enviar fotos/checklist para a central</button><p class="muted">Fotos já enviadas: ${fotos||'nenhuma'}</p><hr><button class="btn gray" onclick="finalizar('${s.id}')">Finalizar serviço no destino</button></div>`}
-function carregar(forcar=false){if(motoristaInteragindo&&!forcar)return;fetch(`/api/motorista/${MID}/servicos`).then(r=>r.json()).then(ss=>{document.getElementById('servicos').innerHTML=ss.length?ss.map(card).join(''):'Nenhum serviço enviado no momento.'})}
+function carregar(forcar=false){if(motoristaInteragindo&&!forcar)return;fetch(`/api/motorista/${MID}/servicos`).then(r=>r.json()).then(ss=>{notificarNovoServicoMotorista(ss);document.getElementById('servicos').innerHTML=ss.length?ss.map(card).join(''):'Nenhum serviço enviado no momento.'})}
 if(MID){carregar(true);setInterval(()=>carregar(false),5000)}
 
 function enviarLocalizacaoSilenciosa(){
@@ -55,6 +63,108 @@ window.addEventListener('load', ()=>{
   setTimeout(enviarLocalizacaoSilenciosa, 800);
   setInterval(enviarLocalizacaoSilenciosa, 30000);
 });
+
+
+
+let audioCtxMotorista = null;
+let sireneMotoristaAtiva = localStorage.getItem('sireneMotoristaAtiva') === '1';
+let servicosConhecidosMotorista = new Set(JSON.parse(localStorage.getItem('servicosConhecidosMotorista') || '[]'));
+
+function atualizarStatusSireneMotorista(){
+  const el = document.getElementById('statusSireneMotorista');
+  const btn = document.getElementById('btnAtivarSireneMotorista');
+  if(el) el.innerText = sireneMotoristaAtiva ? 'Sirene ativa. Quando chegar novo serviço, o celular vai tocar.' : 'Clique em ativar para liberar a sirene no celular.';
+  if(btn) btn.innerText = sireneMotoristaAtiva ? 'Sirene ativada' : 'Ativar sirene';
+}
+
+function ativarSireneMotorista(){
+  try {
+    audioCtxMotorista = audioCtxMotorista || new (window.AudioContext || window.webkitAudioContext)();
+    if(audioCtxMotorista.state === 'suspended') audioCtxMotorista.resume();
+    sireneMotoristaAtiva = true;
+    localStorage.setItem('sireneMotoristaAtiva','1');
+    atualizarStatusSireneMotorista();
+    tocarSireneMotorista(900);
+  } catch(e) {
+    alert('Não foi possível ativar o som neste aparelho.');
+  }
+}
+
+function tocarSireneMotorista(duracaoMs=4500){
+  if(!sireneMotoristaAtiva) return;
+  try {
+    audioCtxMotorista = audioCtxMotorista || new (window.AudioContext || window.webkitAudioContext)();
+    if(audioCtxMotorista.state === 'suspended') audioCtxMotorista.resume();
+
+    const ctx = audioCtxMotorista;
+    const start = ctx.currentTime;
+    const end = start + duracaoMs/1000;
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(650, start);
+
+    let t = start;
+    let high = true;
+    while(t < end){
+      osc.frequency.linearRampToValueAtTime(high ? 1250 : 650, t + 0.35);
+      high = !high;
+      t += 0.35;
+    }
+
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(0.35, start + 0.08);
+    gain.gain.setValueAtTime(0.35, Math.max(start + 0.1, end - 0.25));
+    gain.gain.exponentialRampToValueAtTime(0.0001, end);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(start);
+    osc.stop(end);
+  } catch(e) {
+    console.log('Som bloqueado pelo navegador:', e);
+  }
+}
+
+function testarSireneMotorista(){
+  ativarSireneMotorista();
+  tocarSireneMotorista(3500);
+}
+
+function notificarNovoServicoMotorista(servicos){
+  try {
+    const idsAtuais = (servicos || []).map(s => String(s.id || s.protocolo || '')).filter(Boolean);
+    const conhecidos = servicosConhecidosMotorista;
+
+    if(conhecidos.size === 0){
+      idsAtuais.forEach(id => conhecidos.add(id));
+      localStorage.setItem('servicosConhecidosMotorista', JSON.stringify([...conhecidos]));
+      return;
+    }
+
+    const novos = idsAtuais.filter(id => !conhecidos.has(id));
+    idsAtuais.forEach(id => conhecidos.add(id));
+    localStorage.setItem('servicosConhecidosMotorista', JSON.stringify([...conhecidos].slice(-80)));
+
+    if(novos.length > 0){
+      tocarSireneMotorista(6000);
+      if(navigator.vibrate) navigator.vibrate([600,250,600,250,600]);
+      const el = document.getElementById('statusSireneMotorista');
+      if(el) el.innerText = '🚨 Novo serviço recebido! ' + new Date().toLocaleTimeString();
+    }
+  } catch(e) {
+    console.log(e);
+  }
+}
+
+window.addEventListener('load', atualizarStatusSireneMotorista);
+document.addEventListener('click', function(){
+  if(sireneMotoristaAtiva && audioCtxMotorista && audioCtxMotorista.state === 'suspended'){
+    audioCtxMotorista.resume();
+  }
+}, {once:false});
 
 </script>
 </body>

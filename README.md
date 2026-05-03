@@ -57,3 +57,9 @@ Novidades:
 
 ## V33
 - Corrige erro `name 'urllib' is not defined` no cálculo de distância Google.
+
+
+## V34
+- Área do motorista tem aviso sonoro tipo sirene quando novo serviço chega.
+- Motorista pode ativar/testar sirene no celular.
+- Também vibra o celular quando suportado.
