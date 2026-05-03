@@ -47,3 +47,9 @@ Novidades:
 - Motorista envia GPS automaticamente ao entrar e a cada 30 segundos.
 - Distância exibe mensagens claras quando faltar GPS/origem/chave Google.
 - Banco ganha origem_lat/origem_lng para cache de geolocalização.
+
+
+## V32
+- Distância usa Google Distance Matrix direto com o endereço da origem do serviço.
+- Evita depender primeiro do geocoding/cache da origem.
+- Adiciona diagnóstico /api/servicos/{id}/debug-distancia para validar chave/endereço/GPS.

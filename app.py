@@ -1046,17 +1046,68 @@ def obter_origem_lat_lng(servico):
     return lat, lng
 
 
+
+def normalizar_endereco_google(endereco):
+    endereco = (endereco or "").strip()
+    if not endereco:
+        return ""
+    if "brasil" not in endereco.lower():
+        endereco = f"{endereco}, Rio de Janeiro, RJ, Brasil"
+    return endereco
+
+def google_distance_matrix_endereco(origem_lat, origem_lng, destino_endereco):
+    """
+    Calcula rota usando origem em lat/lng do motorista e destino como endereço textual.
+    Evita depender primeiro do Geocoding da origem do serviço.
+    """
+    key = google_api_key()
+    destino_endereco = normalizar_endereco_google(destino_endereco)
+
+    if not key:
+        return None, None, None, "GOOGLE_MAPS_API_KEY não configurada"
+    if not origem_lat or not origem_lng:
+        return None, None, None, "motorista sem GPS"
+    if not destino_endereco:
+        return None, None, None, "origem do serviço vazia"
+
+    try:
+        params = urllib.parse.urlencode({
+            "origins": f"{origem_lat},{origem_lng}",
+            "destinations": destino_endereco,
+            "mode": "driving",
+            "language": "pt-BR",
+            "region": "br",
+            "key": key
+        })
+        url = "https://maps.googleapis.com/maps/api/distancematrix/json?" + params
+        with urllib.request.urlopen(url, timeout=8) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+
+        api_status = data.get("status")
+        if api_status != "OK":
+            return None, None, None, f"Google: {api_status}"
+
+        rows = data.get("rows") or []
+        if rows and rows[0].get("elements"):
+            el = rows[0]["elements"][0]
+            el_status = el.get("status")
+            if el_status == "OK":
+                dist = el.get("distance", {})
+                dur = el.get("duration", {})
+                return dist.get("text"), dur.get("text"), dist.get("value"), "rota Google"
+            return None, None, None, f"Google rota: {el_status}"
+
+        return None, None, None, "Google sem resultado"
+    except Exception as e:
+        return None, None, None, f"erro Google: {str(e)[:60]}"
+
 @app.get('/api/servicos/{sid}/motoristas')
 def api_motoristas_para_servico(sid: str):
     s = servico_by_id(sid)
     ms = lista_motoristas()
 
+    origem_endereco = (s.get("origem") if s else "") or ""
     origem_lat = origem_lng = None
-    origem_status = ""
-    if s:
-        origem_lat, origem_lng = obter_origem_lat_lng(s)
-        if not origem_lat or not origem_lng:
-            origem_status = "origem não localizada"
 
     saida = []
     for m in ms:
@@ -1072,24 +1123,26 @@ def api_motoristas_para_servico(sid: str):
 
         if not mlat or not mlng:
             calculo_status = "motorista sem GPS"
-        elif not origem_lat or not origem_lng:
-            calculo_status = origem_status or "origem sem geolocalização"
+        elif not origem_endereco:
+            calculo_status = "origem do serviço vazia"
         else:
-            # 1º tenta rota real do Google
-            dist_txt, dur_txt, dist_metros = google_distance_matrix(mlat, mlng, origem_lat, origem_lng)
+            # 1º: rota real pelo Google usando o endereço textual da origem.
+            dist_txt, dur_txt, dist_metros, calculo_status = google_distance_matrix_endereco(
+                mlat, mlng, origem_endereco
+            )
 
-            # 2º fallback: distância aproximada em linha reta
+            # 2º: fallback aproximado por geocoding + linha reta.
             if not dist_txt:
-                dk = distancia_km(mlat, mlng, origem_lat, origem_lng)
-                if dk is not None:
-                    dist_txt = f"{dk} km aprox."
-                    dur_txt = "tempo a calcular"
-                    dist_metros = int(dk * 1000)
-                    calculo_status = "aproximado"
-                else:
-                    calculo_status = "distância indisponível"
-            else:
-                calculo_status = "rota Google"
+                if origem_lat is None or origem_lng is None:
+                    origem_lat, origem_lng = obter_origem_lat_lng(s) if s else (None, None)
+
+                if origem_lat and origem_lng:
+                    dk = distancia_km(mlat, mlng, origem_lat, origem_lng)
+                    if dk is not None:
+                        dist_txt = f"{dk} km aprox."
+                        dur_txt = "tempo a calcular"
+                        dist_metros = int(dk * 1000)
+                        calculo_status = "aproximado"
 
         saida.append({
             **m,
@@ -1108,6 +1161,29 @@ def api_motoristas_para_servico(sid: str):
     ))
     return saida
 
+
+
+@app.get('/api/servicos/{sid}/debug-distancia')
+def api_debug_distancia(sid: str):
+    s = servico_by_id(sid)
+    ms = lista_motoristas()
+    online = [m for m in ms if m.get("online") and m.get("lat") and m.get("lng")]
+    if not s:
+        return {"ok": False, "erro": "serviço não encontrado"}
+    if not online:
+        return {"ok": False, "erro": "nenhum motorista online com GPS", "origem": s.get("origem")}
+    m = online[0]
+    d, t, v, st = google_distance_matrix_endereco(m.get("lat"), m.get("lng"), s.get("origem"))
+    return {
+        "ok": bool(d),
+        "origem": s.get("origem"),
+        "motorista": m.get("nome"),
+        "lat": m.get("lat"),
+        "lng": m.get("lng"),
+        "distancia": d,
+        "tempo": t,
+        "status": st
+    }
 
 @app.post('/servicos/{sid}/enviar')
 def enviar_servico(sid: str, motorista_id: str=Form(...)):
