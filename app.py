@@ -14,14 +14,23 @@ from fastapi import FastAPI, Request, UploadFile, File, Form
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import pandas as pd
 import io, socket, shutil, uuid, json, math, re
 import psycopg2
 from psycopg2.extras import RealDictCursor, Json
 
 app = FastAPI(title="Sistema Interno de Reboque V13 - Faturamento")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 app.mount('/static', StaticFiles(directory='static'), name='static')
 templates = Jinja2Templates(directory='templates')
 UPLOAD_DIR = os.path.join('static', 'uploads')
@@ -429,11 +438,89 @@ DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 if DATABASE_URL and "sslmode=" not in DATABASE_URL:
     DATABASE_URL += ("&" if "?" in DATABASE_URL else "?") + "sslmode=require"
 
-def agora_dt(): return datetime.now()
+TZ_BR = ZoneInfo("America/Sao_Paulo")
+
+
+def agora_dt():
+    """Datetime naive no fuso America/Sao_Paulo (horário de Brasília)."""
+    return datetime.now(TZ_BR).replace(tzinfo=None)
+
+
 def agora(): return agora_dt().strftime('%d/%m/%Y %H:%M:%S')
+
+
+def parse_datetime_br(valor):
+    """Converte dd/mm/yyyy HH:mm(:ss) — horário de Brasília, sem UTC."""
+    s = (valor or "").strip()
+    if not s or s == "-":
+        return None
+    for fmt in ("%d/%m/%Y %H:%M:%S", "%d/%m/%Y %H:%M", "%d/%m/%Y"):
+        try:
+            return datetime.strptime(s, fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def _parse_dt_valor(v):
+    """Interpreta datetime do banco, ISO ou formato BR."""
+    if v is None:
+        return None
+    if isinstance(v, datetime):
+        return v
+    if not isinstance(v, str):
+        return None
+    s = v.strip()
+    if not s or s == "-":
+        return None
+
+    dt = parse_datetime_br(s)
+    if dt:
+        return dt
+
+    s_iso = s.replace("Z", "+00:00")
+    if re.search(r"\+\d{2}$", s_iso):
+        s_iso = s_iso + ":00"
+    if " " in s_iso and "T" not in s_iso:
+        s_iso = s_iso.replace(" ", "T", 1)
+    try:
+        return datetime.fromisoformat(s_iso)
+    except ValueError:
+        pass
+
+    m = re.match(r"(\d{4}-\d{2}-\d{2})[\sT](\d{2}:\d{2})", s)
+    if m:
+        try:
+            return datetime.strptime(f"{m.group(1)} {m.group(2)}", "%Y-%m-%d %H:%M")
+        except ValueError:
+            pass
+    return None
+
+
+def _dt_para_local_br(dt):
+    if dt is None:
+        return None
+    if dt.tzinfo is not None:
+        return dt.astimezone(TZ_BR).replace(tzinfo=None)
+    return dt
+
+
+def formatar_data_hora_central(v):
+    """Coluna Data e Hora da Central: dd/mm/yyyy HH:mm (sem segundos, sem +00)."""
+    dt = _parse_dt_valor(v)
+    if not dt:
+        return "-"
+    dt = _dt_para_local_br(dt)
+    return dt.strftime("%d/%m/%Y %H:%M")
+
+
 def dt_str(v):
-    if not v: return "-"
-    return v if isinstance(v,str) else v.strftime("%d/%m/%Y %H:%M:%S")
+    """Formata timestamp para exibição geral."""
+    dt = _parse_dt_valor(v)
+    if not dt:
+        return "-"
+    dt = _dt_para_local_br(dt)
+    return dt.strftime("%d/%m/%Y %H:%M:%S")
 def get_conn():
     if not DATABASE_URL:
         raise RuntimeError("DATABASE_URL não configurada no Render.")
@@ -534,6 +621,13 @@ def init_db():
               ativo boolean default true,
               created_at timestamp default now()
             );""")
+            cur.execute("""
+            create table if not exists comentarios_servico (
+              id uuid primary key default uuid_generate_v4(),
+              servico_id uuid not null,
+              texto text not null,
+              criado_em timestamp default now()
+            );""")
             alters=[
             "alter table motoristas add column if not exists tipo text;",
             "alter table motoristas add column if not exists cpf text;",
@@ -571,6 +665,9 @@ def init_db():
             "alter table servicos add column if not exists cnpj_cliente text;",
             "alter table servicos add column if not exists referencia_origem text;",
             "alter table servicos add column if not exists referencia_destino text;",
+            "alter table servicos add column if not exists solicitante text;",
+            "alter table servicos add column if not exists problema text;",
+            "alter table servicos add column if not exists fonte_importacao text;",
             "alter table servicos add column if not exists origem_lat double precision;",
             "alter table servicos add column if not exists origem_lng double precision;",
             "alter table checklist_assinaturas add column if not exists assinatura_origem_base64 text;",
@@ -741,6 +838,99 @@ def salvar_placa_cliente_servico(sid, placa_veiculo):
     return True, None
 
 
+def desmontar_endereco_servico(endereco):
+    """Extrai local, bairro, cidade e UF de endereço salvo (formato local - bairro - cidade/UF)."""
+    out = {"local": "", "bairro": "", "cidade": "", "uf": ""}
+    if not endereco or str(endereco).strip() in ("-", ""):
+        return out
+    texto = str(endereco).strip()
+    partes = [p.strip() for p in texto.split(" - ") if p.strip()]
+    if partes:
+        out["local"] = partes[0]
+    if len(partes) >= 3:
+        out["bairro"] = partes[1]
+        ult = partes[2]
+        if "/" in ult:
+            cidade, uf = ult.split("/", 1)
+            out["cidade"] = cidade.strip()
+            out["uf"] = uf.strip()
+        else:
+            out["cidade"] = ult
+    else:
+        bairro, cidade = extrair_bairro_cidade(texto)
+        if bairro and bairro != "-":
+            out["bairro"] = bairro
+        if cidade and cidade != "-":
+            out["cidade"] = cidade
+    return out
+
+
+def listar_comentarios_servico(servico_id):
+    rows = q(
+        """
+        select id, texto, criado_em
+          from comentarios_servico
+         where servico_id = %s
+         order by criado_em desc
+        """,
+        (str(servico_id),),
+        True,
+    )
+    return [
+        {
+            "id": str(r["id"]),
+            "texto": r["texto"],
+            "criado_em": formatar_data_hora_central(r.get("criado_em")),
+        }
+        for r in (rows or [])
+    ]
+
+
+def coletar_arquivos_servico(servico_id, servico=None):
+    """Fotos gerais + fotos do checklist (URLs únicas)."""
+    s = servico or servico_by_id(servico_id)
+    vistos = set()
+    arquivos = []
+
+    def add(url, tipo, nome):
+        u = (url or "").strip()
+        if not u or u in vistos:
+            return
+        vistos.add(u)
+        arquivos.append({"url": u, "tipo": tipo, "nome": nome or tipo})
+
+    for f in s.get("fotos") or []:
+        add(f.get("url"), "Foto do serviço", f.get("filename") or "Foto")
+    for parte, dados in partes_checklist_dict(servico_id).items():
+        for foto in dados.get("fotos") or []:
+            add(foto, f"Checklist — {parte}", parte)
+    return arquivos
+
+
+def checklist_resumo_servico(servico_id):
+    partes = partes_checklist_dict(servico_id)
+    checklist = [
+        {"parte": parte, "marcacoes": dados.get("marcacoes") or [], "fotos": dados.get("fotos") or []}
+        for parte, dados in partes.items()
+    ]
+    assinaturas = obter_assinaturas_checklist(servico_id)
+    total_avarias = sum(len(c.get("marcacoes") or []) for c in checklist)
+    total_fotos = sum(len(c.get("fotos") or []) for c in checklist)
+    status = "Concluído" if assinaturas.get("assinatura_origem_salva") else "Pendente"
+    if assinaturas.get("assinatura_destino_salva"):
+        status = "Origem e destino assinados"
+    elif assinaturas.get("assinatura_origem_salva"):
+        status = "Origem assinada"
+    return {
+        "checklist": checklist,
+        "assinaturas": assinaturas,
+        "total_partes": len(checklist),
+        "total_avarias": total_avarias,
+        "total_fotos_checklist": total_fotos,
+        "status": status,
+    }
+
+
 def lista_motoristas():
     return [normalizar_motorista(r) for r in q("select * from motoristas where coalesce(ativo,true)=true order by nome asc", fetch=True)]
 def lista_servicos(limit=None, ativos=False, filtros=None):
@@ -907,42 +1097,206 @@ def dados_dashboard():
     }
 
 
-def lista_servicos_central_filtrada(statuses: str = "", status: str = "", limit: int = 200):
-    """Lista serviços do dia para a Central, com filtro opcional por status."""
+def extrair_bairro_cidade(endereco):
+    """Extrai bairro e cidade de endereço textual quando possível."""
+    if not endereco or not str(endereco).strip():
+        return "-", "-"
+    texto = str(endereco).strip()
+    partes = [p.strip() for p in re.split(r"\s*-\s*", texto) if p.strip()]
+    if len(partes) >= 2:
+        cidade = partes[-1].split("/")[0].strip()
+        bairro = partes[-2] if len(partes) >= 3 else "-"
+        if len(bairro) > 60:
+            bairro = "-"
+        if len(cidade) > 60:
+            cidade = partes[-1][:60]
+        return bairro or "-", cidade or "-"
+    partes = [p.strip() for p in texto.split(",") if p.strip()]
+    if len(partes) >= 2:
+        cidade = partes[-1].split("/")[0].strip() or "-"
+        bairro = partes[-2] if len(partes) >= 3 else "-"
+        return bairro, cidade
+    return "-", "-"
+
+
+def enriquecer_servico_central(s, raw_row=None):
+    if not s:
+        return s
+    ob, oc = extrair_bairro_cidade(s.get("origem"))
+    db, dc = extrair_bairro_cidade(s.get("destino"))
+    s["origem_bairro"] = ob
+    s["origem_cidade"] = oc
+    s["destino_bairro"] = db
+    s["destino_cidade"] = dc
+    if raw_row is not None:
+        ts = raw_row.get("created_at") or raw_row.get("criado_em")
+    else:
+        ts = s.get("created_at") or s.get("criado_em")
+    s["data_hora_central"] = formatar_data_hora_central(ts)
+    return s
+
+
+def _central_busca_avancada_ativa(**kwargs):
+    avancados = (
+        "data_ini", "data_fim", "protocolo", "placa", "seguradora",
+        "motorista", "tipo", "origem", "destino", "checklist", "status_faturamento",
+    )
+    return any((kwargs.get(k) or "").strip() for k in avancados)
+
+
+def _central_titulo_filtros(filtros):
+    partes = []
+    if filtros.get("statuses"):
+        partes.append("Status: " + filtros["statuses"].replace(",", ", "))
+    elif filtros.get("status"):
+        partes.append("Status: " + filtros["status"])
+    rotulos = {
+        "data_ini": "De",
+        "data_fim": "Até",
+        "protocolo": "Protocolo",
+        "placa": "Placa",
+        "seguradora": "Empresa",
+        "motorista": "Motorista",
+        "tipo": "Tipo",
+        "origem": "Origem",
+        "destino": "Destino",
+        "checklist": "Checklist",
+        "status_faturamento": "Fat.",
+    }
+    for chave, rotulo in rotulos.items():
+        val = (filtros.get(chave) or "").strip()
+        if val:
+            partes.append(f"{rotulo}: {val}")
+    return " · ".join(partes)
+
+
+def lista_servicos_central_filtrada(
+    statuses: str = "",
+    status: str = "",
+    data_ini: str = "",
+    data_fim: str = "",
+    protocolo: str = "",
+    placa: str = "",
+    seguradora: str = "",
+    motorista: str = "",
+    tipo: str = "",
+    origem: str = "",
+    destino: str = "",
+    checklist: str = "",
+    status_faturamento: str = "",
+    limit: int = 200,
+):
+    """Lista serviços para a Central com filtros opcionais."""
     limit = int(limit or 200)
+    where = []
+    params = []
+
+    data_ini = (data_ini or "").strip()
+    data_fim = (data_fim or "").strip()
+    if data_ini:
+        where.append("created_at::date >= %s")
+        params.append(data_ini)
+    if data_fim:
+        where.append("created_at::date <= %s")
+        params.append(data_fim)
+    if not data_ini and not data_fim:
+        where.append("created_at::date = current_date")
+
+    statuses = (statuses or "").strip()
+    status = (status or "").strip()
     if statuses:
         sts = [s.strip().lower() for s in statuses.split(",") if s.strip()]
         if sts:
             placeholders = ",".join(["%s"] * len(sts))
-            rows = q(
-                f"""
-                select *
-                  from servicos
-                 where created_at::date = current_date
-                   and lower(coalesce(status, 'novo')) in ({placeholders})
-                 order by created_at desc
-                 limit {limit}
-                """,
-                tuple(sts),
-                True,
-            )
-            return [normalizar_servico(r) for r in rows]
-    if status:
-        st = status.strip().lower()
-        rows = q(
-            f"""
-            select *
-              from servicos
-             where created_at::date = current_date
-               and lower(coalesce(status, 'novo')) = %s
-             order by created_at desc
-             limit {limit}
-            """,
-            (st,),
-            True,
+            where.append(f"lower(coalesce(status, 'novo')) in ({placeholders})")
+            params.extend(sts)
+    elif status:
+        where.append("lower(coalesce(status, 'novo')) = %s")
+        params.append(status.lower())
+    elif not _central_busca_avancada_ativa(
+        data_ini=data_ini, data_fim=data_fim, protocolo=protocolo, placa=placa,
+        seguradora=seguradora, motorista=motorista, tipo=tipo, origem=origem,
+        destino=destino, checklist=checklist, status_faturamento=status_faturamento,
+    ):
+        where.append("coalesce(status, 'novo') <> 'finalizado'")
+
+    protocolo = (protocolo or "").strip()
+    if protocolo:
+        where.append("coalesce(protocolo, '') ilike %s")
+        params.append(f"%{protocolo}%")
+
+    placa = (placa or "").strip().upper().replace("-", "").replace(" ", "")
+    if placa:
+        where.append(
+            """(
+              upper(replace(replace(coalesce(placa_veiculo_removido, ''), '-', ''), ' ', '')) ilike %s
+              or upper(replace(replace(coalesce(placa_removida, ''), '-', ''), ' ', '')) ilike %s
+            )"""
         )
-        return [normalizar_servico(r) for r in rows]
-    return lista_servicos_hoje(limit=limit)
+        params.extend([f"%{placa}%", f"%{placa}%"])
+
+    seguradora = (seguradora or "").strip()
+    if seguradora:
+        where.append("coalesce(seguradora, '') ilike %s")
+        params.append(f"%{seguradora}%")
+
+    motorista = (motorista or "").strip()
+    if motorista:
+        where.append("coalesce(motorista_nome, '') ilike %s")
+        params.append(f"%{motorista}%")
+
+    tipo = (tipo or "").strip()
+    if tipo:
+        where.append("coalesce(tipo, '') ilike %s")
+        params.append(f"%{tipo}%")
+
+    origem = (origem or "").strip()
+    if origem:
+        where.append("coalesce(origem, '') ilike %s")
+        params.append(f"%{origem}%")
+
+    destino = (destino or "").strip()
+    if destino:
+        where.append("coalesce(destino, '') ilike %s")
+        params.append(f"%{destino}%")
+
+    status_faturamento = (status_faturamento or "").strip()
+    if status_faturamento:
+        where.append("coalesce(status_faturamento, 'para_conferir') = %s")
+        params.append(status_faturamento)
+
+    checklist = (checklist or "").strip().lower()
+    if checklist == "nao_iniciado":
+        where.append(
+            "not exists (select 1 from checklist_avarias c where c.servico_id = servicos.id)"
+        )
+    elif checklist == "iniciado":
+        where.append(
+            "exists (select 1 from checklist_avarias c where c.servico_id = servicos.id)"
+        )
+        where.append(
+            """not exists (
+                 select 1 from checklist_assinaturas a
+                  where a.servico_id = servicos.id
+                    and coalesce(a.assinatura_origem_base64, '') <> ''
+               )"""
+        )
+    elif checklist == "concluido":
+        where.append(
+            """exists (
+                 select 1 from checklist_assinaturas a
+                  where a.servico_id = servicos.id
+                    and coalesce(a.assinatura_origem_base64, '') <> ''
+               )"""
+        )
+
+    sql = "select * from servicos"
+    if where:
+        sql += " where " + " and ".join(where)
+    sql += f" order by created_at desc limit {limit}"
+
+    rows = q(sql, tuple(params), True)
+    return [enriquecer_servico_central(normalizar_servico(r), raw_row=r) for r in rows]
 
 
 def status_operacional_motorista_dashboard(motorista):
@@ -1298,24 +1652,57 @@ def api_dashboard_live():
 
 
 @app.get('/central', response_class=HTMLResponse)
-def central(request: Request, statuses: str = "", status: str = ""):
-    titulo_filtro = ""
-    if statuses:
-        titulo_filtro = "Filtro: " + statuses.replace(",", ", ")
-    elif status:
-        titulo_filtro = "Filtro: " + status
+def central(
+    request: Request,
+    statuses: str = "",
+    status: str = "",
+    data_ini: str = "",
+    data_fim: str = "",
+    protocolo: str = "",
+    placa: str = "",
+    seguradora: str = "",
+    motorista: str = "",
+    tipo: str = "",
+    origem: str = "",
+    destino: str = "",
+    checklist: str = "",
+    status_faturamento: str = "",
+):
+    filtros = {
+        "statuses": statuses,
+        "status": status,
+        "data_ini": data_ini,
+        "data_fim": data_fim,
+        "protocolo": protocolo,
+        "placa": placa,
+        "seguradora": seguradora,
+        "motorista": motorista,
+        "tipo": tipo,
+        "origem": origem,
+        "destino": destino,
+        "checklist": checklist,
+        "status_faturamento": status_faturamento,
+    }
+    titulo_filtro = _central_titulo_filtros(filtros)
     return templates.TemplateResponse(
         'index.html',
         {
             'request': request,
             'motoristas': lista_motoristas(),
-            'servicos': lista_servicos_central_filtrada(statuses=statuses, status=status),
+            'servicos': lista_servicos_central_filtrada(**filtros),
             'lan_ip': get_lan_ip(),
             'tipos_servico': lista_tipos_servico(),
             'precos_por_tipo': {t: itens_padrao_tipo(t) for t in lista_tipos_servico()},
+            'filtros': filtros,
             'filtro_statuses': statuses,
             'filtro_status': status,
             'titulo_filtro': titulo_filtro,
+            'nav_ativo': 'central',
+            'nav_som': True,
+            'status_operacionais': [
+                'novo', 'enviado', 'aceito', 'a caminho', 'na origem',
+                'em transporte', 'finalizado', 'recusado', 'cancelado',
+            ],
         },
     )
 
@@ -1653,6 +2040,8 @@ def pagina_motoristas(request: Request, online: str = ""):
             'request': request,
             'motoristas': motoristas,
             'filtro_online': online in ("1", "true", "sim"),
+            'nav_ativo': 'motoristas',
+            'nav_som': False,
         },
     )
 
@@ -1724,12 +2113,12 @@ def historico(request: Request, data_ini: str="", data_fim: str="", seguradora: 
         por_seg=df.groupby(df["seguradora"].fillna("").replace("", "Sem seguradora")).size().reset_index(name="total").rename(columns={"seguradora":"nome"}).to_dict("records")
         por_tipo=df.groupby(df["tipo"].fillna("").replace("", "Sem tipo")).size().reset_index(name="total").rename(columns={"tipo":"nome"}).to_dict("records")
         por_mot=df.groupby(df["motorista_nome"].fillna("").replace("", "Sem motorista")).size().reset_index(name="total").rename(columns={"motorista_nome":"nome"}).to_dict("records")
-    return templates.TemplateResponse('historico.html', {'request':request,'servicos':servs,'filtros':filtros,'kpis':{"total":total,"finalizados":finalizados,"ativos":ativos,"com_placa":com_placa},'por_seg':por_seg,'por_tipo':por_tipo,'por_mot':por_mot})
+    return templates.TemplateResponse('historico.html', {'request':request,'servicos':servs,'filtros':filtros,'kpis':{"total":total,"finalizados":finalizados,"ativos":ativos,"com_placa":com_placa},'por_seg':por_seg,'por_tipo':por_tipo,'por_mot':por_mot,'nav_ativo':'relatorios','nav_som':False})
 
 @app.get('/operacao', response_class=HTMLResponse)
 def operacao(request: Request):
     ms=lista_motoristas(); servs=lista_servicos(ativos=True,limit=150); ultimos=lista_servicos(limit=20); online=len([m for m in ms if m.get("online")])
-    return templates.TemplateResponse('operacao.html', {'request':request,'motoristas':ms,'servicos':servs,'ultimos':ultimos,'online':online,'total_motoristas':len(ms)})
+    return templates.TemplateResponse('operacao.html', {'request':request,'motoristas':ms,'servicos':servs,'ultimos':ultimos,'online':online,'total_motoristas':len(ms),'nav_ativo':'operacao','nav_som':False})
 
 @app.post('/motoristas')
 async def criar_motorista(request: Request):
@@ -2247,11 +2636,379 @@ def atualizar_localizacao(mid: str, payload: LocationPayload):
 @app.post('/api/motoristas/{mid}/offline')
 def motorista_offline(mid: str):
     q("update motoristas set online=false,ultima_atualizacao=now() where id=%s",(str(mid),)); return {'ok':True}
+
+
+def _vianet_txt(*valores):
+    for v in valores:
+        s = (v or "").strip()
+        if s and s.lower() not in ("-", "nan", "none", "null"):
+            return s
+    return ""
+
+
+_VIANET_LABELS_PROTOCOLO = {
+    "solicitacao", "solicitação", "assistencia", "assistência",
+    "protocolo", "protocolo externo", "local", "cidade", "uf", "estado",
+    "bairro", "cep", "selecionar prestador",
+}
+
+
+def _vianet_norm_label(s):
+    return (s or "").strip().lower().rstrip(":")
+
+
+def _vianet_eh_label_invalido(valor):
+    n = _vianet_norm_label(valor)
+    if not n:
+        return True
+    if n in _VIANET_LABELS_PROTOCOLO:
+        return True
+    if n.endswith(":") or valor.strip().endswith(":"):
+        return True
+    return False
+
+
+def _vianet_extrair_digitos(valor, min_len=1, max_len=12):
+    if _vianet_eh_label_invalido(valor):
+        return ""
+    digits = re.sub(r"\D", "", str(valor or ""))
+    if min_len <= len(digits) <= max_len:
+        return digits
+    return ""
+
+
+def _vianet_protocolo_valido(protocolo):
+    p = (protocolo or "").strip()
+    if not p or _vianet_eh_label_invalido(p):
+        return False
+    if not re.search(r"\d", p):
+        return False
+    return True
+
+
+def montar_protocolo_vianet(dados: dict):
+    """Monta protocolo final: assistência-solicitação, ou assistência, ou protocolo externo."""
+    assist = _vianet_extrair_digitos(
+        _vianet_txt(dados.get("assistencia")), min_len=5, max_len=12
+    )
+    solicit = _vianet_extrair_digitos(
+        _vianet_txt(dados.get("solicitacao")), min_len=1, max_len=4
+    )
+    externo_raw = _vianet_txt(dados.get("protocolo_externo"))
+    externo = externo_raw if _vianet_protocolo_valido(externo_raw) else ""
+
+    proto_capturado = _vianet_txt(dados.get("protocolo"))
+    if _vianet_protocolo_valido(proto_capturado):
+        if assist and solicit and proto_capturado == f"{assist}-{solicit}":
+            return proto_capturado
+        if assist and proto_capturado == assist:
+            return proto_capturado
+        if not assist and not solicit:
+            return proto_capturado
+
+    if assist and solicit:
+        return f"{assist}-{solicit}"
+    if assist:
+        return assist
+    if externo:
+        return externo
+    if _vianet_protocolo_valido(proto_capturado):
+        return proto_capturado
+    return ""
+
+
+def sanitizar_campos_endereco_vianet(bairro, cidade, estado, cep):
+    """Evita UF em bairro e CEP em cidade."""
+    bairro = (bairro or "").strip()
+    cidade = (cidade or "").strip()
+    estado = (estado or "").strip().upper()
+    cep = (cep or "").strip()
+
+    if bairro and len(bairro) == 2 and bairro.isalpha():
+        if not estado:
+            estado = bairro.upper()
+        bairro = ""
+
+    if cidade:
+        cep_digits = re.sub(r"\D", "", cidade)
+        if re.fullmatch(r"\d{5,8}", cep_digits):
+            if not cep:
+                cep = cep_digits
+            cidade = ""
+        elif re.search(r"\(ref\s*:", cidade, re.I):
+            cidade = re.sub(r"\s*\(ref\s*:.*\)\s*$", "", cidade, flags=re.I).strip()
+
+    if estado and len(estado) > 2:
+        uf_match = re.search(r"\b([A-Z]{2})\b", estado.upper())
+        if uf_match:
+            estado = uf_match.group(1)
+
+    if cep:
+        cep = re.sub(r"\D", "", cep)
+        if len(cep) == 8:
+            cep = f"{cep[:5]}-{cep[5:]}"
+
+    return bairro, cidade, estado, cep
+
+
+def montar_endereco_vianet(local, complemento, bairro, cidade, estado, cep, referencias=""):
+    """Formato compatível com extrair_bairro_cidade da Central: local - bairro - cidade/UF."""
+    bairro, cidade, estado, cep = sanitizar_campos_endereco_vianet(bairro, cidade, estado, cep)
+    local = (local or "").strip()
+    complemento = (complemento or "").strip()
+    if complemento and complemento.lower() not in ("-", "nan"):
+        local = f"{local}, {complemento}" if local else complemento
+
+    partes = []
+    if local:
+        partes.append(local)
+    if bairro:
+        partes.append(bairro)
+    if cidade:
+        if estado and len(estado) == 2:
+            partes.append(f"{cidade}/{estado}")
+        else:
+            partes.append(cidade)
+    elif estado and len(estado) == 2:
+        partes.append(estado)
+
+    endereco = " - ".join(partes) if partes else ""
+    if not endereco and cep:
+        endereco = f"CEP {cep}"
+    return endereco or "-"
+
+
+def servico_existe_por_protocolo(protocolo):
+    prot = (protocolo or "").strip()
+    if not prot:
+        return None
+    return one(
+        """
+        select id, protocolo
+          from servicos
+         where lower(trim(coalesce(protocolo, ''))) = lower(%s)
+         limit 1
+        """,
+        (prot,),
+    )
+
+
+def importar_servico_vianet(dados: dict):
+    """Cria serviço a partir do payload da extensão Vianet/Mondial."""
+    protocolo = montar_protocolo_vianet(dados)
+    if not _vianet_protocolo_valido(protocolo):
+        return {
+            "ok": False,
+            "erro": "Protocolo inválido. Abra a tela do serviço no Vianet.",
+        }
+
+    existente = servico_existe_por_protocolo(protocolo)
+    if existente:
+        return {
+            "ok": False,
+            "erro": "serviço já cadastrado",
+            "id": str(existente.get("id")),
+            "protocolo": existente.get("protocolo") or protocolo,
+        }
+
+    seguradora = _vianet_txt(dados.get("seguradora"), dados.get("produto"))
+    tipo = normalizar_tipo_importado(
+        _vianet_txt(dados.get("tipo_servico"), dados.get("servico"), dados.get("serviço"))
+    )
+
+    origem = montar_endereco_vianet(
+        dados.get("local_origem"),
+        dados.get("complemento_origem"),
+        dados.get("bairro_origem"),
+        dados.get("cidade_origem"),
+        dados.get("estado_origem"),
+        dados.get("cep_origem"),
+        dados.get("referencias_origem"),
+    )
+    destino = montar_endereco_vianet(
+        dados.get("local_destino"),
+        dados.get("complemento_destino"),
+        dados.get("bairro_destino"),
+        dados.get("cidade_destino"),
+        dados.get("estado_destino"),
+        dados.get("cep_destino"),
+        _vianet_txt(dados.get("referencia_destino"), dados.get("referencias_destino")),
+    )
+
+    placa_raw = _vianet_txt(dados.get("placa"))
+    placa = normalizar_placa_cliente(placa_raw) if placa_raw else ""
+
+    veiculo_partes = [
+        _vianet_txt(dados.get("veiculo")),
+        _vianet_txt(dados.get("ano")),
+        _vianet_txt(dados.get("cor")),
+        _vianet_txt(dados.get("combustivel")),
+    ]
+    veiculo_cliente = " · ".join([p for p in veiculo_partes if p])
+
+    beneficiario = _vianet_txt(dados.get("segurado"), dados.get("beneficiario"))
+    telefone_cliente = _vianet_txt(dados.get("telefone"))
+    solicitante = _vianet_txt(dados.get("solicitante"))
+    problema = _vianet_txt(dados.get("problema"))
+    cor_cliente = _vianet_txt(dados.get("cor"))
+    referencia_origem = _vianet_txt(dados.get("referencias_origem"))
+    referencia_destino = _vianet_txt(
+        dados.get("referencia_destino"), dados.get("referencias_destino")
+    )
+
+    obs_partes = ["Importado via extensão Essência Exportador (Vianet/Mondial)"]
+    for rotulo, chave in [
+        ("Aceito em", "aceito_em"),
+        ("Prazo", "prazo"),
+        ("Problema", "problema"),
+        ("Solicitante", "solicitante"),
+        ("Combustível", "combustivel"),
+    ]:
+        val = _vianet_txt(dados.get(chave))
+        if val:
+            obs_partes.append(f"{rotulo}: {val}")
+    observacao = " | ".join(obs_partes)
+
+    ts_importacao = agora_dt()
+
+    row = one(
+        """
+        insert into servicos (
+            protocolo, seguradora, tipo, origem, destino, observacao,
+            status, status_faturamento,
+            placa_veiculo_removido, placa_removida,
+            beneficiario, telefone_cliente, veiculo_cliente, cor_cliente,
+            referencia_origem, referencia_destino,
+            solicitante, problema, fonte_importacao,
+            criado_em, atualizado_em, created_at
+        ) values (
+            %s,%s,%s,%s,%s,%s,
+            'novo','para_conferir',
+            %s,%s,
+            %s,%s,%s,%s,
+            %s,%s,
+            %s,%s,'vianet',
+            %s,%s,%s
+        ) returning id, protocolo
+        """,
+        (
+            protocolo,
+            seguradora,
+            tipo,
+            origem,
+            destino,
+            observacao,
+            placa or None,
+            placa or None,
+            beneficiario or None,
+            telefone_cliente or None,
+            veiculo_cliente or None,
+            cor_cliente or None,
+            referencia_origem or None,
+            referencia_destino or None,
+            solicitante or None,
+            problema or None,
+            ts_importacao,
+            ts_importacao,
+            ts_importacao,
+        ),
+    )
+
+    sid = str(row["id"])
+    criar_itens_para_servico(row["id"], tipo)
+    registrar_evento_db(sid, "novo", "Importado da extensão Vianet/Mondial")
+
+    return {
+        "ok": True,
+        "id": sid,
+        "protocolo": row.get("protocolo") or protocolo,
+        "mensagem": "Serviço importado com sucesso.",
+    }
+
+
+class VianetImportPayload(BaseModel):
+    protocolo: str = ""
+    assistencia: str = ""
+    solicitacao: str = ""
+    protocolo_externo: str = ""
+    seguradora: str = ""
+    produto: str = ""
+    tipo_servico: str = ""
+    servico: str = ""
+    aceito_em: str = ""
+    prazo: str = ""
+    local_origem: str = ""
+    complemento_origem: str = ""
+    bairro_origem: str = ""
+    cidade_origem: str = ""
+    estado_origem: str = ""
+    cep_origem: str = ""
+    referencias_origem: str = ""
+    problema: str = ""
+    segurado: str = ""
+    solicitante: str = ""
+    telefone: str = ""
+    veiculo: str = ""
+    placa: str = ""
+    ano: str = ""
+    cor: str = ""
+    combustivel: str = ""
+    local_destino: str = ""
+    complemento_destino: str = ""
+    referencia_destino: str = ""
+    bairro_destino: str = ""
+    cidade_destino: str = ""
+    estado_destino: str = ""
+    cep_destino: str = ""
+    raw: dict | None = None
+
+
+@app.post("/api/importar/vianet")
+async def api_importar_vianet(payload: VianetImportPayload):
+    dados = payload.model_dump()
+    if payload.raw and isinstance(payload.raw, dict):
+        for k, v in payload.raw.items():
+            if k not in dados or not str(dados.get(k) or "").strip():
+                dados[k] = v
+    resultado = importar_servico_vianet(dados)
+    status = 200 if resultado.get("ok") else (409 if resultado.get("erro") == "serviço já cadastrado" else 400)
+    return JSONResponse(resultado, status_code=status)
+
+
 @app.get('/api/motoristas')
 def api_motoristas(): return lista_motoristas()
 @app.get('/api/servicos')
-def api_servicos(statuses: str = "", status: str = ""):
-    return lista_servicos_central_filtrada(statuses=statuses, status=status, limit=200)
+def api_servicos(
+    statuses: str = "",
+    status: str = "",
+    data_ini: str = "",
+    data_fim: str = "",
+    protocolo: str = "",
+    placa: str = "",
+    seguradora: str = "",
+    motorista: str = "",
+    tipo: str = "",
+    origem: str = "",
+    destino: str = "",
+    checklist: str = "",
+    status_faturamento: str = "",
+):
+    return lista_servicos_central_filtrada(
+        statuses=statuses,
+        status=status,
+        data_ini=data_ini,
+        data_fim=data_fim,
+        protocolo=protocolo,
+        placa=placa,
+        seguradora=seguradora,
+        motorista=motorista,
+        tipo=tipo,
+        origem=origem,
+        destino=destino,
+        checklist=checklist,
+        status_faturamento=status_faturamento,
+        limit=200,
+    )
 
 
 # ============================================================
@@ -2471,20 +3228,185 @@ def faturamento(request: Request, data_ini: str="", data_fim: str="", seguradora
       "negociacao": len([s for s in servs if s.get("status_faturamento")=="negociacao"]),
       "faturado": len([s for s in servs if s.get("status_faturamento")=="faturado"]),
     }
-    return templates.TemplateResponse('faturamento.html', {'request':request,'servicos':servs,'filtros':dict(data_ini=data_ini,data_fim=data_fim,seguradora=seguradora,status_faturamento=status_faturamento,motorista=motorista),'kpis':kpis})
+    return templates.TemplateResponse('faturamento.html', {'request':request,'servicos':servs,'filtros':dict(data_ini=data_ini,data_fim=data_fim,seguradora=seguradora,status_faturamento=status_faturamento,motorista=motorista),'kpis':kpis,'nav_ativo':'faturamento','nav_som':False})
+
+
+def _faturamento_redirect_com_filtros(form_or_dict):
+    """Monta URL /faturamento preservando filtros da query string."""
+    if hasattr(form_or_dict, "get"):
+        get = form_or_dict.get
+    else:
+        get = form_or_dict.get
+    params = {}
+    for key, form_key in [
+        ("data_ini", "data_ini"),
+        ("data_fim", "data_fim"),
+        ("seguradora", "seguradora"),
+        ("motorista", "motorista"),
+        ("status_faturamento", "status_faturamento_filtro"),
+    ]:
+        val = (get(form_key) or get(key) or "").strip()
+        if val:
+            params[key] = val
+    qs = urllib.parse.urlencode(params)
+    return f"/faturamento?{qs}" if qs else "/faturamento"
+
+
+@app.post('/faturamento/acao-massa')
+async def faturamento_acao_massa(request: Request):
+    form = await request.form()
+    ids = form.getlist("servico_ids")
+    novo_status = (form.get("status_faturamento") or "").strip()
+    permitidos = {"para_conferir", "para_faturar", "negociacao", "faturado"}
+    if novo_status not in permitidos:
+        return RedirectResponse(_faturamento_redirect_com_filtros(form), 303)
+
+    atualizados = 0
+    for sid in ids:
+        sid = str(sid).strip()
+        if not sid:
+            continue
+        if not one("select id from servicos where id=%s", (sid,)):
+            continue
+        q(
+            "update servicos set status_faturamento=%s, atualizado_em=now() where id=%s",
+            (novo_status, sid),
+        )
+        registrar_evento_db(sid, "faturamento", f"Status faturamento (massa): {novo_status}")
+        atualizados += 1
+
+    destino = _faturamento_redirect_com_filtros(form)
+    if atualizados:
+        sep = "&" if "?" in destino else "?"
+        destino = f"{destino}{sep}massa_ok={atualizados}"
+    return RedirectResponse(destino, 303)
+
 
 @app.get('/faturamento/{sid}', response_class=HTMLResponse)
-def faturamento_detalhe(sid: str, request: Request):
-    s=servico_by_id(sid)
-    if not s: return RedirectResponse('/faturamento',303)
-    itens=itens_do_servico(sid)
-    # Fallback: se for serviço importado antigo sem itens, cria automaticamente
-    # para liberar edição no faturamento.
+def faturamento_detalhe(sid: str, request: Request, aba: str = "editar", ok: str = ""):
+    s = servico_by_id(sid)
+    if not s:
+        return RedirectResponse('/faturamento', 303)
+    itens = itens_do_servico(sid)
     if not itens:
         criar_itens_para_servico(sid, s.get("tipo"))
         s = servico_by_id(sid)
         itens = itens_do_servico(sid)
-    return templates.TemplateResponse('servico_financeiro.html', {'request':request,'s':s,'itens':itens,'tipos_servico':lista_tipos_servico(),'precos_por_tipo':{t:itens_padrao_tipo(t) for t in lista_tipos_servico()}})
+    end_origem = desmontar_endereco_servico(s.get("origem"))
+    end_destino = desmontar_endereco_servico(s.get("destino"))
+    chk = checklist_resumo_servico(sid)
+    abas_validas = {"editar", "financeiro", "comentarios", "arquivos", "checklist"}
+    aba_ativa = aba if aba in abas_validas else "editar"
+    return templates.TemplateResponse(
+        'servico_financeiro.html',
+        {
+            'request': request,
+            's': s,
+            'itens': itens,
+            'tipos_servico': lista_tipos_servico(),
+            'precos_por_tipo': {t: itens_padrao_tipo(t) for t in lista_tipos_servico()},
+            'motoristas': lista_motoristas(),
+            'status_operacionais': [
+                'novo', 'enviado', 'aceito', 'a caminho', 'na origem',
+                'em transporte', 'finalizado', 'recusado', 'cancelado',
+            ],
+            'end_origem': end_origem,
+            'end_destino': end_destino,
+            'comentarios': listar_comentarios_servico(sid),
+            'arquivos': coletar_arquivos_servico(sid, s),
+            'checklist_resumo': chk,
+            'aba_ativa': aba_ativa,
+            'ok': ok,
+            'nav_ativo': 'faturamento',
+            'nav_som': False,
+        },
+    )
+
+
+@app.post('/faturamento/{sid}/editar')
+async def faturamento_editar(sid: str, request: Request):
+    form = await request.form()
+    motorista_id = (form.get("motorista_id") or "").strip() or None
+    motorista_nome = (form.get("motorista_nome") or "").strip()
+    if motorista_id:
+        m = one("select nome from motoristas where id=%s", (motorista_id,))
+        if m:
+            motorista_nome = m.get("nome") or motorista_nome
+
+    origem = montar_endereco_vianet(
+        form.get("local_origem"),
+        form.get("complemento_origem"),
+        form.get("bairro_origem"),
+        form.get("cidade_origem"),
+        form.get("uf_origem"),
+        form.get("cep_origem"),
+        form.get("referencia_origem"),
+    )
+    destino = montar_endereco_vianet(
+        form.get("local_destino"),
+        form.get("complemento_destino"),
+        form.get("bairro_destino"),
+        form.get("cidade_destino"),
+        form.get("uf_destino"),
+        form.get("cep_destino"),
+        form.get("referencia_destino"),
+    )
+    placa = normalizar_placa_cliente(form.get("placa") or "")
+    q(
+        """
+        update servicos set
+            protocolo=%s, seguradora=%s, tipo=%s, status=%s,
+            motorista_id=%s, motorista_nome=%s,
+            placa_veiculo_removido=%s, placa_removida=%s,
+            beneficiario=%s, solicitante=%s, telefone_cliente=%s,
+            veiculo_cliente=%s, cor_cliente=%s,
+            origem=%s, destino=%s,
+            referencia_origem=%s, referencia_destino=%s,
+            observacao=%s, problema=%s,
+            atualizado_em=%s
+         where id=%s
+        """,
+        (
+            (form.get("protocolo") or "").strip(),
+            (form.get("seguradora") or "").strip(),
+            (form.get("tipo") or "").strip(),
+            (form.get("status") or "novo").strip(),
+            motorista_id,
+            motorista_nome or None,
+            placa or None,
+            placa or None,
+            (form.get("beneficiario") or "").strip() or None,
+            (form.get("solicitante") or "").strip() or None,
+            (form.get("telefone") or "").strip() or None,
+            (form.get("veiculo") or "").strip() or None,
+            (form.get("cor") or "").strip() or None,
+            origem,
+            destino,
+            (form.get("referencia_origem") or "").strip() or None,
+            (form.get("referencia_destino") or "").strip() or None,
+            (form.get("observacao") or "").strip() or None,
+            (form.get("problema") or "").strip() or None,
+            agora_dt(),
+            str(sid),
+        ),
+    )
+    registrar_evento_db(sid, "edição", "Dados do serviço atualizados na auditoria")
+    return RedirectResponse(f"/faturamento/{sid}?aba=editar&ok=1", 303)
+
+
+@app.post('/faturamento/{sid}/comentario')
+async def faturamento_comentario(sid: str, request: Request):
+    form = await request.form()
+    texto = (form.get("texto") or "").strip()
+    if not servico_by_id(sid):
+        return RedirectResponse("/faturamento", 303)
+    if texto:
+        q(
+            "insert into comentarios_servico (servico_id, texto, criado_em) values (%s, %s, %s)",
+            (str(sid), texto, agora_dt()),
+        )
+        registrar_evento_db(sid, "comentário", texto[:120])
+    return RedirectResponse(f"/faturamento/{sid}?aba=comentarios&ok=1", 303)
 
 @app.post('/faturamento/{sid}/salvar')
 async def faturamento_salvar(sid: str, request: Request):
@@ -2498,7 +3420,7 @@ async def faturamento_salvar(sid: str, request: Request):
     total=atualizar_total_servico(sid)
     q("update servicos set tipo=%s,status_faturamento=%s,valor_total=%s,atualizado_em=now() where id=%s",(tipo,status_faturamento,total,str(sid)))
     registrar_evento_db(sid,'faturamento',f'Status: {status_faturamento} - Total: {fmt_moeda(total)}')
-    return RedirectResponse(f'/faturamento/{sid}',303)
+    return RedirectResponse(f'/faturamento/{sid}?aba=financeiro&ok=1',303)
 
 @app.post('/faturamento/{sid}/status')
 def faturamento_status(sid: str, status_faturamento: str=Form(...)):

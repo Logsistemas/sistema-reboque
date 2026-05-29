@@ -79,6 +79,22 @@ body.dash-body {
   padding: 10px 14px;
 }
 
+.dash-nav .submenu a:hover,
+.dash-nav .submenu a.nav-active {
+  background: #f97316;
+  color: #fff;
+}
+
+.dash-nav .sound-btn {
+  background: #16a34a !important;
+  border-radius: 8px !important;
+  padding: 8px 12px !important;
+}
+
+.dash-nav .sound-btn.off {
+  background: #dc2626 !important;
+}
+
 .dash-wrap {
   padding: 18px;
   max-width: 1600px;

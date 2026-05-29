@@ -3,197 +3,254 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Sistema Reboque</title>
+  <title>Central de Serviços — Essência Logística</title>
   <link rel="stylesheet" href="/static/style.css">
-<script>
-function abrirModal(id){const el=document.getElementById(id); if(el) el.style.display="flex";}
-function fecharModal(id){const el=document.getElementById(id); if(el) el.style.display="none";}
-</script>
-
-<style>
-.app-top{display:flex!important;align-items:center;justify-content:space-between;gap:18px;padding:0 16px;height:42px;overflow:visible!important;position:sticky;top:0;z-index:1000}
-.main-menu{display:flex;align-items:center;gap:8px;height:100%}
-.main-menu a,.main-menu button{color:#fff;text-decoration:none;background:transparent;border:0;font-weight:700;font-size:13px;padding:12px 10px;cursor:pointer}
-.main-menu a:hover,.main-menu button:hover{background:rgba(255,255,255,.12)}
-.menu-item{position:relative;height:100%;display:flex;align-items:center}
-.submenu{display:none;position:absolute;top:40px;left:0;min-width:190px;background:#111827;border-radius:0 0 8px 8px;box-shadow:0 12px 28px rgba(0,0,0,.25);padding:6px 0;z-index:2000}
-.menu-item:hover .submenu{display:block}
-.submenu a{display:block;color:#fff;padding:10px 14px;white-space:nowrap}
-.submenu a:hover{background:#f97316;color:#fff}
-.sound-btn{background:#16a34a!important;border-radius:8px!important;padding:8px 12px!important}
-.sound-btn.off{background:#dc2626!important}
-.layout{display:block!important}
-.layout main{width:100%!important;max-width:none!important}
-.top-actions{display:none!important}
-.modal-sistema{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:22px}
-.modal-box{background:#fff;border-radius:14px;max-width:520px;width:100%;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
-.modal-box.grande{max-width:760px}
-.modal-head{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:12px}
-.modal-box form{display:grid;gap:10px}
-.modal-box .row{display:flex;gap:10px}
-.modal-box input,.modal-box textarea,.modal-box select{width:100%}
-.services-clean tbody tr{cursor:pointer}
-.services-clean tbody tr:hover{background:#f8fafc}
-</style>
-
-
-<style>
-#servicos-body tr{cursor:pointer}
-#servicos-body tr:hover{background:#f8fafc}
-.btn-enviar-motorista{white-space:nowrap}
-</style>
-
-<style>.btn[disabled]{opacity:.65;cursor:not-allowed}.btn-enviar-motorista{white-space:nowrap}</style>
-
-<style>
-.modal-motorista{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:20px}
-.modal-motorista-box{background:#fff;border-radius:14px;max-width:560px;width:100%;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
-.modal-motorista-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
-.motorista-opcao{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin:8px 0;cursor:pointer}
-.motorista-opcao:hover{background:#f8fafc}
-.motorista-opcao input{width:auto}
-.status-dot{font-size:12px;border-radius:999px;padding:4px 8px;background:#eee}
-.status-dot.online{background:#dcfce7;color:#166534}
-.status-dot.offline{background:#fee2e2;color:#991b1b}
-.btn-enviar-motorista{white-space:nowrap}
-</style>
-
-
-<style>
-.status-dot.ocupado{background:#fef3c7;color:#92400e}
-.motorista-opcao.bloqueado{opacity:.72;background:#f8fafc}
-.motorista-opcao.bloqueado input{cursor:not-allowed}
-</style>
-
-
-<style>
-.motorista-opcao.ranking{display:grid;grid-template-columns:34px 1fr auto;align-items:center}
-.rank-num{width:26px;height:26px;border-radius:999px;background:#e5e7eb;color:#0f172a;display:flex;align-items:center;justify-content:center;font-weight:800}
-.rank-main input{margin-right:8px}
-.rank-badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:5px}
-.badge-dist,.badge-time{display:inline-block;border-radius:8px;padding:4px 7px;background:#e0f2fe;color:#075985;font-size:12px;font-weight:700}
-.badge-time{background:#dcfce7;color:#166534}
-.status-dot.ocupado{background:#fef3c7;color:#92400e}
-.motorista-opcao.bloqueado{opacity:.72;background:#f8fafc}
-.motorista-opcao.bloqueado input{cursor:not-allowed}
-</style>
-
-
-<style>
-.ranking-header{display:flex;justify-content:space-between;gap:12px;align-items:center;margin:8px 0 10px;font-weight:900;color:#0b2f57}
-.motorista-opcao.ranking{display:grid;grid-template-columns:34px 1fr auto;align-items:center;gap:10px}
-.rank-num{width:26px;height:26px;border-radius:999px;background:#e5e7eb;color:#0f172a;display:flex;align-items:center;justify-content:center;font-weight:900}
-.rank-main input{margin-right:8px}
-.rank-badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:5px}
-.badge-dist,.badge-time{display:inline-block;border-radius:8px;padding:4px 7px;background:#e0f2fe;color:#075985;font-size:12px;font-weight:800}
-.badge-time{background:#dcfce7;color:#166534}
-.status-dot.ocupado{background:#fef3c7;color:#92400e}
-.motorista-opcao.bloqueado{opacity:.70;background:#f8fafc}
-.motorista-opcao.bloqueado input{cursor:not-allowed}
-</style>
-
+  <link rel="stylesheet" href="/static/dashboard.css">
+  <link rel="stylesheet" href="/static/central.css">
 </head>
-<body>
-<div class="top app-top">
-  <span>🚛 Sistema Interno de Reboque — Central</span>
-  <nav class="main-menu">
-    <a href="/">Dashboard</a>
-    <div class="menu-item">
-      <button type="button">Serviços ▾</button>
-      <div class="submenu">
-        <a href="/central">Central</a>
-        <a href="/servicos/novo">Cadastrar manualmente</a>
-        <a href="/servicos/importar">Importar Excel/PDF</a>
+<body class="central-body">
+  {% include "partials/nav_principal.html" %}
+
+  <div class="central-wrap">
+    <div class="central-header">
+      <div>
+        <h1>Serviços</h1>
+        <p class="subtitulo">Visão operacional dos serviços do dia</p>
+      </div>
+      <div class="central-header-actions">
+        <button type="button" class="central-btn central-btn-outline" onclick="atualizarCentral()">↻ Atualizar</button>
+        <button type="button" class="central-btn central-btn-secondary" onclick="abrirModal('modalProcurar')">🔍 Procurar</button>
+        <button type="button" class="central-btn central-btn-outline" onclick="exportarCsvCentral()">⬇ Exportar CSV</button>
       </div>
     </div>
-    <div class="menu-item">
-      <button type="button">Cadastros ▾</button>
-      <div class="submenu">
-        <a href="/cadastros/motoristas/novo">Cadastrar motorista</a>
-        <a href="/cadastros/veiculos/novo">Cadastrar veículo</a>
-        <a href="/cadastros/usuarios/novo">Cadastrar usuário</a>
+
+    {% if titulo_filtro %}
+    <div class="central-filtros-ativo">
+      <span><b>Filtros ativos:</b> {{ titulo_filtro }}</span>
+      <a href="/central">Limpar filtros</a>
+    </div>
+    {% endif %}
+
+    <div class="central-card">
+      <div class="central-contador">
+        <span id="central-contador"><b>{{ servicos|length }}</b> serviço(s) exibido(s)</span>
+      </div>
+      <div class="central-table-wrap">
+        <table class="central-table">
+          <thead>
+            <tr>
+              <th>Data e Hora</th>
+              <th>Status</th>
+              <th>Empresa</th>
+              <th>Protocolo</th>
+              <th>Tipo</th>
+              <th>Origem Bairro</th>
+              <th>Origem Cidade</th>
+              <th>Destino Bairro</th>
+              <th>Destino Cidade</th>
+              <th>Placa</th>
+              <th>Motorista</th>
+              <th>Valor</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="servicos-body">
+            {% for s in servicos %}
+            <tr data-id="{{ s.id }}" onclick="irParaServico('{{ s.id }}')">
+              <td class="col-data">{{ s.data_hora_central or '-' }}</td>
+              <td><span data-status="{{ s.status }}">{{ s.status }}</span></td>
+              <td>{{ s.seguradora or '-' }}</td>
+              <td class="col-protocolo"><a href="/faturamento/{{ s.id }}" onclick="event.stopPropagation()">{{ s.protocolo or '-' }}</a></td>
+              <td>{{ s.tipo or '-' }}</td>
+              <td>{{ s.origem_bairro or '-' }}</td>
+              <td>{{ s.origem_cidade or '-' }}</td>
+              <td>{{ s.destino_bairro or '-' }}</td>
+              <td>{{ s.destino_cidade or '-' }}</td>
+              <td><b>{{ s.placa_veiculo_removido or s.placa_removida or '-' }}</b></td>
+              <td>{{ s.motorista_nome or '-' }}</td>
+              <td class="col-valor">{{ s.valor_total_fmt or 'R$ 0,00' }}</td>
+              <td class="col-acoes" onclick="event.stopPropagation()">
+                <a class="central-link-rota" target="_blank" href="https://www.google.com/maps/dir/?api=1&origin={{ s.origem|urlencode }}&destination={{ s.destino|urlencode }}">Rota</a>
+                {% if s.status == 'finalizado' %}
+                <button type="button" class="central-btn-acao muted" disabled>Finalizado</button>
+                {% else %}
+                <button type="button" class="central-btn-acao primary" onclick="abrirModalMotorista('{{ s.id }}')">Enviar / trocar</button>
+                {% endif %}
+              </td>
+            </tr>
+            {% else %}
+            <tr class="central-empty-row">
+              <td colspan="13">
+                <div class="central-empty">Nenhum serviço encontrado para os filtros atuais.</div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
     </div>
-    <a href="/motoristas">Motoristas</a>
-    <a href="/central">Central</a>
-    <a href="/operacao">Operação ao vivo</a>
-    <a href="/historico">Histórico / Relatórios</a>
-    <a href="/faturamento">Faturamento</a>
-    <a href="/motorista/login">Área do Motorista</a>
-    <button type="button" id="btnSomTopo" class="sound-btn" onclick="ativarSom()">Ativar som</button>
-  </nav>
-</div>
+  </div>
 
-<div class="layout">
-  
+  <!-- Modal Procurar -->
+  <div id="modalProcurar" class="modal-sistema modal-procurar">
+    <div class="modal-box">
+      <div class="modal-head">
+        <h2>Procurar serviços</h2>
+        <button type="button" class="central-btn central-btn-outline" onclick="fecharModal('modalProcurar')">Fechar</button>
+      </div>
+      <form method="get" action="/central" id="formProcurar">
+        {% if filtros.statuses %}
+        <input type="hidden" name="statuses" value="{{ filtros.statuses }}">
+        {% endif %}
+        <div class="modal-procurar-grid">
+          <div>
+            <label>Período inicial</label>
+            <input type="date" name="data_ini" value="{{ filtros.data_ini or '' }}">
+          </div>
+          <div>
+            <label>Período final</label>
+            <input type="date" name="data_fim" value="{{ filtros.data_fim or '' }}">
+          </div>
+          <div>
+            <label>Protocolo</label>
+            <input type="text" name="protocolo" value="{{ filtros.protocolo or '' }}" placeholder="Nº protocolo">
+          </div>
+          <div>
+            <label>Placa</label>
+            <input type="text" name="placa" value="{{ filtros.placa or '' }}" placeholder="ABC1D23">
+          </div>
+          <div>
+            <label>Empresa / Seguradora</label>
+            <input type="text" name="seguradora" value="{{ filtros.seguradora or '' }}" placeholder="Seguradora">
+          </div>
+          <div>
+            <label>Motorista</label>
+            <input type="text" name="motorista" value="{{ filtros.motorista or '' }}" placeholder="Nome do motorista" list="lista-motoristas-filtro">
+            <datalist id="lista-motoristas-filtro">
+              {% for m in motoristas %}
+              <option value="{{ m.nome }}"></option>
+              {% endfor %}
+            </datalist>
+          </div>
+          <div>
+            <label>Tipo de serviço</label>
+            <select name="tipo">
+              <option value="">Todos</option>
+              {% for t in tipos_servico %}
+              <option value="{{ t }}" {{ 'selected' if filtros.tipo == t else '' }}>{{ t }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label>Status do serviço</label>
+            <select name="status">
+              <option value="">Todos</option>
+              {% for st in status_operacionais %}
+              <option value="{{ st }}" {{ 'selected' if filtros.status == st else '' }}>{{ st }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label>Checklist</label>
+            <select name="checklist">
+              <option value="" {{ 'selected' if not filtros.checklist else '' }}>Todos</option>
+              <option value="nao_iniciado" {{ 'selected' if filtros.checklist == 'nao_iniciado' else '' }}>Não iniciado</option>
+              <option value="iniciado" {{ 'selected' if filtros.checklist == 'iniciado' else '' }}>Iniciado</option>
+              <option value="concluido" {{ 'selected' if filtros.checklist == 'concluido' else '' }}>Concluído</option>
+            </select>
+          </div>
+          <div>
+            <label>Status faturamento</label>
+            <select name="status_faturamento">
+              <option value="">Todos</option>
+              <option value="para_conferir" {{ 'selected' if filtros.status_faturamento == 'para_conferir' else '' }}>Para conferir</option>
+              <option value="para_faturar" {{ 'selected' if filtros.status_faturamento == 'para_faturar' else '' }}>Para faturar</option>
+              <option value="negociacao" {{ 'selected' if filtros.status_faturamento == 'negociacao' else '' }}>Negociação</option>
+              <option value="faturado" {{ 'selected' if filtros.status_faturamento == 'faturado' else '' }}>Faturado</option>
+            </select>
+          </div>
+          <div class="full">
+            <label>Origem (texto)</label>
+            <input type="text" name="origem" value="{{ filtros.origem or '' }}" placeholder="Buscar na origem">
+          </div>
+          <div class="full">
+            <label>Destino (texto)</label>
+            <input type="text" name="destino" value="{{ filtros.destino or '' }}" placeholder="Buscar no destino">
+          </div>
+        </div>
+        <div class="modal-procurar-actions">
+          <a href="/central" class="central-btn central-btn-outline">Limpar</a>
+          <button type="submit" class="central-btn central-btn-primary">Procurar</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
-  <main>
-<div class="card overflow">
-      <h2>Serviços{% if titulo_filtro %} <span class="muted" style="font-size:14px;font-weight:600">— {{ titulo_filtro }}</span>{% endif %}</h2>
-      {% if titulo_filtro %}
-      <p style="margin:0 0 12px"><a href="/central">Limpar filtro</a></p>
-      {% endif %}
-      <table>
-        <thead>
-          <tr>
-            <th>Protocolo</th>
-            <th>Seguradora</th>
-            <th>Tipo de serviço</th>
-            <th>Origem → Destino</th>
-            <th>Status</th>
-            <th>Motorista</th>
-            <th>Placa</th>
-            <th>Ação</th>
-          </tr>
-        </thead>
-        <tbody id="servicos-body">
-          {% for s in servicos %}
-          <tr onclick="window.location.href='/faturamento/{{s.id}}'">
-            <td><a href="/faturamento/{{s.id}}" onclick="event.stopPropagation()">{{s.protocolo}}</a></td>
-            <td>{{s.seguradora}}</td>
-            <td>{{s.tipo}}</td>
-            <td>
-              <b>{{s.origem}}</b><br>
-              → {{s.destino}}<br>
-              <a target="_blank" onclick="event.stopPropagation()" href="https://www.google.com/maps/dir/?api=1&origin={{s.origem|urlencode}}&destination={{s.destino|urlencode}}">rota</a>
-            </td>
-            <td><span class="pill">{{s.status}}</span></td>
-            <td>{{s.motorista_nome}}</td>
-            <td><b>{{s.placa_veiculo_removido or s.placa_removida or '-'}}</b></td>
-            <td>
-              {% if s.status == 'finalizado' %}
-                <button type="button" class="btn gray" disabled>Finalizado</button>
-              {% else %}
-                <button type="button" class="btn-enviar-motorista" onclick="event.stopPropagation();abrirModalMotorista('{{s.id}}')">Enviar / trocar motorista</button>
-              {% endif %}
-            </td>
-          </tr>
+  <!-- Modals legados (cadastro) -->
+  <div id="modalNovoServico" class="modal-sistema">
+    <div class="modal-box grande">
+      <div class="modal-head"><h2>Cadastrar serviço manualmente</h2><button type="button" class="central-btn central-btn-outline" onclick="fecharModal('modalNovoServico')">Fechar</button></div>
+      <form method="post" action="/servicos" id="form-servico">
+        <input name="protocolo" placeholder="Protocolo" required>
+        <input name="seguradora" placeholder="Seguradora">
+        <select name="tipo" id="tipo-servico" required onchange="montarItensFinanceiros()">
+          <option value="">Selecione o tipo de serviço</option>
+          {% for t in tipos_servico %}
+          <option value="{{ t }}">{{ t }}</option>
           {% endfor %}
-        </tbody>
-      </table>
+        </select>
+        <textarea name="origem" placeholder="Origem completa" required></textarea>
+        <textarea name="destino" placeholder="Destino completo" required></textarea>
+        <textarea name="observacao" placeholder="Observação"></textarea>
+        <div id="itens-financeiros"></div>
+        <p>Total estimado: <b id="total-servico">R$ 0,00</b></p>
+        <button type="submit" class="central-btn central-btn-primary">Criar serviço</button>
+      </form>
     </div>
-  </main>
-</div>
+  </div>
+
+  <div id="modalMotorista" class="modal-motorista" style="display:none;">
+    <div class="modal-motorista-box">
+      <div class="modal-motorista-head">
+        <h2>Enviar / trocar motorista</h2>
+        <button type="button" class="central-btn central-btn-outline" onclick="fecharModalMotorista()">Fechar</button>
+      </div>
+      <p class="muted">Selecione o motorista mais próximo e disponível para receber este serviço.</p>
+      <form id="formEnviarMotorista" method="post">
+        <div id="listaMotoristasModal"></div>
+        <br>
+        <button type="submit" class="central-btn central-btn-primary">Confirmar envio</button>
+      </form>
+    </div>
+  </div>
 
 <script>
+function abrirModal(id) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = 'flex';
+}
+function fecharModal(id) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = 'none';
+}
+
 let somAtivo = false;
 let ultimoEstado = {};
 let motoristasCache = [];
+let ultimosServicos = [];
 
-const FILTRO_CENTRAL = new URLSearchParams(window.location.search);
-const STATUSES_FILTRO = (FILTRO_CENTRAL.get('statuses') || '')
-  .split(',')
-  .map((s) => s.trim().toLowerCase())
-  .filter(Boolean);
-const STATUS_FILTRO = (FILTRO_CENTRAL.get('status') || '').trim().toLowerCase();
+const FILTER_KEYS = [
+  'statuses', 'status', 'data_ini', 'data_fim', 'protocolo', 'placa',
+  'seguradora', 'motorista', 'tipo', 'origem', 'destino', 'checklist', 'status_faturamento'
+];
 
 function queryFiltroServicosCentral() {
   const atual = new URLSearchParams(window.location.search);
   const qs = new URLSearchParams();
-  const statuses = atual.get('statuses');
-  const status = atual.get('status');
-  if (statuses) qs.set('statuses', statuses);
-  if (status) qs.set('status', status);
+  FILTER_KEYS.forEach((k) => {
+    const v = atual.get(k);
+    if (v) qs.set(k, v);
+  });
   return qs.toString();
 }
 
@@ -202,22 +259,39 @@ function urlApiServicos() {
   return qs ? `/api/servicos?${qs}` : '/api/servicos';
 }
 
-function aplicarFiltroServicos(ss) {
-  if (!ss) return [];
-  if (STATUSES_FILTRO.length) {
-    return ss.filter((s) => STATUSES_FILTRO.includes((s.status || '').toLowerCase()));
-  }
-  if (STATUS_FILTRO) {
-    return ss.filter((s) => (s.status || '').toLowerCase() === STATUS_FILTRO);
-  }
-  return ss;
-}
-
 function safe(v) {
   return (v === null || v === undefined || v === '') ? '-' : String(v);
 }
 
-function beep(freq=880, duration=180) {
+function escapeHtml(t) {
+  return String(t || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function statusBadgeClass(status) {
+  const st = (status || '').toLowerCase().trim();
+  const map = {
+    'novo': 'st-novo',
+    'enviado': 'st-enviado',
+    'aceito': 'st-aceito',
+    'a caminho': 'st-a-caminho',
+    'na origem': 'st-na-origem',
+    'em transporte': 'st-em-transporte',
+    'finalizado': 'st-finalizado',
+    'recusado': 'st-recusado',
+    'cancelado': 'st-cancelado',
+  };
+  return 'central-badge ' + (map[st] || 'st-default');
+}
+
+function irParaServico(id) {
+  if (id) window.location.href = '/faturamento/' + id;
+}
+
+function beep(freq = 880, duration = 180) {
   if (!somAtivo) return;
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -227,30 +301,38 @@ function beep(freq=880, duration=180) {
     osc.connect(gain);
     gain.connect(ctx.destination);
     osc.start();
-    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + duration/1000);
-    osc.stop(ctx.currentTime + duration/1000);
-  } catch(e) {}
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + duration / 1000);
+    osc.stop(ctx.currentTime + duration / 1000);
+  } catch (e) {}
 }
 
 function ativarSom() {
   somAtivo = !somAtivo;
   localStorage.setItem('somAtivo', somAtivo ? '1' : '0');
-  const el = document.getElementById('somStatus');
-  if (el) el.innerText = somAtivo ? 'Som ativado' : 'Som desativado';
   const btn = document.getElementById('btnSomTopo') || document.querySelector('button[onclick="ativarSom()"]');
   if (btn) {
     btn.innerText = somAtivo ? 'Desativar som' : 'Ativar som';
     btn.classList.toggle('off', somAtivo);
   }
-  if (somAtivo) beep(900,220);
+  if (somAtivo) beep(900, 220);
 }
-
 
 const PRECOS_POR_TIPO = {{ precos_por_tipo|tojson }};
 
 function brMoney(v) {
   const n = Number(v || 0);
-  return n.toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
+  return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+/** Data/Hora Central — sempre dd/mm/yyyy HH:mm, nunca ISO cru. */
+function formatarDataHoraCentral(val) {
+  if (!val || val === '-') return '-';
+  const s = String(val).trim();
+  if (/^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}$/.test(s)) return s;
+  if (/^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}:\d{2}$/.test(s)) return s.slice(0, 16);
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2})/);
+  if (m) return `${m[3]}/${m[2]}/${m[1]} ${m[4]}:${m[5]}`;
+  return s;
 }
 
 function montarItensFinanceiros() {
@@ -263,14 +345,14 @@ function montarItensFinanceiros() {
     calcularTotalServico();
     return;
   }
-  box.innerHTML = itens.map(it => {
+  box.innerHTML = itens.map((it) => {
     const nome = it.nome_item || it.nome || '';
     const valor = Number(it.valor_padrao || 0).toFixed(2);
     const qtd = (nome.toUpperCase() === 'SAIDA' || nome.toUpperCase() === 'SAÍDA') ? 1 : 0;
     return `
       <div class="item-financeiro">
-        <input type="hidden" name="item_nome" value="${nome}">
-        <label>${nome}</label>
+        <input type="hidden" name="item_nome" value="${escapeHtml(nome)}">
+        <label>${escapeHtml(nome)}</label>
         <input type="number" step="0.01" min="0" name="item_qtd" value="${qtd}" oninput="calcularTotalServico()" placeholder="Qtd">
         <input type="number" step="0.01" min="0" name="item_valor" value="${valor}" oninput="calcularTotalServico()" placeholder="Valor unit.">
       </div>
@@ -284,71 +366,68 @@ function calcularTotalServico() {
   const totalEl = document.getElementById('total-servico');
   if (!box || !totalEl) return;
   let total = 0;
-  const linhas = box.querySelectorAll('.item-financeiro');
-  linhas.forEach(l => {
+  box.querySelectorAll('.item-financeiro').forEach((l) => {
     const qtd = Number(l.querySelector('[name="item_qtd"]').value || 0);
     const valor = Number(l.querySelector('[name="item_valor"]').value || 0);
     total += qtd * valor;
   });
   totalEl.innerText = brMoney(total);
 }
-document.addEventListener('DOMContentLoaded', montarItensFinanceiros);
-
-if (localStorage.getItem('somAtivo') === '1') {
-  somAtivo = true;
-  setTimeout(() => {
-    let el = document.getElementById('somStatus');
-    if (el) el.innerText = 'Som ativado';
-    const btn = document.getElementById('btnSomTopo') || document.querySelector('button[onclick="ativarSom()"]');
-    if (btn) { btn.innerText = 'Desativar som'; btn.classList.add('off'); }
-  }, 300);
-}
-
-if (window.Notification && Notification.permission !== 'granted') {
-  Notification.requestPermission();
-}
-
-let markers = {};
-
-function renderMotoristas(ms) {
-  motoristasCache = ms || [];
-}
-
-function opcoesMotoristas() {
-  return motoristasCache.map(m => {
-    return `<option value="${m.id}">${safe(m.nome)} ${m.online ? '🟢' : ''}</option>`;
-  }).join('');
-}
 
 function renderServicos(ss) {
   const tbody = document.getElementById('servicos-body');
+  const contador = document.getElementById('central-contador');
   if (!tbody) return;
 
-  tbody.innerHTML = (ss || []).map((s) => {
+  ultimosServicos = ss || [];
+
+  if (contador) {
+    contador.innerHTML = `<b>${ultimosServicos.length}</b> serviço(s) exibido(s)`;
+  }
+
+  if (!ultimosServicos.length) {
+    tbody.innerHTML = `
+      <tr class="central-empty-row">
+        <td colspan="13"><div class="central-empty">Nenhum serviço encontrado para os filtros atuais.</div></td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = ultimosServicos.map((s) => {
     const placa = s.placa_veiculo_removido || s.placa_removida || '';
     const rota = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(s.origem || '')}&destination=${encodeURIComponent(s.destino || '')}`;
+    const st = (s.status || '').toLowerCase();
+    const btnAcao = st === 'finalizado'
+      ? '<button type="button" class="central-btn-acao muted" disabled>Finalizado</button>'
+      : `<button type="button" class="central-btn-acao primary" onclick="abrirModalMotorista('${s.id}')">Enviar / trocar</button>`;
 
     return `
-      <tr onclick="window.location.href='/faturamento/${s.id}'">
-        <td><a href="/faturamento/${s.id}" onclick="event.stopPropagation()">${safe(s.protocolo)}</a></td>
-        <td>${safe(s.seguradora)}</td>
-        <td>${safe(s.tipo)}</td>
-        <td>
-          <b>${safe(s.origem)}</b><br>
-          → ${safe(s.destino)}<br>
-          <a target="_blank" onclick="event.stopPropagation()" href="${rota}">rota</a>
-        </td>
-        <td><span class="pill">${safe(s.status)}</span></td>
-        <td>${safe(s.motorista_nome)}</td>
-        <td><b>${placa || '-'}</b></td>
-        <td>
-          ${(s.status === 'finalizado') 
-            ? '<button type="button" class="btn gray" disabled>Finalizado</button>' 
-            : `<button type="button" class="btn-enviar-motorista" onclick="event.stopPropagation();abrirModalMotorista('${s.id}')">Enviar / trocar motorista</button>`}
+      <tr data-id="${escapeHtml(s.id)}" onclick="irParaServico('${s.id}')">
+        <td class="col-data">${escapeHtml(formatarDataHoraCentral(s.data_hora_central))}</td>
+        <td><span class="${statusBadgeClass(s.status)}">${escapeHtml(s.status)}</span></td>
+        <td>${escapeHtml(s.seguradora)}</td>
+        <td class="col-protocolo"><a href="/faturamento/${s.id}" onclick="event.stopPropagation()">${escapeHtml(s.protocolo)}</a></td>
+        <td>${escapeHtml(s.tipo)}</td>
+        <td>${escapeHtml(s.origem_bairro)}</td>
+        <td>${escapeHtml(s.origem_cidade)}</td>
+        <td>${escapeHtml(s.destino_bairro)}</td>
+        <td>${escapeHtml(s.destino_cidade)}</td>
+        <td><b>${escapeHtml(placa || '-')}</b></td>
+        <td>${escapeHtml(s.motorista_nome)}</td>
+        <td class="col-valor">${escapeHtml(s.valor_total_fmt || brMoney(s.valor_total))}</td>
+        <td class="col-acoes" onclick="event.stopPropagation()">
+          <a class="central-link-rota" target="_blank" href="${rota}">Rota</a>
+          ${btnAcao}
         </td>
       </tr>
     `;
   }).join('');
+
+  tbody.querySelectorAll('[data-status]').forEach((el) => {
+    const st = el.getAttribute('data-status');
+    el.className = statusBadgeClass(st);
+  });
 }
 
 async function atualizarCentral() {
@@ -361,16 +440,16 @@ async function atualizarCentral() {
     const ms = await motoristasRes.json();
     const ss = await servicosRes.json();
 
-    renderMotoristas(ms);
-    renderServicos(aplicarFiltroServicos(ss));
+    motoristasCache = ms || [];
+    renderServicos(ss);
 
-    (ss || []).forEach(s => {
+    (ss || []).forEach((s) => {
       const fotosQtd = Array.isArray(s.fotos) ? s.fotos.length : 0;
       const key = s.id;
       const val = `${s.status || ''}|${s.placa_veiculo_removido || s.placa_removida || ''}|${fotosQtd}|${s.ultimo_evento || ''}`;
 
       if (ultimoEstado[key] && ultimoEstado[key] !== val) {
-        beep(760,180);
+        beep(760, 180);
         if (window.Notification && Notification.permission === 'granted') {
           new Notification('Serviço atualizado', {
             body: `${s.motorista_nome || 'Motorista'} - ${s.status || ''}`
@@ -379,12 +458,10 @@ async function atualizarCentral() {
       }
       ultimoEstado[key] = val;
     });
-
   } catch (err) {
-    console.log("Erro ao atualizar central:", err);
+    console.log('Erro ao atualizar central:', err);
   }
 }
-
 
 function formatarDistanciaMotorista(m) {
   if (m.rota_disponivel && m.distancia_texto && m.duracao_texto) {
@@ -408,22 +485,19 @@ async function abrirModalMotorista(servicoId) {
   modal.style.display = 'flex';
 
   try {
-    const resp = await fetch(`/api/servicos/${servicoId}/motoristas?ts=` + Date.now(), {cache:'no-store'});
-    if (resp.ok) {
-      motoristasCache = await resp.json();
-    }
-  } catch(e) {
+    const resp = await fetch(`/api/servicos/${servicoId}/motoristas?ts=` + Date.now(), { cache: 'no-store' });
+    if (resp.ok) motoristasCache = await resp.json();
+  } catch (e) {
     console.log('Erro ao carregar motoristas:', e);
   }
 
   const ms = motoristasCache || [];
-
   if (!ms.length) {
     lista.innerHTML = '<p class="muted">Nenhum motorista cadastrado.</p>';
     return;
   }
 
-  const primeiroLivre = ms.findIndex(x => x.online && !x.ocupado);
+  const primeiroLivre = ms.findIndex((x) => x.online && !x.ocupado);
 
   lista.innerHTML = `
     <div class="ranking-header">
@@ -437,30 +511,24 @@ async function abrirModalMotorista(servicoId) {
     const distancia = formatarDistanciaMotorista(m);
     const disabled = (!online || ocupado) ? 'disabled' : '';
     const checked = (!disabled && idx === primeiroLivre) ? 'checked' : '';
-
     const statusTxt = !online ? 'Offline' : ocupado ? `Ocupado${m.servico_ocupado ? ' - ' + m.servico_ocupado : ''}` : 'Livre';
     const cls = !online ? 'offline' : ocupado ? 'ocupado' : 'online';
 
     return `
       <label class="motorista-opcao ranking ${disabled ? 'bloqueado' : ''}">
         <span class="rank-num">${idx + 1}</span>
-
         <span class="rank-main">
           <input type="radio" name="motorista_id" value="${m.id}" ${checked} ${disabled}>
           <b>${safe(m.nome)}</b>
           <span class="muted">(${safe(placaAtual || '-')})</span><br>
-
-          <span class="rank-badges">
-            <span class="badge-dist">📍 ${safe(distancia)}</span>
-          </span>
+          <span class="rank-badges"><span class="badge-dist">📍 ${safe(distancia)}</span></span>
         </span>
-
         <span class="status-dot ${cls}">${statusTxt}</span>
       </label>
     `;
   }).join('');
 
-  const temLivre = ms.some(m => m.online && !m.ocupado);
+  const temLivre = ms.some((m) => m.online && !m.ocupado);
   const btn = form.querySelector('button[type="submit"]');
   if (btn) {
     btn.disabled = !temLivre;
@@ -473,106 +541,80 @@ function fecharModalMotorista() {
   if (modal) modal.style.display = 'none';
 }
 
-document.addEventListener('click', function(e){
+async function exportarCsvCentral() {
+  let ss = ultimosServicos;
+  if (!ss.length) {
+    try {
+      const res = await fetch(urlApiServicos(), { cache: 'no-store' });
+      ss = await res.json();
+    } catch (e) {
+      alert('Não foi possível exportar.');
+      return;
+    }
+  }
+  if (!ss.length) {
+    alert('Nenhum serviço para exportar.');
+    return;
+  }
+
+  const cols = [
+    ['Data/Hora', (s) => formatarDataHoraCentral(s.data_hora_central) || ''],
+    ['Status', (s) => s.status || ''],
+    ['Empresa', (s) => s.seguradora || ''],
+    ['Protocolo', (s) => s.protocolo || ''],
+    ['Tipo', (s) => s.tipo || ''],
+    ['Origem Bairro', (s) => s.origem_bairro || ''],
+    ['Origem Cidade', (s) => s.origem_cidade || ''],
+    ['Destino Bairro', (s) => s.destino_bairro || ''],
+    ['Destino Cidade', (s) => s.destino_cidade || ''],
+    ['Placa', (s) => s.placa_veiculo_removido || s.placa_removida || ''],
+    ['Motorista', (s) => s.motorista_nome || ''],
+    ['Valor', (s) => s.valor_total_fmt || ''],
+  ];
+
+  const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const linhas = [cols.map((c) => esc(c[0])).join(';')];
+  ss.forEach((s) => linhas.push(cols.map((c) => esc(c[1](s))).join(';')));
+
+  const blob = new Blob(['\ufeff' + linhas.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  const hoje = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  a.download = `central-servicos-${hoje.getFullYear()}-${pad(hoje.getMonth() + 1)}-${pad(hoje.getDate())}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+document.addEventListener('click', (e) => {
   const modal = document.getElementById('modalMotorista');
   if (modal && e.target === modal) fecharModalMotorista();
+  const modalProc = document.getElementById('modalProcurar');
+  if (modalProc && e.target === modalProc) fecharModal('modalProcurar');
 });
+
+document.addEventListener('DOMContentLoaded', () => {
+  montarItensFinanceiros();
+  document.querySelectorAll('#servicos-body [data-status]').forEach((el) => {
+    el.className = statusBadgeClass(el.getAttribute('data-status'));
+  });
+});
+
+if (localStorage.getItem('somAtivo') === '1') {
+  somAtivo = true;
+  setTimeout(() => {
+    const btn = document.getElementById('btnSomTopo') || document.querySelector('button[onclick="ativarSom()"]');
+    if (btn) { btn.innerText = 'Desativar som'; btn.classList.add('off'); }
+  }, 300);
+}
+
+if (window.Notification && Notification.permission !== 'granted') {
+  Notification.requestPermission();
+}
 
 setInterval(atualizarCentral, 5000);
 atualizarCentral();
-
-
 </script>
-
-<div id="modalNovoServico" class="modal-sistema">
-  <div class="modal-box grande">
-    <div class="modal-head"><h2>Cadastrar serviço manualmente</h2><button type="button" class="btn gray" onclick="fecharModal('modalNovoServico')">Fechar</button></div>
-    <form method="post" action="/servicos" id="form-servico">
-        <input name="protocolo" placeholder="Protocolo" required>
-        <input name="seguradora" placeholder="Seguradora">
-        <select name="tipo" id="tipo-servico" required onchange="montarItensFinanceiros()">
-          <option value="">Selecione o tipo de serviço</option>
-          {% for t in tipos_servico %}
-          <option value="{{t}}">{{t}}</option>
-          {% endfor %}
-        </select>
-        <textarea name="origem" placeholder="Origem completa" required></textarea>
-        <textarea name="destino" placeholder="Destino completo" required></textarea>
-        <textarea name="observacao" placeholder="Observação"></textarea>
-<button>Criar serviço</button>
-      </form>
-  </div>
-</div>
-<div id="modalImportar" class="modal-sistema">
-  <div class="modal-box">
-    <div class="modal-head"><h2>Importar serviços</h2><button type="button" class="btn gray" onclick="fecharModal('modalImportar')">Fechar</button></div>
-    <form method="post" action="/servicos/importar" enctype="multipart/form-data">
-        <input type="file" name="file" accept=".xlsx,.xls" required>
-        <button>Importar serviços</button>
-      </form>
-      <p class="muted">Importação inicial. Integração direta com seguradoras depende de API/acesso delas.</p>
-  </div>
-</div>
-<div id="modalMotoristaCadastro" class="modal-sistema">
-  <div class="modal-box grande">
-    <div class="modal-head"><h2>Cadastrar motorista</h2><button type="button" class="btn gray" onclick="fecharModal('modalMotoristaCadastro')">Fechar</button></div>
-    <form method="post" action="/motoristas">
-        <input name="nome" placeholder="Nome" required>
-        <input name="telefone" placeholder="Telefone">
-        <div class="row">
-          <input name="veiculo" placeholder="Veículo">
-          <input name="placa" placeholder="Placa">
-        </div>
-        <input name="tipo" placeholder="Tipo: leve, pesado, moto...">
-        <button>Cadastrar</button>
-      </form>
-    <p class="muted">Na próxima etapa, vamos ampliar para CPF, CNH, vencimento da CNH, nascimento, estado civil e endereço completo.</p>
-  </div>
-</div>
-<div id="modalVeiculoCadastro" class="modal-sistema">
-  <div class="modal-box grande">
-    <div class="modal-head"><h2>Cadastrar veículo</h2><button type="button" class="btn gray" onclick="fecharModal('modalVeiculoCadastro')">Fechar</button></div>
-    <form method="post" action="#">
-      <input name="placa" placeholder="Placa">
-      <input name="modelo" placeholder="Modelo / veículo">
-      <input name="tipo" placeholder="Tipo: leve, pesado, moto, apoio...">
-      <input name="ano" placeholder="Ano">
-      <input name="renavam" placeholder="Renavam">
-      <textarea name="observacao" placeholder="Observações"></textarea>
-      <button type="button" onclick="alert('Cadastro completo de veículos será ligado ao banco na próxima etapa.')">Salvar veículo</button>
-    </form>
-  </div>
-</div>
-<div id="modalUsuarioCadastro" class="modal-sistema">
-  <div class="modal-box grande">
-    <div class="modal-head"><h2>Cadastrar usuário interno</h2><button type="button" class="btn gray" onclick="fecharModal('modalUsuarioCadastro')">Fechar</button></div>
-    <form method="post" action="#">
-      <input name="nome" placeholder="Nome completo">
-      <input name="cpf" placeholder="CPF">
-      <input name="telefone" placeholder="Telefone">
-      <input name="email" placeholder="E-mail / login">
-      <input name="senha" type="password" placeholder="Senha">
-      <select name="perfil"><option value="operador">Operador central</option><option value="faturamento">Faturamento</option><option value="gestor">Gestor</option></select>
-      <button type="button" onclick="alert('Cadastro de usuários com login/senha será ligado ao banco na próxima etapa.')">Salvar usuário</button>
-    </form>
-  </div>
-</div>
-
-
-<div id="modalMotorista" class="modal-motorista" style="display:none;">
-  <div class="modal-motorista-box">
-    <div class="modal-motorista-head">
-      <h2>Enviar / trocar motorista</h2>
-      <button type="button" class="btn gray" onclick="fecharModalMotorista()">Fechar</button>
-    </div>
-    <p class="muted">Selecione o motorista mais próximo e disponível para receber este serviço.</p>
-    <form id="formEnviarMotorista" method="post">
-      <div id="listaMotoristasModal"></div>
-      <br>
-      <button type="submit">Confirmar envio</button>
-    </form>
-  </div>
-</div>
 
 </body>
 </html>

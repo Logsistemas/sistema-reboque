@@ -1,99 +1,406 @@
 <!doctype html>
 <html lang="pt-br">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Auditoria do serviço</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Serviço {{ s.protocolo }} — Auditoria</title>
 <link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/dashboard.css">
+<link rel="stylesheet" href="/static/servico_detalhe.css">
 </head>
 <body>
-<div class="top">
-  <span>💰 Auditoria / Fechamento</span>
-  <span><a href="/">Central</a><a href="/faturamento">Faturamento</a></span>
-</div>
-<div class="page">
-  <div class="card">
-    <h2>Serviço {{s.protocolo}}</h2>
-    <div class="grid2">
+{% include "partials/nav_principal.html" %}
+
+<div class="sd-page">
+  <div class="sd-shell">
+    <header class="sd-header">
       <div>
-        <h3>Informações gerais</h3>
-        <p><b>Seguradora:</b> {{s.seguradora}}</p>
-        <p><b>Tipo / Produto:</b> {{s.tipo}}</p>
-        <p><b>Motorista:</b> {{s.motorista_nome}}</p>
-        <p><b>Status operação:</b> {{s.status}}</p>
-        <p><b>Status faturamento:</b> {{s.status_faturamento}}</p>
-        <p><b>Total:</b> {{s.valor_total_fmt}}</p>
+        <h1>Protocolo {{ s.protocolo or '-' }}</h1>
+        <div class="sd-header-meta">
+          <span class="sd-badge">{{ s.seguradora or 'Sem empresa' }}</span>
+          <span class="sd-badge">{{ s.tipo or 'Sem tipo' }}</span>
+          <span class="sd-badge orange">{{ s.status or 'novo' }}</span>
+          <span class="sd-badge">Fat: {{ s.status_faturamento or 'para_conferir' }}</span>
+        </div>
       </div>
-      <div>
-        <h3>Beneficiário / veículo</h3>
-        <p><b>Beneficiário:</b> {{s.beneficiario or '-'}}</p>
-        <p><b>Telefone:</b> {{s.telefone_cliente or '-'}}</p>
-        <p><b>Veículo:</b> {{s.veiculo_cliente or '-'}}</p>
-        <p><b>Cor:</b> {{s.cor_cliente or '-'}}</p>
-        <p><b>Placa:</b> {{s.placa_veiculo_removido or s.placa_removida or '-'}}</p>
+      <div class="sd-header-meta">
+        <span class="sd-badge">Total: {{ s.valor_total_fmt }}</span>
       </div>
-    </div>
-    <hr>
-    <p><b>Origem:</b> {{s.origem}} {% if s.referencia_origem %}<br><b>Referência origem:</b> {{s.referencia_origem}}{% endif %}</p>
-    <p><b>Destino:</b> {{s.destino}} {% if s.referencia_destino %}<br><b>Referência destino:</b> {{s.referencia_destino}}{% endif %}</p>
-    {% if s.observacao %}<p><b>Observação:</b> {{s.observacao}}</p>{% endif %}
-    {% if s.fotos %}<p><b>Fotos/checklist:</b> {% for f in s.fotos %}<a target="_blank" href="{{f.url}}">foto {{loop.index}}</a> {% endfor %}</p>{% endif %}
+    </header>
+
+    <nav class="sd-sidebar">
+      <button type="button" class="sd-nav-item {% if aba_ativa == 'editar' %}active{% endif %}" data-aba="editar">
+        <span class="sd-nav-icon">✎</span> Editar
+      </button>
+      <button type="button" class="sd-nav-item {% if aba_ativa == 'financeiro' %}active{% endif %}" data-aba="financeiro">
+        <span class="sd-nav-icon">$</span> Financeiro
+      </button>
+      <button type="button" class="sd-nav-item {% if aba_ativa == 'comentarios' %}active{% endif %}" data-aba="comentarios">
+        <span class="sd-nav-icon">💬</span> Comentários
+      </button>
+      <button type="button" class="sd-nav-item {% if aba_ativa == 'arquivos' %}active{% endif %}" data-aba="arquivos">
+        <span class="sd-nav-icon">📎</span> Arquivos
+      </button>
+      <button type="button" class="sd-nav-item {% if aba_ativa == 'checklist' %}active{% endif %}" data-aba="checklist">
+        <span class="sd-nav-icon">✓</span> Checklist
+      </button>
+      <a href="/central" class="sd-nav-item voltar">
+        <span class="sd-nav-icon">←</span> Voltar
+      </a>
+    </nav>
+
+    <main class="sd-main">
+      {% if ok %}
+      <div class="sd-alert-ok">Alterações salvas com sucesso.</div>
+      {% endif %}
+
+      <!-- ABA EDITAR -->
+      <div class="sd-panel {% if aba_ativa == 'editar' %}active{% endif %}" id="panel-editar">
+        <form method="post" action="/faturamento/{{ s.id }}/editar">
+          <div class="sd-section">
+            <h3>Dados do serviço</h3>
+            <div class="sd-grid">
+              <div class="sd-field">
+                <label>Protocolo</label>
+                <input name="protocolo" value="{{ s.protocolo or '' }}" required>
+              </div>
+              <div class="sd-field">
+                <label>Seguradora / Empresa</label>
+                <input name="seguradora" value="{{ s.seguradora or '' }}">
+              </div>
+              <div class="sd-field">
+                <label>Tipo de serviço</label>
+                <select name="tipo">
+                  {% for t in tipos_servico %}
+                  <option value="{{ t }}" {% if t == s.tipo %}selected{% endif %}>{{ t }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="sd-field">
+                <label>Status operação</label>
+                <select name="status">
+                  {% for st in status_operacionais %}
+                  <option value="{{ st }}" {% if st == s.status %}selected{% endif %}>{{ st }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="sd-field">
+                <label>Motorista</label>
+                <select name="motorista_id">
+                  <option value="">— Sem motorista —</option>
+                  {% for m in motoristas %}
+                  <option value="{{ m.id }}" {% if m.id == s.motorista_id %}selected{% endif %}>{{ m.nome }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="sd-field">
+                <label>Placa</label>
+                <input name="placa" value="{{ s.placa_veiculo_removido or s.placa_removida or '' }}">
+              </div>
+            </div>
+          </div>
+
+          <div class="sd-section">
+            <h3>Cliente e veículo</h3>
+            <div class="sd-grid">
+              <div class="sd-field">
+                <label>Beneficiário / Segurado</label>
+                <input name="beneficiario" value="{{ s.beneficiario or '' }}">
+              </div>
+              <div class="sd-field">
+                <label>Solicitante</label>
+                <input name="solicitante" value="{{ s.solicitante or '' }}">
+              </div>
+              <div class="sd-field">
+                <label>Telefone</label>
+                <input name="telefone" value="{{ s.telefone_cliente or '' }}">
+              </div>
+              <div class="sd-field">
+                <label>Veículo</label>
+                <input name="veiculo" value="{{ s.veiculo_cliente or '' }}">
+              </div>
+              <div class="sd-field">
+                <label>Cor</label>
+                <input name="cor" value="{{ s.cor_cliente or '' }}">
+              </div>
+            </div>
+          </div>
+
+          <div class="sd-section">
+            <h3>Origem</h3>
+            <div class="sd-grid sd-grid-3">
+              <div class="sd-field full">
+                <label>Local / endereço</label>
+                <input name="local_origem" value="{{ end_origem.local or '' }}">
+              </div>
+              <div class="sd-field">
+                <label>Bairro</label>
+                <input name="bairro_origem" value="{{ end_origem.bairro or '' }}">
+              </div>
+              <div class="sd-field">
+                <label>Cidade</label>
+                <input name="cidade_origem" value="{{ end_origem.cidade or '' }}">
+              </div>
+              <div class="sd-field">
+                <label>UF</label>
+                <input name="uf_origem" value="{{ end_origem.uf or '' }}" maxlength="2">
+              </div>
+              <div class="sd-field">
+                <label>CEP</label>
+                <input name="cep_origem" value="">
+              </div>
+              <div class="sd-field">
+                <label>Referência</label>
+                <input name="referencia_origem" value="{{ s.referencia_origem or '' }}">
+              </div>
+            </div>
+          </div>
+
+          <div class="sd-section">
+            <h3>Destino</h3>
+            <div class="sd-grid sd-grid-3">
+              <div class="sd-field full">
+                <label>Local / endereço</label>
+                <input name="local_destino" value="{{ end_destino.local or '' }}">
+              </div>
+              <div class="sd-field">
+                <label>Bairro</label>
+                <input name="bairro_destino" value="{{ end_destino.bairro or '' }}">
+              </div>
+              <div class="sd-field">
+                <label>Cidade</label>
+                <input name="cidade_destino" value="{{ end_destino.cidade or '' }}">
+              </div>
+              <div class="sd-field">
+                <label>UF</label>
+                <input name="uf_destino" value="{{ end_destino.uf or '' }}" maxlength="2">
+              </div>
+              <div class="sd-field">
+                <label>CEP</label>
+                <input name="cep_destino" value="">
+              </div>
+              <div class="sd-field">
+                <label>Referência</label>
+                <input name="referencia_destino" value="{{ s.referencia_destino or '' }}">
+              </div>
+            </div>
+          </div>
+
+          <div class="sd-section">
+            <h3>Observações</h3>
+            <div class="sd-grid">
+              <div class="sd-field full">
+                <label>Observação geral</label>
+                <textarea name="observacao">{{ s.observacao or '' }}</textarea>
+              </div>
+              <div class="sd-field full">
+                <label>Problema / informações importantes</label>
+                <textarea name="problema">{{ s.problema or '' }}</textarea>
+              </div>
+            </div>
+          </div>
+
+          <div class="sd-actions">
+            <button type="submit" class="sd-btn sd-btn-primary">Salvar alterações</button>
+            <a href="/central" class="sd-btn sd-btn-dark">Voltar à Central</a>
+          </div>
+        </form>
+      </div>
+
+      <!-- ABA FINANCEIRO -->
+      <div class="sd-panel {% if aba_ativa == 'financeiro' %}active{% endif %}" id="panel-financeiro">
+        <form method="post" action="/faturamento/{{ s.id }}/salvar">
+          <div class="sd-section">
+            <h3>Itens financeiros</h3>
+            <div class="sd-grid" style="margin-bottom:14px">
+              <div class="sd-field">
+                <label>Tipo / produto</label>
+                <select name="tipo" id="tipo-servico" onchange="carregarPadrao()">
+                  {% for t in tipos_servico %}
+                  <option value="{{ t }}" {% if t == s.tipo %}selected{% endif %}>{{ t }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="sd-field">
+                <label>Status financeiro</label>
+                <select name="status_faturamento">
+                  <option value="para_conferir" {% if s.status_faturamento == 'para_conferir' %}selected{% endif %}>Para conferir</option>
+                  <option value="para_faturar" {% if s.status_faturamento == 'para_faturar' %}selected{% endif %}>Para faturar</option>
+                  <option value="negociacao" {% if s.status_faturamento == 'negociacao' %}selected{% endif %}>Para negociar</option>
+                  <option value="faturado" {% if s.status_faturamento == 'faturado' %}selected{% endif %}>Faturado</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="sd-finance-wrap">
+              <div class="sd-finance-grid head">
+                <span>Item</span><span>Qtd</span><span>Valor unit.</span>
+              </div>
+              <div id="itens-financeiros">
+                {% for it in itens %}
+                <div class="sd-finance-grid item-financeiro">
+                  <input type="hidden" name="item_nome" value="{{ it.nome_item }}">
+                  <label>{{ it.nome_item }}</label>
+                  <input type="number" step="0.01" min="0" name="item_qtd" value="{{ it.quantidade }}" oninput="calcularTotal()">
+                  <input type="number" step="0.01" min="0" name="item_valor" value="{{ it.valor_unitario }}" oninput="calcularTotal()">
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+
+            <div class="sd-total">Total: <span id="total-servico">{{ s.valor_total_fmt }}</span></div>
+          </div>
+
+          <div class="sd-actions">
+            <button type="submit" class="sd-btn sd-btn-primary">Salvar auditoria / fechamento</button>
+            <button type="button" class="sd-btn sd-btn-ghost" onclick="carregarPadrao()">Recarregar itens padrão</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- ABA COMENTÁRIOS -->
+      <div class="sd-panel {% if aba_ativa == 'comentarios' %}active{% endif %}" id="panel-comentarios">
+        <div class="sd-section">
+          <h3>Comentários operacionais</h3>
+          {% if comentarios %}
+            {% for c in comentarios %}
+            <div class="sd-comentario">
+              <time>{{ c.criado_em }}</time>
+              <p>{{ c.texto }}</p>
+            </div>
+            {% endfor %}
+          {% else %}
+            <div class="sd-empty">Nenhum comentário registrado ainda.</div>
+          {% endif %}
+        </div>
+
+        <form method="post" action="/faturamento/{{ s.id }}/comentario" class="sd-section">
+          <h3>Novo comentário</h3>
+          <div class="sd-field">
+            <textarea name="texto" rows="4" placeholder="Ex: Serviço fechado na saída. Cliente cancelou no local." required></textarea>
+          </div>
+          <div class="sd-actions">
+            <button type="submit" class="sd-btn sd-btn-primary">Salvar comentário</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- ABA ARQUIVOS -->
+      <div class="sd-panel {% if aba_ativa == 'arquivos' %}active{% endif %}" id="panel-arquivos">
+        <div class="sd-section">
+          <h3>Arquivos e fotos</h3>
+          {% if arquivos %}
+          <div class="sd-arquivos-grid">
+            {% for arq in arquivos %}
+            <a href="{{ arq.url }}" target="_blank" class="sd-arquivo-card">
+              <img src="{{ arq.url }}" alt="{{ arq.nome }}" onerror="this.src='';this.style.height='80px';this.alt='Arquivo'">
+              <div class="sd-arquivo-meta">
+                <b>{{ arq.nome }}</b>
+                {{ arq.tipo }}
+              </div>
+            </a>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div class="sd-empty">Nenhum arquivo enviado ainda.</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- ABA CHECKLIST -->
+      <div class="sd-panel {% if aba_ativa == 'checklist' %}active{% endif %}" id="panel-checklist">
+        <div class="sd-section">
+          <h3>Checklist do motorista</h3>
+          <div class="sd-checklist-tags">
+            <span class="sd-tag">Status: {{ checklist_resumo.status }}</span>
+            <span class="sd-tag">{{ checklist_resumo.total_partes }} partes</span>
+            <span class="sd-tag">{{ checklist_resumo.total_avarias }} avarias</span>
+            <span class="sd-tag">{{ checklist_resumo.total_fotos_checklist }} fotos</span>
+          </div>
+
+          {% if checklist_resumo.checklist %}
+            {% for item in checklist_resumo.checklist %}
+            <div class="sd-checklist-parte">
+              <h4>{{ item.parte }}</h4>
+              <div class="sd-checklist-tags">
+                <span class="sd-tag">{{ item.marcacoes|length }} avaria(s)</span>
+                <span class="sd-tag">{{ item.fotos|length }} foto(s)</span>
+              </div>
+              {% if item.fotos %}
+              <div class="sd-arquivos-grid" style="margin-top:10px">
+                {% for foto in item.fotos %}
+                <a href="{{ foto }}" target="_blank" class="sd-arquivo-card">
+                  <img src="{{ foto }}" alt="Foto {{ item.parte }}">
+                  <div class="sd-arquivo-meta"><b>{{ item.parte }}</b></div>
+                </a>
+                {% endfor %}
+              </div>
+              {% endif %}
+            </div>
+            {% endfor %}
+          {% else %}
+            <div class="sd-empty">Checklist ainda não realizado pelo motorista.</div>
+          {% endif %}
+
+          <div class="sd-section" style="margin-top:20px">
+            <h3>Assinaturas</h3>
+            <div class="sd-grid">
+              <div>
+                <strong>Origem</strong>
+                {% if checklist_resumo.assinaturas.assinatura_origem %}
+                <img src="{{ checklist_resumo.assinaturas.assinatura_origem }}" class="sd-assinatura-preview" alt="Assinatura origem">
+                <p class="muted">{{ checklist_resumo.assinaturas.assinatura_origem_em }}</p>
+                {% else %}
+                <p class="muted">Pendente</p>
+                {% endif %}
+              </div>
+              <div>
+                <strong>Destino</strong>
+                {% if checklist_resumo.assinaturas.assinatura_destino %}
+                <img src="{{ checklist_resumo.assinaturas.assinatura_destino }}" class="sd-assinatura-preview" alt="Assinatura destino">
+                <p class="muted">{{ checklist_resumo.assinaturas.assinatura_destino_em }}</p>
+                {% else %}
+                <p class="muted">Pendente</p>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+
+          <div class="sd-actions">
+            <a href="/servicos/{{ s.id }}/checklist" target="_blank" class="sd-btn sd-btn-dark">Visualizar checklist completo</a>
+          </div>
+        </div>
+      </div>
+    </main>
   </div>
-
-  <form class="card" method="post" action="/faturamento/{{s.id}}/salvar">
-    <h2>Itens financeiros</h2>
-    <div class="row">
-      <select name="tipo" id="tipo-servico" onchange="carregarPadrao()">
-        {% for t in tipos_servico %}
-        <option value="{{t}}" {{'selected' if t==s.tipo else ''}}>{{t}}</option>
-        {% endfor %}
-      </select>
-      <select name="status_faturamento">
-        <option value="para_conferir" {{'selected' if s.status_faturamento=='para_conferir' else ''}}>Para conferir</option>
-        <option value="para_faturar" {{'selected' if s.status_faturamento=='para_faturar' else ''}}>Para faturar</option>
-        <option value="negociacao" {{'selected' if s.status_faturamento=='negociacao' else ''}}>Para negociar</option>
-        <option value="faturado" {{'selected' if s.status_faturamento=='faturado' else ''}}>Faturado</option>
-      </select>
-    </div>
-
-    <div id="itens-financeiros">
-      {% for it in itens %}
-      <div class="item-financeiro">
-        <input type="hidden" name="item_nome" value="{{it.nome_item}}">
-        <label>{{it.nome_item}}</label>
-        <input type="number" step="0.01" min="0" name="item_qtd" value="{{it.quantidade}}" oninput="calcularTotal()">
-        <input type="number" step="0.01" min="0" name="item_valor" value="{{it.valor_unitario}}" oninput="calcularTotal()">
-      </div>
-      {% endfor %}
-    </div>
-
-    <div class="total-box">Total: <b id="total-servico">{{s.valor_total_fmt}}</b></div>
-    <br>
-    <button>Salvar auditoria / fechamento</button>
-    <a class="btn dark" href="/faturamento">Voltar</a>
-  </form>
 </div>
 
 <script>
 const PRECOS_POR_TIPO = {{ precos_por_tipo|tojson }};
-function brMoney(v){return Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});}
-function calcularTotal(){
-  let total=0;
-  document.querySelectorAll('.item-financeiro').forEach(l=>{
-    const q=Number(l.querySelector('[name="item_qtd"]').value||0);
-    const v=Number(l.querySelector('[name="item_valor"]').value||0);
-    total += q*v;
-  });
-  document.getElementById('total-servico').innerText=brMoney(total);
+
+function brMoney(v) {
+  return Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
-function carregarPadrao(){
-  if(!confirm('Carregar itens padrão deste tipo? Isso substitui os itens atuais da tela.')) return;
-  const tipo=document.getElementById('tipo-servico').value;
-  const itens=PRECOS_POR_TIPO[tipo]||[];
-  document.getElementById('itens-financeiros').innerHTML=itens.map(it=>{
-    const nome=it.nome_item||it.nome||'';
-    const valor=Number(it.valor_padrao||0).toFixed(2);
-    const qtd=(nome.toUpperCase()==='SAIDA'||nome.toUpperCase()==='SAÍDA')?1:0;
-    return `<div class="item-financeiro">
+
+function calcularTotal() {
+  let total = 0;
+  document.querySelectorAll('.item-financeiro').forEach((l) => {
+    const q = Number(l.querySelector('[name="item_qtd"]').value || 0);
+    const v = Number(l.querySelector('[name="item_valor"]').value || 0);
+    total += q * v;
+  });
+  document.getElementById('total-servico').innerText = brMoney(total);
+}
+
+function carregarPadrao() {
+  if (!confirm('Carregar itens padrão deste tipo? Isso substitui os itens atuais da tela.')) return;
+  const tipo = document.getElementById('tipo-servico').value;
+  const itens = PRECOS_POR_TIPO[tipo] || [];
+  document.getElementById('itens-financeiros').innerHTML = itens.map((it) => {
+    const nome = it.nome_item || it.nome || '';
+    const valor = Number(it.valor_padrao || 0).toFixed(2);
+    const qtd = (nome.toUpperCase() === 'SAIDA' || nome.toUpperCase() === 'SAÍDA') ? 1 : 0;
+    return `<div class="sd-finance-grid item-financeiro">
       <input type="hidden" name="item_nome" value="${nome}">
       <label>${nome}</label>
       <input type="number" step="0.01" min="0" name="item_qtd" value="${qtd}" oninput="calcularTotal()">
@@ -102,6 +409,23 @@ function carregarPadrao(){
   }).join('');
   calcularTotal();
 }
+
+function ativarAba(nome) {
+  document.querySelectorAll('.sd-panel').forEach((p) => p.classList.remove('active'));
+  document.querySelectorAll('.sd-nav-item[data-aba]').forEach((n) => n.classList.remove('active'));
+  const panel = document.getElementById('panel-' + nome);
+  const nav = document.querySelector('.sd-nav-item[data-aba="' + nome + '"]');
+  if (panel) panel.classList.add('active');
+  if (nav) nav.classList.add('active');
+  const url = new URL(window.location);
+  url.searchParams.set('aba', nome);
+  window.history.replaceState({}, '', url);
+}
+
+document.querySelectorAll('.sd-nav-item[data-aba]').forEach((btn) => {
+  btn.addEventListener('click', () => ativarAba(btn.dataset.aba));
+});
+
 calcularTotal();
 </script>
 </body>

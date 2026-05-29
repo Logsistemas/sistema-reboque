@@ -5,11 +5,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Motoristas</title>
 <link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/dashboard.css">
 <style>
 body{background:#f3f6fb}
 .page{max-width:1500px;margin:18px auto;padding:0 16px}
-.top{display:flex;align-items:center;justify-content:space-between;background:#0b2f57;color:#fff;padding:10px 16px;font-weight:800}
-.top a{color:#fff;text-decoration:none;margin-left:16px;font-weight:700}
 .card{background:#fff;border-radius:14px;padding:18px;box-shadow:0 10px 30px rgba(15,23,42,.08);margin-bottom:14px}
 .header-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
 .btn{border:0;border-radius:10px;padding:9px 13px;font-weight:800;cursor:pointer;text-decoration:none;display:inline-block}
@@ -42,16 +41,7 @@ textarea{min-height:70px}
 </style>
 </head>
 <body>
-<div class="top">
-  <span>🚚 Sistema Interno de Reboque — Motoristas</span>
-  <span>
-    <a href="/">Dashboard</a>
-    <a href="/central">Central</a>
-    <a href="/cadastros/motoristas/novo">Cadastrar motorista</a>
-    <a href="/operacao">Operação ao vivo</a>
-    <a href="/historico">Histórico / Relatórios</a>
-  </span>
-</div>
+{% include "partials/nav_principal.html" %}
 
 <div class="page">
   <div class="card">

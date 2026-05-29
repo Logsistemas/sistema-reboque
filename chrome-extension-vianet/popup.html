@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <title>Essência Exportador</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      width: 420px;
+      margin: 0;
+      font-family: "Segoe UI", Arial, sans-serif;
+      background: #eef2f7;
+      color: #0f172a;
+    }
+    .header {
+      background: #111827;
+      color: #fff;
+      padding: 14px 16px;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 800;
+    }
+    .header p {
+      margin: 4px 0 0;
+      font-size: 12px;
+      color: #94a3b8;
+    }
+    .body { padding: 14px 16px 16px; }
+    .actions {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    button {
+      flex: 1;
+      border: 0;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .btn-capture { background: #0b2f57; color: #fff; }
+    .btn-send { background: #ff6b00; color: #fff; }
+    .btn-send:disabled { opacity: 0.5; cursor: not-allowed; }
+    .status {
+      font-size: 12px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      margin-bottom: 12px;
+      display: none;
+    }
+    .status.ok { display: block; background: #dcfce7; color: #166534; }
+    .status.err { display: block; background: #fee2e2; color: #991b1b; }
+    .status.info { display: block; background: #e0f2fe; color: #075985; }
+    .preview {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 12px;
+      max-height: 320px;
+      overflow: auto;
+      font-size: 12px;
+    }
+    .preview h3 {
+      margin: 0 0 10px;
+      font-size: 13px;
+      color: #0b2f57;
+    }
+    .preview dl {
+      margin: 0;
+      display: grid;
+      grid-template-columns: 110px 1fr;
+      gap: 6px 10px;
+    }
+    .preview dt {
+      font-weight: 700;
+      color: #64748b;
+    }
+    .preview dd {
+      margin: 0;
+      word-break: break-word;
+    }
+    .config {
+      margin-top: 12px;
+      font-size: 11px;
+      color: #64748b;
+    }
+    .config input {
+      width: 100%;
+      margin-top: 4px;
+      padding: 7px 9px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      font-size: 12px;
+    }
+    .btn-debug {
+      width: 100%;
+      margin-bottom: 12px;
+      background: #fff;
+      color: #0b2f57;
+      border: 1px solid #cbd5e1;
+    }
+    .debug-panel {
+      display: none;
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 12px;
+      max-height: 420px;
+      overflow: auto;
+      font-size: 11px;
+    }
+    .debug-meta p { margin: 4px 0; }
+    .debug-list { margin: 6px 0 6px 18px; padding: 0; font-size: 10px; }
+    .debug-panel h3 {
+      margin: 0 0 8px;
+      font-size: 12px;
+      color: #0b2f57;
+    }
+    .debug-table-wrap { overflow-x: auto; }
+    .debug-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 10px;
+    }
+    .debug-table th,
+    .debug-table td {
+      border: 1px solid #e2e8f0;
+      padding: 4px 6px;
+      text-align: left;
+      vertical-align: top;
+    }
+    .debug-pre {
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 10px;
+      max-height: 160px;
+      overflow: auto;
+      background: #f8fafc;
+      padding: 8px;
+      border-radius: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Essência Exportador</h1>
+    <p>Vianet/Mondial → Sistema Reboque</p>
+  </div>
+  <div class="body">
+    <div class="actions">
+      <button type="button" class="btn-capture" id="btnCapturar">Capturar serviço</button>
+      <button type="button" class="btn-send" id="btnEnviar" disabled>Enviar para sistema</button>
+    </div>
+    <div id="status" class="status"></div>
+    <button type="button" class="btn-debug" id="btnDebug">Ver debug</button>
+    <div class="debug-panel" id="debug"></div>
+    <div class="preview" id="preview">
+      <h3>Preview</h3>
+      <p style="color:#64748b;margin:0">Abra um serviço no Vianet e clique em <b>Capturar serviço</b>.</p>
+    </div>
+    <div class="config">
+      <label for="apiBase">URL do backend</label>
+      <input type="text" id="apiBase" value="http://localhost:8000">
+    </div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

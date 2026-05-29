@@ -5,7 +5,7 @@
     <div class="menu-item">
       <button type="button">Serviços ▾</button>
       <div class="submenu">
-        <a href="/central">Central</a>
+        <a href="/central" class="{% if nav_ativo == 'central' %}nav-active{% endif %}">Central</a>
         <a href="/servicos/novo">Cadastrar manualmente</a>
         <a href="/servicos/importar">Importar Excel/PDF</a>
       </div>
@@ -13,7 +13,7 @@
     <a href="/motoristas" class="{% if nav_ativo == 'motoristas' %}nav-active{% endif %}">Motoristas</a>
     <a href="/faturamento" class="{% if nav_ativo == 'faturamento' %}nav-active{% endif %}">Faturamento</a>
     <a href="/historico" class="{% if nav_ativo == 'relatorios' %}nav-active{% endif %}">Relatórios</a>
-    <a href="/operacao">Operação ao vivo</a>
+    <a href="/operacao" class="{% if nav_ativo == 'operacao' %}nav-active{% endif %}">Operação ao vivo</a>
     <a href="/motorista/login">Área do Motorista</a>
     {% if nav_som %}
     <button type="button" id="btnSomTopo" class="sound-btn" onclick="ativarSom()">Ativar som</button>
