@@ -95,11 +95,13 @@ function fecharModal(id){const el=document.getElementById(id); if(el) el.style.d
 </head>
 <body>
 <div class="top app-top">
-  <span>🚛 Sistema Interno de Reboque — Operação Online</span>
+  <span>🚛 Sistema Interno de Reboque — Central</span>
   <nav class="main-menu">
+    <a href="/">Dashboard</a>
     <div class="menu-item">
       <button type="button">Serviços ▾</button>
       <div class="submenu">
+        <a href="/central">Central</a>
         <a href="/servicos/novo">Cadastrar manualmente</a>
         <a href="/servicos/importar">Importar Excel/PDF</a>
       </div>
@@ -113,7 +115,7 @@ function fecharModal(id){const el=document.getElementById(id); if(el) el.style.d
       </div>
     </div>
     <a href="/motoristas">Motoristas</a>
-    <a href="/">Central</a>
+    <a href="/central">Central</a>
     <a href="/operacao">Operação ao vivo</a>
     <a href="/historico">Histórico / Relatórios</a>
     <a href="/faturamento">Faturamento</a>
@@ -127,7 +129,10 @@ function fecharModal(id){const el=document.getElementById(id); if(el) el.style.d
 
   <main>
 <div class="card overflow">
-      <h2>Serviços</h2>
+      <h2>Serviços{% if titulo_filtro %} <span class="muted" style="font-size:14px;font-weight:600">— {{ titulo_filtro }}</span>{% endif %}</h2>
+      {% if titulo_filtro %}
+      <p style="margin:0 0 12px"><a href="/central">Limpar filtro</a></p>
+      {% endif %}
       <table>
         <thead>
           <tr>
@@ -174,6 +179,24 @@ function fecharModal(id){const el=document.getElementById(id); if(el) el.style.d
 let somAtivo = false;
 let ultimoEstado = {};
 let motoristasCache = [];
+
+const FILTRO_CENTRAL = new URLSearchParams(window.location.search);
+const STATUSES_FILTRO = (FILTRO_CENTRAL.get('statuses') || '')
+  .split(',')
+  .map((s) => s.trim().toLowerCase())
+  .filter(Boolean);
+const STATUS_FILTRO = (FILTRO_CENTRAL.get('status') || '').trim().toLowerCase();
+
+function aplicarFiltroServicos(ss) {
+  if (!ss) return [];
+  if (STATUSES_FILTRO.length) {
+    return ss.filter((s) => STATUSES_FILTRO.includes((s.status || '').toLowerCase()));
+  }
+  if (STATUS_FILTRO) {
+    return ss.filter((s) => (s.status || '').toLowerCase() === STATUS_FILTRO);
+  }
+  return ss;
+}
 
 function safe(v) {
   return (v === null || v === undefined || v === '') ? '-' : String(v);
@@ -324,7 +347,7 @@ async function atualizarCentral() {
     const ss = await servicosRes.json();
 
     renderMotoristas(ms);
-    renderServicos(ss);
+    renderServicos(aplicarFiltroServicos(ss));
 
     (ss || []).forEach(s => {
       const fotosQtd = Array.isArray(s.fotos) ? s.fotos.length : 0;
@@ -347,6 +370,13 @@ async function atualizarCentral() {
   }
 }
 
+
+function formatarDistanciaMotorista(m) {
+  if (m.rota_disponivel && m.distancia_texto && m.duracao_texto) {
+    return `${m.distancia_texto} | ${m.duracao_texto}`;
+  }
+  return m.distancia_texto || 'Distância indisponível';
+}
 
 async function abrirModalMotorista(servicoId) {
   const modal = document.getElementById('modalMotorista');
@@ -389,8 +419,7 @@ async function abrirModalMotorista(servicoId) {
     const online = !!m.online;
     const ocupado = !!m.ocupado;
     const placaAtual = m.placa_atual || m.placa || '';
-    const distancia = m.distancia_texto || 'sem localização';
-    const duracao = m.duracao_texto || '';
+    const distancia = formatarDistanciaMotorista(m);
     const disabled = (!online || ocupado) ? 'disabled' : '';
     const checked = (!disabled && idx === primeiroLivre) ? 'checked' : '';
 
@@ -408,7 +437,6 @@ async function abrirModalMotorista(servicoId) {
 
           <span class="rank-badges">
             <span class="badge-dist">📍 ${safe(distancia)}</span>
-            ${duracao ? `<span class="badge-time">⏱ ${safe(duracao)}</span>` : ''}
           </span>
         </span>
 

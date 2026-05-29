@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Dashboard — Sistema Reboque</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/dashboard.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+</head>
+<body class="dash-body">
+  {% include "partials/nav_principal.html" %}
+
+  <div class="dash-wrap">
+    <div class="dash-header">
+      <div>
+        <h1>Dashboard</h1>
+        <div class="muted">Visão operacional em tempo real — <span id="dash-data-ref">{{ data_ref }}</span></div>
+      </div>
+      <div class="dash-header-actions">
+        <span class="live-badge" id="dash-live-badge">● Ao vivo</span>
+        <a href="/central" class="btn">Central de Serviços</a>
+      </div>
+    </div>
+
+    <div class="dash-top-grid">
+      <section class="dash-cards-area">
+        <div class="dash-cards-grid" id="dash-cards">
+          <a class="dash-card accent dash-card-link" data-href="/central" href="/central">
+            <div class="label">Serviços cadastrados</div>
+            <div class="value" data-kpi="total_cadastrados">{{ kpis.total_cadastrados }}</div>
+            <div class="hint">Total no sistema</div>
+          </a>
+          <a class="dash-card green dash-card-link" data-href="/central?statuses=finalizado" href="/central?statuses=finalizado">
+            <div class="label">Serviços concluídos</div>
+            <div class="value" data-kpi="concluidos">{{ kpis.concluidos }}</div>
+            <div class="hint">Status finalizado</div>
+          </a>
+          <a class="dash-card blue dash-card-link" data-href="/central?statuses=na origem,em transporte" href="/central?statuses=na origem,em transporte">
+            <div class="label">Serviços em andamento</div>
+            <div class="value" data-kpi="em_origem_transporte">{{ kpis.em_origem_transporte }}</div>
+            <div class="hint">Na origem + em transporte</div>
+          </a>
+          <a class="dash-card accent dash-card-link" data-href="/central" href="/central">
+            <div class="label">Serviços do dia</div>
+            <div class="value" data-kpi="do_dia">{{ kpis.do_dia }}</div>
+            <div class="hint">Criados hoje</div>
+          </a>
+          <div class="dash-card">
+            <div class="label">TMC do dia</div>
+            <div class="value" data-kpi="tmc_dia">{{ kpis.tmc_dia }}</div>
+            <div class="hint">Tempo médio de conclusão</div>
+          </div>
+          <div class="dash-card">
+            <div class="label">TME do mês</div>
+            <div class="value" data-kpi="tme_mes">{{ kpis.tme_mes }}</div>
+            <div class="hint">Tempo médio até origem</div>
+          </div>
+          <a class="dash-card red dash-card-link" data-href="/central?statuses=recusado" href="/central?statuses=recusado">
+            <div class="label">Serviços recusados</div>
+            <div class="value" data-kpi="recusados">{{ kpis.recusados }}</div>
+          </a>
+          <a class="dash-card red dash-card-link" data-href="/central?statuses=cancelado" href="/central?statuses=cancelado">
+            <div class="label">Serviços cancelados</div>
+            <div class="value" data-kpi="cancelados">{{ kpis.cancelados }}</div>
+          </a>
+          <a class="dash-card green dash-card-link" data-href="/faturamento" href="/faturamento">
+            <div class="label">Receita do mês</div>
+            <div class="value value-sm" data-kpi="receita_mes_fmt">{{ kpis.receita_mes_fmt }}</div>
+          </a>
+          <a class="dash-card purple dash-card-link" data-href="/motoristas?online=1" href="/motoristas?online=1">
+            <div class="label">Motoristas online</div>
+            <div class="value" data-kpi="motoristas_online">{{ kpis.motoristas_online }}</div>
+            <div class="hint">Clique para ver lista</div>
+          </a>
+          <div class="dash-card blue">
+            <div class="label">KM percorridos hoje</div>
+            <div class="value" data-kpi="km_hoje">{{ kpis.km_hoje }}</div>
+            <div class="hint">Indicador em evolução</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="dash-map-panel">
+        <div class="panel-head">
+          <h2>Mapa operacional</h2>
+          <div class="map-legend">
+            <span><i class="legend-dot livre"></i>Livre</span>
+            <span><i class="legend-dot caminho"></i>A caminho</span>
+            <span><i class="legend-dot origem"></i>Na origem</span>
+            <span><i class="legend-dot transporte"></i>Em transporte</span>
+            <span><i class="legend-dot offline"></i>Offline</span>
+          </div>
+        </div>
+        <div id="dash-map"></div>
+      </section>
+
+      <aside class="dash-alerts-panel">
+        <div class="panel-head">
+          <h2>Alertas</h2>
+          <span class="alert-count" id="dash-alert-count">{{ alertas|length }}</span>
+        </div>
+        <div class="alerts-list" id="dash-alertas">
+          {% if alertas %}
+            {% for a in alertas %}
+            <a class="alert-item" href="{{ a.link }}">
+              <span class="alert-ico">{{ a.icone }}</span>
+              <span>{{ a.texto }}</span>
+            </a>
+            {% endfor %}
+          {% else %}
+            <p class="muted alert-empty">Nenhum alerta no momento.</p>
+          {% endif %}
+        </div>
+      </aside>
+    </div>
+
+    <div class="dash-bottom-grid">
+      <section class="dash-panel">
+        <h2>Resumo operacional (hoje)</h2>
+        <div id="dash-resumo-status">
+          {% set max_st = resumo_status|map(attribute='total')|max if resumo_status else 0 %}
+          {% for item in resumo_status %}
+          <div class="bar-row" data-status-row="{{ item.chave }}">
+            <span>{{ item.status }}</span>
+            <div class="bar-track">
+              <div class="bar-fill" style="width: {{ (item.total * 100 / max_st) if max_st else 0 }}%"></div>
+            </div>
+            <b class="bar-qtd">{{ item.total }}</b>
+          </div>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="dash-panel">
+        <h2>Top motoristas hoje</h2>
+        <div id="dash-ranking">
+          {% if ranking %}
+          <table class="ranking-table">
+            <thead>
+              <tr><th>#</th><th>Motorista</th><th>Serviços</th><th>Tempo médio</th></tr>
+            </thead>
+            <tbody>
+              {% for m in ranking %}
+              <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ m.nome }}</td>
+                <td><b>{{ m.qtd }}</b></td>
+                <td>{{ m.tempo_medio }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <p class="muted">Nenhum serviço atribuído hoje.</p>
+          {% endif %}
+        </div>
+      </section>
+
+      <section class="dash-panel">
+        <h2>Resumo financeiro (mês)</h2>
+        <div id="dash-resumo-financeiro">
+          {% if resumo_financeiro %}
+            {% for item in resumo_financeiro %}
+            <div class="finance-line">
+              <span>{{ item.status }}</span>
+              <span><b>{{ item.total }}</b> serv. — {{ item.valor_fmt }}</span>
+            </div>
+            {% endfor %}
+            <div class="finance-line">
+              <span><b>Total faturável</b></span>
+              <span><b data-kpi="receita_mes_fmt_dup">{{ kpis.receita_mes_fmt }}</b></span>
+            </div>
+          {% else %}
+            <p class="muted">Sem movimentação financeira no mês.</p>
+          {% endif %}
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="/static/dashboard.js"></script>
+  <script>
+    window.DASH_INIT = {
+      motoristas: {{ motoristas_mapa_json|safe }}
+    };
+    if (window.DashboardApp) {
+      DashboardApp.init(window.DASH_INIT.motoristas);
+    }
+  </script>
+</body>
+</html>

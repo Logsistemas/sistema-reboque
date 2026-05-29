@@ -1,3 +1,11 @@
+import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+# .env na raiz do projeto; não sobrescreve variáveis já definidas (ex.: Render).
+load_dotenv(Path(__file__).resolve().parent / ".env")
+
 import urllib
 import urllib.request
 import urllib.parse
@@ -9,7 +17,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from datetime import datetime
 import pandas as pd
-import io, socket, os, shutil, uuid, json
+import io, socket, shutil, uuid, json, math, re
 import psycopg2
 from psycopg2.extras import RealDictCursor, Json
 
@@ -469,6 +477,28 @@ def init_db():
               servico_id uuid, url text, filename text, created_at timestamp default now()
             );""")
             cur.execute("""
+            create table if not exists checklist_avarias (
+            id uuid primary key default uuid_generate_v4(),
+            servico_id uuid not null,
+            parte text,
+            marcacoes jsonb default '[]'::jsonb,
+            fotos jsonb default '[]'::jsonb,
+            created_at timestamp default now()
+        );
+          """)
+            cur.execute("""
+            create table if not exists checklist_assinaturas (
+              id uuid primary key default uuid_generate_v4(),
+              servico_id uuid not null unique,
+              assinatura_origem_base64 text,
+              assinatura_destino_base64 text,
+              assinatura_base64 text,
+              origem_atualizada_em timestamp,
+              destino_atualizada_em timestamp,
+              created_at timestamp default now(),
+              updated_at timestamp default now()
+            );""")
+            cur.execute("""
             create table if not exists tabela_precos (
               id uuid primary key default uuid_generate_v4(),
               tipo_servico text not null,
@@ -542,8 +572,20 @@ def init_db():
             "alter table servicos add column if not exists referencia_origem text;",
             "alter table servicos add column if not exists referencia_destino text;",
             "alter table servicos add column if not exists origem_lat double precision;",
-            "alter table servicos add column if not exists origem_lng double precision;"]
+            "alter table servicos add column if not exists origem_lng double precision;",
+            "alter table checklist_assinaturas add column if not exists assinatura_origem_base64 text;",
+            "alter table checklist_assinaturas add column if not exists assinatura_destino_base64 text;",
+            "alter table checklist_assinaturas add column if not exists origem_atualizada_em timestamp;",
+            "alter table checklist_assinaturas add column if not exists destino_atualizada_em timestamp;",
+            "alter table checklist_assinaturas alter column assinatura_base64 drop not null;"]
             for a in alters: cur.execute(a)
+            cur.execute("""
+                update checklist_assinaturas
+                   set assinatura_origem_base64 = assinatura_base64,
+                       origem_atualizada_em = coalesce(origem_atualizada_em, updated_at, created_at, now())
+                 where coalesce(assinatura_origem_base64, '') = ''
+                   and coalesce(assinatura_base64, '') <> ''
+            """)
             cur.execute("select count(*) as total from tabela_precos")
             total_precos = cur.fetchone()["total"]
             if not total_precos:
@@ -641,6 +683,64 @@ def normalizar_servico(s, incluir_fotos=True):
     s["valor_total_fmt"] = fmt_moeda(s["valor_total"])
     s["status_faturamento"] = s.get("status_faturamento") or "para_conferir"
     return s
+
+PLACA_CLIENTE_RE = re.compile(r"^[A-Z]{3}(\d{4}|\d[A-Z]\d{2})$")
+
+
+def normalizar_placa_cliente(valor):
+    return (valor or "").upper().replace("-", "").replace(" ", "").strip()
+
+
+def placa_cliente_valida(placa):
+    placa = normalizar_placa_cliente(placa)
+    return bool(placa) and bool(PLACA_CLIENTE_RE.match(placa))
+
+
+def placa_cliente_do_servico(servico):
+    if not servico:
+        return ""
+    return normalizar_placa_cliente(
+        servico.get("placa_veiculo_removido") or servico.get("placa_removida") or ""
+    )
+
+
+def salvar_placa_cliente_servico(sid, placa_veiculo):
+    placa = normalizar_placa_cliente(placa_veiculo)
+    if not placa:
+        return False, "Informe a placa"
+    if not placa_cliente_valida(placa):
+        return (
+            False,
+            "Placa inválida. Use o formato antigo (ABC1234) ou Mercosul (ABC1D23).",
+        )
+
+    existe = servico_by_id(sid)
+    if not existe:
+        return False, "Serviço não encontrado"
+
+    status_atual = (existe.get("status") or "").strip().lower()
+    if status_atual == "finalizado":
+        return False, "Não é possível alterar a placa de um serviço finalizado."
+
+    novo_status = existe.get("status") or "novo"
+    if novo_status not in ["em transporte", "finalizado"]:
+        novo_status = "na origem"
+
+    q(
+        """
+        update servicos
+           set placa_veiculo_removido=%s,
+               placa_removida=%s,
+               status=%s,
+               atualizado_em=now()
+         where id=%s
+        """,
+        (placa, placa, novo_status, str(sid)),
+    )
+    registrar_evento_db(sid, "placa lançada", f"Placa: {placa}")
+    return True, None
+
+
 def lista_motoristas():
     return [normalizar_motorista(r) for r in q("select * from motoristas where coalesce(ativo,true)=true order by nome asc", fetch=True)]
 def lista_servicos(limit=None, ativos=False, filtros=None):
@@ -716,9 +816,513 @@ def get_lan_ip():
         s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM); s.connect(("8.8.8.8",80)); ip=s.getsockname()[0]; s.close(); return ip
     except Exception: return "SEU_IP"
 
+
+def fmt_minutos_dashboard(valor):
+    if valor is None:
+        return "0 min"
+    try:
+        return f"{int(round(float(valor)))} min"
+    except Exception:
+        return "0 min"
+
+
+# Colunas legadas (ex.: atualizado_em) podem estar como text no banco — só o Dashboard usa estes casts.
+_DASH_ISO_TS_RE = r"^[0-9]{4}-[0-9]{2}-[0-9]{2}"
+
+
+def _dash_sql_ts(coluna):
+    """Converte text ou timestamp para timestamptz quando o valor parece data ISO."""
+    return f"""(
+      CASE
+        WHEN coalesce({coluna}::text, '') ~ '{_DASH_ISO_TS_RE}'
+        THEN ({coluna}::text)::timestamptz
+        ELSE NULL
+      END
+    )"""
+
+
+def _dash_sql_date(coluna):
+    return f"""(
+      CASE
+        WHEN coalesce({coluna}::text, '') ~ '{_DASH_ISO_TS_RE}'
+        THEN ({coluna}::text)::date
+        ELSE NULL
+      END
+    )"""
+
+
+def _dash_where_servico_hoje(prefixo=""):
+    col = f"{prefixo}created_at" if prefixo else "created_at"
+    return f"{_dash_sql_date(col)} = current_date"
+
+
+def dados_dashboard():
+    ts_created = _dash_sql_ts("created_at")
+    row = one(
+        f"""
+        select
+          count(*)::int as total_cadastrados,
+          count(*) filter (where coalesce(status,'') = 'finalizado')::int as concluidos,
+          count(*) filter (
+            where coalesce(status,'') not in ('finalizado','recusado','cancelado')
+          )::int as em_andamento,
+          count(*) filter (
+            where coalesce(status,'') in ('na origem', 'em transporte')
+          )::int as em_origem_transporte,
+          count(*) filter (where {_dash_where_servico_hoje()})::int as do_dia,
+          count(*) filter (where coalesce(status,'') = 'recusado')::int as recusados,
+          count(*) filter (where coalesce(status,'') = 'cancelado')::int as cancelados,
+          coalesce(
+            sum(valor_total) filter (
+              where {ts_created} is not null
+                and date_trunc('month', {ts_created}) = date_trunc('month', now())
+            ), 0
+          ) as receita_mes,
+          (
+            select count(*)::int
+              from motoristas
+             where coalesce(ativo, true) = true
+               and coalesce(online, false) = true
+          ) as motoristas_online
+        from servicos
+        """,
+    ) or {}
+
+    receita = float(row.get("receita_mes") or 0)
+    return {
+        "total_cadastrados": int(row.get("total_cadastrados") or 0),
+        "concluidos": int(row.get("concluidos") or 0),
+        "em_andamento": int(row.get("em_andamento") or 0),
+        "em_origem_transporte": int(row.get("em_origem_transporte") or 0),
+        "do_dia": int(row.get("do_dia") or 0),
+        "recusados": int(row.get("recusados") or 0),
+        "cancelados": int(row.get("cancelados") or 0),
+        "motoristas_online": int(row.get("motoristas_online") or 0),
+        "receita_mes": receita,
+        "receita_mes_fmt": fmt_moeda(receita),
+        "tmc_dia": "0 min",
+        "tme_mes": "0 min",
+        "tmc_mes": "0 min",
+        "km_hoje": 0,
+    }
+
+
+def lista_servicos_central_filtrada(statuses: str = "", status: str = "", limit: int = 200):
+    """Lista serviços do dia para a Central, com filtro opcional por status."""
+    limit = int(limit or 200)
+    if statuses:
+        sts = [s.strip().lower() for s in statuses.split(",") if s.strip()]
+        if sts:
+            placeholders = ",".join(["%s"] * len(sts))
+            rows = q(
+                f"""
+                select *
+                  from servicos
+                 where created_at::date = current_date
+                   and lower(coalesce(status, 'novo')) in ({placeholders})
+                 order by created_at desc
+                 limit {limit}
+                """,
+                tuple(sts),
+                True,
+            )
+            return [normalizar_servico(r) for r in rows]
+    if status:
+        st = status.strip().lower()
+        rows = q(
+            f"""
+            select *
+              from servicos
+             where created_at::date = current_date
+               and lower(coalesce(status, 'novo')) = %s
+             order by created_at desc
+             limit {limit}
+            """,
+            (st,),
+            True,
+        )
+        return [normalizar_servico(r) for r in rows]
+    return lista_servicos_hoje(limit=limit)
+
+
+def status_operacional_motorista_dashboard(motorista):
+    if not motorista.get("online"):
+        return "offline", "Offline", "#dc2626"
+    ocupado = motorista_ocupado(motorista.get("id"))
+    if not ocupado:
+        return "livre", "Livre", "#16a34a"
+    st = (ocupado.get("status") or "").lower()
+    mapa = {
+        "a caminho": ("a_caminho", "A caminho", "#eab308"),
+        "na origem": ("na_origem", "Na origem", "#f97316"),
+        "em transporte": ("em_transporte", "Em transporte", "#2563eb"),
+        "enviado": ("enviado", "Enviado", "#eab308"),
+        "aceito": ("aceito", "Aceito", "#16a34a"),
+    }
+    return mapa.get(st, ("livre", "Livre", "#16a34a"))
+
+
+def distancia_origem_dashboard(motorista, servico):
+    if not servico:
+        return None
+    mlat = motorista.get("lat")
+    mlng = motorista.get("lng")
+    lat = servico.get("origem_lat")
+    lng = servico.get("origem_lng")
+    if not mlat or not mlng or not lat or not lng:
+        return None
+    dk = distancia_km(mlat, mlng, lat, lng)
+    if dk is None:
+        return None
+    return f"{dk} km aprox."
+
+
+def motoristas_mapa_dashboard_enriquecido():
+    rows = q(
+        """
+        select *
+          from motoristas
+         where coalesce(ativo, true) = true
+        """,
+        fetch=True,
+    )
+    lista = []
+    for r in rows:
+        m = normalizar_motorista(r)
+        if not m:
+            continue
+        codigo, label, cor = status_operacional_motorista_dashboard(m)
+        servico_ativo = None
+        distancia_origem = "-"
+        protocolo = None
+        ocupado = motorista_ocupado(m.get("id"))
+        if ocupado:
+            servico_ativo = servico_by_id(ocupado.get("id"))
+            if servico_ativo:
+                protocolo = servico_ativo.get("protocolo")
+                dist = distancia_origem_dashboard(m, servico_ativo)
+                if dist:
+                    distancia_origem = dist
+        try:
+            lat = float(m.get("lat")) if m.get("lat") is not None else None
+            lng = float(m.get("lng")) if m.get("lng") is not None else None
+        except Exception:
+            lat, lng = None, None
+        lista.append(
+            {
+                "id": str(m.get("id")),
+                "nome": m.get("nome") or "Motorista",
+                "placa": m.get("placa_atual") or m.get("placa") or "-",
+                "online": bool(m.get("online")),
+                "lat": lat,
+                "lng": lng,
+                "status_operacional": codigo,
+                "status_label": label,
+                "cor_marcador": cor,
+                "gps_atualizacao": dt_str(m.get("ultima_atualizacao")) or "-",
+                "servico_protocolo": protocolo,
+                "distancia_origem": distancia_origem,
+            }
+        )
+    return lista
+
+
+ORDEM_STATUS_DASHBOARD = [
+    ("enviado", "Enviado"),
+    ("a caminho", "A caminho"),
+    ("na origem", "Na origem"),
+    ("em transporte", "Em transporte"),
+    ("finalizado", "Finalizado"),
+    ("cancelado", "Cancelado"),
+]
+
+
+def resumo_status_operacional_dashboard():
+    rows = q(
+        f"""
+        select lower(coalesce(status, 'novo')) as status, count(*)::int as total
+          from servicos
+         where {_dash_where_servico_hoje()}
+         group by 1
+        """,
+        fetch=True,
+    )
+    mapa = {r.get("status"): int(r.get("total") or 0) for r in rows}
+    return [
+        {"chave": chave, "status": rotulo, "total": mapa.get(chave, 0)}
+        for chave, rotulo in ORDEM_STATUS_DASHBOARD
+    ]
+
+
+def alertas_operacionais_dashboard():
+    alertas = []
+    ts_atualizado = _dash_sql_ts("atualizado_em")
+
+    sem_placa = q(
+        f"""
+        select id, protocolo
+          from servicos
+         where {_dash_where_servico_hoje()}
+           and coalesce(status, '') not in ('finalizado', 'recusado', 'cancelado')
+           and coalesce(placa_veiculo_removido, placa_removida, '') = ''
+         order by {_dash_sql_ts("created_at")} desc nulls last
+         limit 20
+        """,
+        fetch=True,
+    )
+    for s in sem_placa:
+        alertas.append(
+            {
+                "tipo": "sem_placa",
+                "icone": "⚠",
+                "texto": f"Serviço sem placa — {s.get('protocolo') or s.get('id')}",
+                "link": "/central",
+            }
+        )
+
+    sem_checklist = q(
+        f"""
+        select s.id, s.protocolo
+          from servicos s
+          left join checklist_avarias c on c.servico_id = s.id
+         where {_dash_where_servico_hoje("s.")}
+           and coalesce(s.status, '') not in ('finalizado', 'recusado', 'cancelado')
+         group by s.id, s.protocolo
+        having count(c.id) = 0
+         order by max({_dash_sql_ts("s.created_at")}) desc nulls last
+         limit 20
+        """,
+        fetch=True,
+    )
+    for s in sem_checklist:
+        alertas.append(
+            {
+                "tipo": "sem_checklist",
+                "icone": "⚠",
+                "texto": f"Checklist não iniciado — {s.get('protocolo') or s.get('id')}",
+                "link": f"/servicos/{s.get('id')}/checklist",
+            }
+        )
+
+    sem_gps = q(
+        """
+        select nome
+          from motoristas
+         where coalesce(ativo, true) = true
+           and coalesce(online, false) = true
+           and (lat is null or lng is null)
+         order by nome
+         limit 20
+        """,
+        fetch=True,
+    )
+    for m in sem_gps:
+        alertas.append(
+            {
+                "tipo": "sem_gps",
+                "icone": "⚠",
+                "texto": f"Motorista sem GPS — {m.get('nome')}",
+                "link": "/motoristas?online=1",
+            }
+        )
+
+    parados = q(
+        f"""
+        select protocolo
+          from servicos
+         where {_dash_where_servico_hoje()}
+           and coalesce(status, '') not in ('finalizado', 'recusado', 'cancelado')
+           and {ts_atualizado} is not null
+           and {ts_atualizado} < now() - interval '30 minutes'
+         order by {ts_atualizado} asc nulls last
+         limit 20
+        """,
+        fetch=True,
+    )
+    for s in parados:
+        alertas.append(
+            {
+                "tipo": "parado",
+                "icone": "⚠",
+                "texto": f"Serviço parado há mais de 30 min — {s.get('protocolo')}",
+                "link": "/central",
+            }
+        )
+
+    na_origem_longo = q(
+        f"""
+        select protocolo
+          from servicos
+         where {_dash_where_servico_hoje()}
+           and lower(coalesce(status, '')) = 'na origem'
+           and {ts_atualizado} is not null
+           and {ts_atualizado} < now() - interval '60 minutes'
+         order by {ts_atualizado} asc nulls last
+         limit 20
+        """,
+        fetch=True,
+    )
+    for s in na_origem_longo:
+        alertas.append(
+            {
+                "tipo": "origem_longo",
+                "icone": "⚠",
+                "texto": f"Na origem há mais de 60 min — {s.get('protocolo')}",
+                "link": "/central?statuses=na origem",
+            }
+        )
+
+    sem_motorista = q(
+        f"""
+        select protocolo
+          from servicos
+         where {_dash_where_servico_hoje()}
+           and lower(coalesce(status, '')) = 'enviado'
+           and (motorista_id is null or coalesce(motorista_nome, '') = '')
+         order by {_dash_sql_ts("created_at")} desc nulls last
+         limit 20
+        """,
+        fetch=True,
+    )
+    for s in sem_motorista:
+        alertas.append(
+            {
+                "tipo": "sem_motorista",
+                "icone": "⚠",
+                "texto": f"Enviado sem motorista — {s.get('protocolo')}",
+                "link": "/central?statuses=enviado",
+            }
+        )
+
+    return alertas[:40]
+
+
+def ranking_motoristas_hoje_dashboard():
+    rows = q(
+        f"""
+        select coalesce(motorista_nome, 'Sem nome') as nome,
+               motorista_id,
+               count(*)::int as qtd
+          from servicos
+         where {_dash_where_servico_hoje()}
+           and motorista_id is not null
+         group by motorista_nome, motorista_id
+         order by qtd desc, nome asc
+         limit 8
+        """,
+        fetch=True,
+    )
+    return [
+        {
+            "nome": r.get("nome"),
+            "qtd": int(r.get("qtd") or 0),
+            "tempo_medio": "0 min",
+        }
+        for r in rows
+    ]
+
+
+def payload_dashboard_live():
+    return {
+        "ok": True,
+        "data_ref": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+        "kpis": dados_dashboard(),
+        "resumo_status": resumo_status_operacional_dashboard(),
+        "resumo_financeiro": resumo_financeiro_dashboard(),
+        "motoristas_mapa": motoristas_mapa_dashboard_enriquecido(),
+        "alertas": alertas_operacionais_dashboard(),
+        "ranking": ranking_motoristas_hoje_dashboard(),
+    }
+
+
+def resumo_operacional_dashboard():
+    rows = q(
+        """
+        select coalesce(status, 'novo') as status, count(*)::int as total
+          from servicos
+         where created_at::date = current_date
+         group by 1
+         order by total desc
+        """,
+        fetch=True,
+    )
+    return [dict(r) for r in rows]
+
+
+def resumo_financeiro_dashboard():
+    ts_created = _dash_sql_ts("created_at")
+    rows = q(
+        f"""
+        select coalesce(status_faturamento, 'para_conferir') as status,
+               count(*)::int as total,
+               coalesce(sum(valor_total), 0) as valor
+          from servicos
+         where {ts_created} is not null
+           and date_trunc('month', {ts_created}) = date_trunc('month', now())
+         group by 1
+         order by total desc
+        """,
+        fetch=True,
+    )
+    out = []
+    for r in rows:
+        item = dict(r)
+        item["valor_fmt"] = fmt_moeda(float(item.get("valor") or 0))
+        out.append(item)
+    return out
+
+
 @app.get('/', response_class=HTMLResponse)
-def index(request: Request):
-    return templates.TemplateResponse('index.html', {'request':request,'motoristas':lista_motoristas(),'servicos': lista_servicos_hoje(limit=200),'lan_ip':get_lan_ip(),'tipos_servico':lista_tipos_servico(),'precos_por_tipo':{t:itens_padrao_tipo(t) for t in lista_tipos_servico()}})
+def dashboard(request: Request):
+    live = payload_dashboard_live()
+    return templates.TemplateResponse(
+        'dashboard.html',
+        {
+            'request': request,
+            'nav_ativo': 'dashboard',
+            'nav_som': False,
+            'data_ref': live['data_ref'],
+            'kpis': live['kpis'],
+            'resumo_status': live['resumo_status'],
+            'resumo_financeiro': live['resumo_financeiro'],
+            'alertas': live['alertas'],
+            'ranking': live['ranking'],
+            'motoristas_mapa_json': json.dumps(live['motoristas_mapa']),
+        },
+    )
+
+
+@app.get('/api/dashboard/live')
+def api_dashboard_live():
+    return payload_dashboard_live()
+
+
+@app.get('/central', response_class=HTMLResponse)
+def central(request: Request, statuses: str = "", status: str = ""):
+    titulo_filtro = ""
+    if statuses:
+        titulo_filtro = "Filtro: " + statuses.replace(",", ", ")
+    elif status:
+        titulo_filtro = "Filtro: " + status
+    return templates.TemplateResponse(
+        'index.html',
+        {
+            'request': request,
+            'motoristas': lista_motoristas(),
+            'servicos': lista_servicos_central_filtrada(statuses=statuses, status=status),
+            'lan_ip': get_lan_ip(),
+            'tipos_servico': lista_tipos_servico(),
+            'precos_por_tipo': {t: itens_padrao_tipo(t) for t in lista_tipos_servico()},
+            'filtro_statuses': statuses,
+            'filtro_status': status,
+            'titulo_filtro': titulo_filtro,
+        },
+    )
+
+
+@app.get('/servicos')
+def servicos_alias():
+    return RedirectResponse('/central', status_code=303)
 
 
 @app.get('/servicos/novo', response_class=HTMLResponse)
@@ -752,7 +1356,7 @@ async def salvar_veiculo(request: Request):
         form.get('placa','').strip(), form.get('modelo','').strip(), form.get('tipo','').strip(),
         form.get('ano','').strip(), form.get('renavam','').strip(), form.get('observacao','').strip()
     ))
-    return RedirectResponse('/', 303)
+    return RedirectResponse('/central', 303)
 
 @app.post('/cadastros/usuarios')
 async def salvar_usuario(request: Request):
@@ -761,17 +1365,296 @@ async def salvar_usuario(request: Request):
         form.get('nome','').strip(), form.get('cpf','').strip(), form.get('telefone','').strip(),
         form.get('email','').strip(), form.get('senha','').strip(), form.get('perfil','').strip()
     ))
-    return RedirectResponse('/', 303)
+    return RedirectResponse('/central', 303)
 
+
+def partes_checklist_dict(servico_id):
+    """Retorna { parte: { marcacoes, fotos } } para um serviço."""
+    rows = q(
+        """
+        select parte, marcacoes, fotos
+          from checklist_avarias
+         where servico_id = %s
+         order by parte
+        """,
+        (str(servico_id),),
+        True,
+    )
+    partes = {}
+    for row in rows or []:
+        partes[row["parte"]] = {
+            "marcacoes": row["marcacoes"] or [],
+            "fotos": row["fotos"] or [],
+        }
+    return partes
+
+
+def assinatura_base64_valida(valor):
+    texto = (valor or "").strip()
+    return len(texto) > 80
+
+
+def obter_assinaturas_checklist(servico_id):
+    row = one(
+        """
+        select assinatura_origem_base64,
+               assinatura_destino_base64,
+               assinatura_base64,
+               origem_atualizada_em,
+               destino_atualizada_em,
+               updated_at
+          from checklist_assinaturas
+         where servico_id=%s
+        """,
+        (str(servico_id),),
+    )
+    if not row:
+        return {
+            "assinatura_origem": None,
+            "assinatura_origem_salva": False,
+            "assinatura_destino": None,
+            "assinatura_destino_salva": False,
+        }
+
+    origem = (row.get("assinatura_origem_base64") or "").strip()
+    destino = (row.get("assinatura_destino_base64") or "").strip()
+    legado = (row.get("assinatura_base64") or "").strip()
+
+    if not origem and legado:
+        origem = legado
+
+    return {
+        "assinatura_origem": origem or None,
+        "assinatura_origem_salva": assinatura_base64_valida(origem),
+        "assinatura_origem_em": dt_str(row.get("origem_atualizada_em")),
+        "assinatura_destino": destino or None,
+        "assinatura_destino_salva": assinatura_base64_valida(destino),
+        "assinatura_destino_em": dt_str(row.get("destino_atualizada_em")),
+        # Compatibilidade com checklists antigos / clientes legados
+        "assinatura": origem or None,
+        "assinatura_salva": assinatura_base64_valida(origem),
+        "assinatura_atualizada_em": dt_str(row.get("origem_atualizada_em") or row.get("updated_at")),
+    }
+
+
+def salvar_assinatura_checklist(servico_id, tipo, assinatura_base64):
+    """
+    Persiste assinatura de origem ou destino.
+    Nunca substitui assinatura já existente do mesmo tipo.
+    """
+    tipo = (tipo or "").strip().lower()
+    if tipo not in ("origem", "destino"):
+        return False, "tipo_invalido"
+
+    assinatura = (assinatura_base64 or "").strip()
+    if not assinatura_base64_valida(assinatura):
+        return False, "vazio"
+
+    row = one(
+        "select assinatura_origem_base64, assinatura_destino_base64 from checklist_assinaturas where servico_id=%s",
+        (str(servico_id),),
+    )
+
+    col = "assinatura_origem_base64" if tipo == "origem" else "assinatura_destino_base64"
+    ts_col = "origem_atualizada_em" if tipo == "origem" else "destino_atualizada_em"
+
+    if row and assinatura_base64_valida(row.get(col)):
+        return False, "ja_existe"
+
+    if not row:
+        dados = {
+            "servico_id": str(servico_id),
+            "origem": assinatura if tipo == "origem" else None,
+            "destino": assinatura if tipo == "destino" else None,
+        }
+        q(
+            f"""
+            insert into checklist_assinaturas
+              (servico_id, {col}, {ts_col}, assinatura_base64, created_at, updated_at)
+            values (%s, %s, now(), %s, now(), now())
+            """,
+            (
+                dados["servico_id"],
+                assinatura,
+                assinatura if tipo == "origem" else None,
+            ),
+        )
+        return True, "ok"
+
+    q(
+        f"""
+        update checklist_assinaturas
+           set {col}=%s,
+               {ts_col}=now(),
+               updated_at=now()
+         where servico_id=%s
+           and coalesce({col}, '') = ''
+        """,
+        (assinatura, str(servico_id)),
+    )
+    return True, "ok"
+
+
+def processar_assinaturas_payload(servico_id, dados):
+    """Salva assinaturas enviadas no payload sem apagar as existentes."""
+    resultados = []
+    if "assinatura_origem" in dados:
+        ok, status = salvar_assinatura_checklist(servico_id, "origem", dados.get("assinatura_origem"))
+        resultados.append(("origem", ok, status))
+    if "assinatura_destino" in dados:
+        ok, status = salvar_assinatura_checklist(servico_id, "destino", dados.get("assinatura_destino"))
+        resultados.append(("destino", ok, status))
+    if "assinatura" in dados and "assinatura_origem" not in dados:
+        ok, status = salvar_assinatura_checklist(servico_id, "origem", dados.get("assinatura"))
+        resultados.append(("origem", ok, status))
+    return resultados
+
+
+def tem_assinatura_origem(servico_id, dados=None):
+    dados = dados or {}
+    if assinatura_base64_valida(dados.get("assinatura_origem")):
+        return True
+    if assinatura_base64_valida(dados.get("assinatura")):
+        return True
+    info = obter_assinaturas_checklist(servico_id)
+    return bool(info.get("assinatura_origem_salva"))
+
+
+def resposta_checklist_dados(servico_id):
+    partes = partes_checklist_dict(servico_id)
+    assinaturas = obter_assinaturas_checklist(servico_id)
+    return {
+        "partes": partes,
+        **assinaturas,
+    }
+
+
+@app.get("/servicos/{servico_id}/checklist", response_class=HTMLResponse)
+async def pagina_checklist(servico_id: str, request: Request):
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+
+            cur.execute("""
+                select parte, marcacoes, fotos
+                from checklist_avarias
+                where servico_id = %s
+                order by parte
+            """, (servico_id,))
+
+            rows = cur.fetchall()
+
+    checklist = []
+
+    for row in rows:
+
+        checklist.append({
+            "parte": row["parte"],
+            "marcacoes": row["marcacoes"] or [],
+            "fotos": row["fotos"] or []
+        })
+
+    assinaturas = obter_assinaturas_checklist(servico_id)
+
+    return templates.TemplateResponse(
+        "checklist_visualizar.html",
+        {
+            "request": request,
+            "checklist": checklist,
+            "servico_id": servico_id,
+            "assinatura": assinaturas.get("assinatura_origem"),
+            "assinatura_origem": assinaturas.get("assinatura_origem"),
+            "assinatura_destino": assinaturas.get("assinatura_destino"),
+        }
+    )
+
+
+@app.get("/api/checklist-dados/{servico_id}")
+async def checklist_dados(servico_id: str):
+    return resposta_checklist_dados(servico_id)
+
+
+@app.get("/api/checklist-json/{servico_id}")
+async def checklist_json(servico_id: str):
+    return resposta_checklist_dados(servico_id)
+
+
+@app.post("/api/checklist/salvar")
+async def salvar_checklist(request: Request):
+    dados = await request.json()
+
+    servico_id = dados.get("servico_id")
+    checklist = dados.get("checklist", {})
+
+    if not servico_id:
+        return JSONResponse({"ok": False, "erro": "servico_id não informado"}, status_code=400)
+
+    if not isinstance(checklist, dict):
+        return JSONResponse({"ok": False, "erro": "checklist deve ser um objeto"}, status_code=400)
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            for parte, info in checklist.items():
+                info = info or {}
+
+                marcacoes = info.get("marcacoes", [])
+                fotos = info.get("fotos", [])
+
+                cur.execute("""
+                    delete from checklist_avarias
+                    where servico_id = %s and parte = %s
+                """, (servico_id, parte))
+
+                cur.execute("""
+                    insert into checklist_avarias
+                    (servico_id, parte, marcacoes, fotos)
+                    values (%s, %s, %s::jsonb, %s::jsonb)
+                """, (
+                    servico_id,
+                    parte,
+                    json.dumps(marcacoes),
+                    json.dumps(fotos)
+                ))
+
+        conn.commit()
+
+    processar_assinaturas_payload(servico_id, dados)
+
+    assinaturas = obter_assinaturas_checklist(servico_id)
+
+    if not tem_assinatura_origem(servico_id, dados):
+        return JSONResponse(
+            {
+                "ok": False,
+                "erro": "Assinatura de origem é obrigatória para finalizar o checklist.",
+            },
+            status_code=400,
+        )
+
+    return {
+        "ok": True,
+        "assinatura_origem_salva": bool(assinaturas.get("assinatura_origem_salva")),
+        "assinatura_destino_salva": bool(assinaturas.get("assinatura_destino_salva")),
+        "assinatura_salva": bool(assinaturas.get("assinatura_origem_salva")),
+    }
 
 @app.get('/motoristas', response_class=HTMLResponse)
-def pagina_motoristas(request: Request):
+def pagina_motoristas(request: Request, online: str = ""):
     motoristas = q("""
         select *
           from motoristas
          order by coalesce(ativo,true) desc, nome asc
     """, fetch=True)
-    return templates.TemplateResponse('motoristas_lista.html', {'request': request, 'motoristas': motoristas})
+    if online in ("1", "true", "sim"):
+        motoristas = [m for m in motoristas if m.get("online")]
+    return templates.TemplateResponse(
+        'motoristas_lista.html',
+        {
+            'request': request,
+            'motoristas': motoristas,
+            'filtro_online': online in ("1", "true", "sim"),
+        },
+    )
 
 @app.post('/motoristas/{mid}/editar')
 async def editar_motorista(mid: str, request: Request):
@@ -858,7 +1741,7 @@ async def criar_motorista(request: Request):
         form.get('nascimento','').strip(), form.get('estado_civil','').strip(), form.get('endereco','').strip(),
         form.get('login','').strip(), form.get('senha','').strip()
     ))
-    return RedirectResponse('/',303)
+    return RedirectResponse('/central', 303)
 @app.post('/servicos')
 async def criar_servico(request: Request):
     form = await request.form()
@@ -874,7 +1757,7 @@ async def criar_servico(request: Request):
     row=one("insert into servicos (protocolo,seguradora,tipo,origem,destino,observacao,status,status_faturamento,criado_em,atualizado_em) values (%s,%s,%s,%s,%s,%s,'novo','para_conferir',now(),now()) returning id",(protocolo,seguradora,tipo,origem,destino,observacao))
     criar_itens_para_servico(row["id"], tipo, nomes, qtds, valores)
     registrar_evento_db(row["id"],"novo","Serviço criado com valores")
-    return RedirectResponse('/',303)
+    return RedirectResponse('/central', 303)
 
 @app.post('/servicos/importar')
 async def importar_servicos(file: UploadFile=File(...)):
@@ -1003,7 +1886,7 @@ async def importar_servicos(file: UploadFile=File(...)):
             registrar_evento_db(new["id"], "novo", "Importado do Excel AutEM com itens financeiros")
             importados += 1
 
-    return RedirectResponse('/?importados=' + str(importados), 303)
+    return RedirectResponse('/central?importados=' + str(importados), 303)
 
 
 
@@ -1174,57 +2057,101 @@ def google_distance_matrix_endereco(origem_lat, origem_lng, destino_endereco):
     except Exception as e:
         return None, None, None, f"erro Google: {str(e)[:60]}"
 
+
+def calcular_info_distancia_motorista(motorista, servico):
+    """
+    Textos amigáveis para a modal Enviar/trocar motorista na Central.
+    Nunca expõe mensagens técnicas (ex.: nome de variável de ambiente).
+    """
+    mlat = motorista.get("lat")
+    mlng = motorista.get("lng")
+    origem_endereco = ((servico or {}).get("origem") or "").strip()
+
+    if not mlat or not mlng:
+        return {
+            "distancia_texto": "Motorista sem GPS",
+            "duracao_texto": "",
+            "distancia_valor": None,
+            "rota_disponivel": False,
+            "calculo_status": "sem_gps",
+        }
+
+    if not origem_endereco:
+        return {
+            "distancia_texto": "Origem não informada",
+            "duracao_texto": "",
+            "distancia_valor": None,
+            "rota_disponivel": False,
+            "calculo_status": "sem_origem",
+        }
+
+    if not google_api_key():
+        return {
+            "distancia_texto": "Distância indisponível",
+            "duracao_texto": "",
+            "distancia_valor": None,
+            "rota_disponivel": False,
+            "calculo_status": "sem_chave",
+        }
+
+    dist_txt, dur_txt, dist_metros, calculo_status = google_distance_matrix_endereco(
+        mlat, mlng, origem_endereco
+    )
+
+    if dist_txt and dur_txt:
+        return {
+            "distancia_texto": dist_txt,
+            "duracao_texto": dur_txt,
+            "distancia_valor": dist_metros,
+            "rota_disponivel": True,
+            "calculo_status": calculo_status or "rota_google",
+        }
+
+    if dist_txt:
+        return {
+            "distancia_texto": dist_txt,
+            "duracao_texto": dur_txt or "",
+            "distancia_valor": dist_metros,
+            "rota_disponivel": False,
+            "calculo_status": calculo_status or "parcial",
+        }
+
+    origem_lat, origem_lng = obter_origem_lat_lng(servico) if servico else (None, None)
+    if origem_lat and origem_lng:
+        dk = distancia_km(mlat, mlng, origem_lat, origem_lng)
+        if dk is not None:
+            return {
+                "distancia_texto": f"{dk} km aprox.",
+                "duracao_texto": "",
+                "distancia_valor": int(dk * 1000),
+                "rota_disponivel": False,
+                "calculo_status": "aproximado",
+            }
+
+    return {
+        "distancia_texto": "Distância indisponível",
+        "duracao_texto": "",
+        "distancia_valor": None,
+        "rota_disponivel": False,
+        "calculo_status": "indisponivel",
+    }
+
+
 @app.get('/api/servicos/{sid}/motoristas')
 def api_motoristas_para_servico(sid: str):
     s = servico_by_id(sid)
     ms = lista_motoristas()
 
-    origem_endereco = (s.get("origem") if s else "") or ""
-    origem_lat = origem_lng = None
-
     saida = []
     for m in ms:
         ocupado = motorista_ocupado(m.get("id"))
-
-        dist_txt = None
-        dur_txt = None
-        dist_metros = None
-        calculo_status = ""
-
-        mlat = m.get("lat")
-        mlng = m.get("lng")
-
-        if not mlat or not mlng:
-            calculo_status = "motorista sem GPS"
-        elif not origem_endereco:
-            calculo_status = "origem do serviço vazia"
-        else:
-            # 1º: rota real pelo Google usando o endereço textual da origem.
-            dist_txt, dur_txt, dist_metros, calculo_status = google_distance_matrix_endereco(
-                mlat, mlng, origem_endereco
-            )
-
-            # 2º: fallback aproximado por geocoding + linha reta.
-            if not dist_txt:
-                if origem_lat is None or origem_lng is None:
-                    origem_lat, origem_lng = obter_origem_lat_lng(s) if s else (None, None)
-
-                if origem_lat and origem_lng:
-                    dk = distancia_km(mlat, mlng, origem_lat, origem_lng)
-                    if dk is not None:
-                        dist_txt = f"{dk} km aprox."
-                        dur_txt = "tempo a calcular"
-                        dist_metros = int(dk * 1000)
-                        calculo_status = "aproximado"
+        info = calcular_info_distancia_motorista(m, s)
 
         saida.append({
             **m,
             "ocupado": bool(ocupado),
             "servico_ocupado": ocupado.get("protocolo") if ocupado else None,
-            "distancia_texto": dist_txt or calculo_status or "sem localização",
-            "duracao_texto": dur_txt or "",
-            "distancia_valor": dist_metros,
-            "calculo_status": calculo_status
+            **info,
         })
 
     saida.sort(key=lambda x: (
@@ -1262,12 +2189,12 @@ def api_debug_distancia(sid: str):
 def enviar_servico(sid: str, motorista_id: str=Form(...)):
     s = servico_by_id(sid)
     if not s:
-        return RedirectResponse('/', 303)
+        return RedirectResponse('/central', 303)
 
     # Só bloqueia troca de motorista quando o serviço já foi finalizado.
     if (s.get("status") or "").lower() == "finalizado":
         registrar_evento_db(sid, 'troca bloqueada', 'Serviço finalizado não permite troca de motorista')
-        return RedirectResponse('/', 303)
+        return RedirectResponse('/central', 303)
 
     m = motorista_by_id(motorista_id)
     if m:
@@ -1281,7 +2208,7 @@ def enviar_servico(sid: str, motorista_id: str=Form(...)):
              where id=%s
         """, (str(motorista_id), m["nome"], str(sid)))
         registrar_evento_db(sid, 'enviado', f"Enviado/reencaminhado para {m['nome']} - placa atual: {placa_trabalho}")
-    return RedirectResponse('/',303)
+    return RedirectResponse('/central', 303)
 
 
 class AppLoginPayload(BaseModel):
@@ -1296,6 +2223,10 @@ class AppLocationPayload(BaseModel):
 class AppStatusPayload(BaseModel):
     status: str
     detalhe: str = ""
+
+class AppPlacaPayload(BaseModel):
+    placa: str = ""
+    placa_veiculo: str = ""
 
 class AppFcmPayload(BaseModel):
     token: str
@@ -1379,7 +2310,7 @@ def api_app_motorista_servicos(mid: str):
           from servicos
          where motorista_id=%s
            and coalesce(status,'novo') not in ('finalizado')
-         order by coalesce(created_at, criado_em, now()) desc
+         order by created_at desc
          limit 50
     """, (str(mid),), fetch=True)
     return {"ok": True, "servicos": [normalizar_servico(r) for r in rows]}
@@ -1408,12 +2339,34 @@ def api_app_servico_status(sid: str, payload: AppStatusPayload):
     if status not in permitidos:
         return JSONResponse({"ok": False, "erro": "Status inválido."}, status_code=400)
 
+    if status == "na origem":
+        servico = servico_by_id(sid)
+        if not servico:
+            return JSONResponse({"ok": False, "erro": "Serviço não encontrado."}, status_code=404)
+        if not placa_cliente_valida(placa_cliente_do_servico(servico)):
+            return JSONResponse(
+                {
+                    "ok": False,
+                    "erro": "Informe a placa do veículo antes de marcar chegada na origem.",
+                },
+                status_code=400,
+            )
+
     extra = ""
     if status == "finalizado":
         extra = ", finalizado_em=now()"
 
     q(f"update servicos set status=%s, atualizado_em=now(){extra} where id=%s", (status, str(sid)))
     registrar_evento_db(sid, status, payload.detalhe or f"Status atualizado pelo App do Motorista: {status}")
+    return {"ok": True, "servico": servico_by_id(sid)}
+
+
+@app.post("/api/app/servicos/{sid}/placa")
+def api_app_servico_placa(sid: str, payload: AppPlacaPayload):
+    placa = payload.placa_veiculo or payload.placa
+    ok, erro = salvar_placa_cliente_servico(sid, placa)
+    if not ok:
+        return JSONResponse({"ok": False, "erro": erro}, status_code=400)
     return {"ok": True, "servico": servico_by_id(sid)}
 
 @app.post("/api/app/motorista/{mid}/fcm-token")
@@ -1475,14 +2428,11 @@ def atualizar_status(sid: str, status: str=Form(...)):
     registrar_evento_db(sid,status); return {'ok':True,'servico':servico_by_id(sid)}
 @app.post('/api/servicos/{sid}/placa')
 def enviar_placa(sid: str, placa_veiculo: str=Form(...)):
-    placa=(placa_veiculo or "").upper().replace("-","").replace(" ","").strip()
-    if not placa: return JSONResponse({'ok':False,'erro':'Informe a placa'},400)
-    existe=servico_by_id(sid)
-    if not existe: return JSONResponse({'ok':False,'erro':'Serviço não encontrado'},404)
-    novo_status=existe.get("status") or "novo"
-    if novo_status not in ['em transporte','finalizado']: novo_status='na origem'
-    q("update servicos set placa_veiculo_removido=%s,placa_removida=%s,status=%s,atualizado_em=now() where id=%s",(placa,placa,novo_status,str(sid)))
-    registrar_evento_db(sid,'placa lançada',f'Placa: {placa}'); return {'ok':True,'servico':servico_by_id(sid)}
+    ok, erro = salvar_placa_cliente_servico(sid, placa_veiculo)
+    if not ok:
+        status = 404 if erro == "Serviço não encontrado" else 400
+        return JSONResponse({"ok": False, "erro": erro}, status_code=status)
+    return {"ok": True, "servico": servico_by_id(sid)}
 @app.post('/api/servicos/{sid}/fotos')
 async def enviar_fotos(sid: str, fotos: list[UploadFile]=File(default=[])):
     if not servico_by_id(sid): return JSONResponse({'ok':False,'erro':'Serviço não encontrado'},404)

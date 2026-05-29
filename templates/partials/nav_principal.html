@@ -1,0 +1,22 @@
+<div class="top app-top dash-nav">
+  <span class="brand">🚛 Essência Logística — Operação</span>
+  <nav class="main-menu">
+    <a href="/" class="{% if nav_ativo == 'dashboard' %}nav-active{% endif %}">Dashboard</a>
+    <div class="menu-item">
+      <button type="button">Serviços ▾</button>
+      <div class="submenu">
+        <a href="/central">Central</a>
+        <a href="/servicos/novo">Cadastrar manualmente</a>
+        <a href="/servicos/importar">Importar Excel/PDF</a>
+      </div>
+    </div>
+    <a href="/motoristas" class="{% if nav_ativo == 'motoristas' %}nav-active{% endif %}">Motoristas</a>
+    <a href="/faturamento" class="{% if nav_ativo == 'faturamento' %}nav-active{% endif %}">Faturamento</a>
+    <a href="/historico" class="{% if nav_ativo == 'relatorios' %}nav-active{% endif %}">Relatórios</a>
+    <a href="/operacao">Operação ao vivo</a>
+    <a href="/motorista/login">Área do Motorista</a>
+    {% if nav_som %}
+    <button type="button" id="btnSomTopo" class="sound-btn" onclick="ativarSom()">Ativar som</button>
+    {% endif %}
+  </nav>
+</div>

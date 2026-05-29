@@ -45,7 +45,8 @@ textarea{min-height:70px}
 <div class="top">
   <span>🚚 Sistema Interno de Reboque — Motoristas</span>
   <span>
-    <a href="/">Central</a>
+    <a href="/">Dashboard</a>
+    <a href="/central">Central</a>
     <a href="/cadastros/motoristas/novo">Cadastrar motorista</a>
     <a href="/operacao">Operação ao vivo</a>
     <a href="/historico">Histórico / Relatórios</a>
@@ -56,8 +57,8 @@ textarea{min-height:70px}
   <div class="card">
     <div class="header-row">
       <div>
-        <h2 style="margin:0">Motoristas cadastrados</h2>
-        <div class="small">Aqui você consulta e altera login, senha, placa atual, dados cadastrais, status online/offline e ativo/inativo.</div>
+        <h2 style="margin:0">Motoristas cadastrados{% if filtro_online %} — somente online{% endif %}</h2>
+        <div class="small">Aqui você consulta e altera login, senha, placa atual, dados cadastrais, status online/offline e ativo/inativo.{% if filtro_online %} <a href="/motoristas">Ver todos</a>{% endif %}</div>
       </div>
       <a class="btn btn-primary" href="/cadastros/motoristas/novo">+ Cadastrar motorista</a>
     </div>
