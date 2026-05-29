@@ -187,6 +187,21 @@ const STATUSES_FILTRO = (FILTRO_CENTRAL.get('statuses') || '')
   .filter(Boolean);
 const STATUS_FILTRO = (FILTRO_CENTRAL.get('status') || '').trim().toLowerCase();
 
+function queryFiltroServicosCentral() {
+  const atual = new URLSearchParams(window.location.search);
+  const qs = new URLSearchParams();
+  const statuses = atual.get('statuses');
+  const status = atual.get('status');
+  if (statuses) qs.set('statuses', statuses);
+  if (status) qs.set('status', status);
+  return qs.toString();
+}
+
+function urlApiServicos() {
+  const qs = queryFiltroServicosCentral();
+  return qs ? `/api/servicos?${qs}` : '/api/servicos';
+}
+
 function aplicarFiltroServicos(ss) {
   if (!ss) return [];
   if (STATUSES_FILTRO.length) {
@@ -340,7 +355,7 @@ async function atualizarCentral() {
   try {
     const [motoristasRes, servicosRes] = await Promise.all([
       fetch('/api/motoristas', { cache: 'no-store' }),
-      fetch('/api/servicos', { cache: 'no-store' })
+      fetch(urlApiServicos(), { cache: 'no-store' })
     ]);
 
     const ms = await motoristasRes.json();

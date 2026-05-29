@@ -2250,7 +2250,8 @@ def motorista_offline(mid: str):
 @app.get('/api/motoristas')
 def api_motoristas(): return lista_motoristas()
 @app.get('/api/servicos')
-def api_servicos(): return lista_servicos_hoje(limit=200)
+def api_servicos(statuses: str = "", status: str = ""):
+    return lista_servicos_central_filtrada(statuses=statuses, status=status, limit=200)
 
 
 # ============================================================
