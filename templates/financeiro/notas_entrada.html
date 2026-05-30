@@ -9,9 +9,10 @@
   <link rel="stylesheet" href="/static/controle.css">
   <link rel="stylesheet" href="/static/cadastros.css">
   <link rel="stylesheet" href="/static/financeiro.css">
+  {% include "partials/head_premium.html" %}
 </head>
-<body class="fin-body">
-{% include "partials/nav_principal.html" %}
+<body class="ess-app fin-body">
+{% include "partials/app_shell_start.html" %}
 <div id="finToast"></div>
 <div class="fin-shell">
   <aside class="fin-sidebar-left">
@@ -105,31 +106,85 @@
 </div>
 
 <!-- Modal importação -->
-<div id="modalImport" class="cad-modal" aria-hidden="true">
-  <div class="cad-modal-shell fin-modal-import">
-    <main class="cad-modal-main">
-      <h2 class="cad-modal-title">Importação de XML NF-e</h2>
-      <p id="importErro" class="cad-erro" style="display:none"></p>
-      <div class="cad-form-grid">
-        <div><label>Loja / unidade</label><input type="text" id="imp_loja" placeholder="Ex.: Matriz, Filial SP"></div>
-        <div class="full fin-check-row">
-          <label class="fin-check-import"><input type="checkbox" id="imp_lancar_cp"> Lançar contas a pagar automaticamente</label>
+<div id="modalImport" class="cad-modal fin-modal-import-wrap" aria-hidden="true">
+  <div class="fin-modal-import-shell" role="dialog" aria-labelledby="impTitulo">
+    <aside class="fin-imp-side">
+      <div class="fin-imp-side-icon" aria-hidden="true">
+        <svg viewBox="0 0 48 48" fill="none"><rect x="8" y="6" width="32" height="36" rx="4" stroke="currentColor" stroke-width="2"/><path d="M16 22h16M16 28h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </div>
+      <h2 id="impTitulo" class="fin-imp-title">Importação XML NF-e</h2>
+      <p class="fin-imp-desc">Importe o XML enviado pelo fornecedor para registrar a nota de entrada.</p>
+      <p id="importErro" class="cad-erro fin-imp-erro" style="display:none"></p>
+      <div class="fin-imp-field">
+        <label for="imp_loja">Loja / unidade</label>
+        <select id="imp_loja">
+          <option value="">— Selecione —</option>
+          <option value="Matriz">Matriz</option>
+          <option value="Filial SP">Filial SP</option>
+          <option value="Filial RJ">Filial RJ</option>
+          <option value="Outra">Outra (informar nas obs.)</option>
+        </select>
+      </div>
+      <div class="fin-imp-secure-card">
+        <span class="fin-imp-secure-icon">🛡</span>
+        <div>
+          <strong>Importação segura</strong>
+          <p>Validação por chave de acesso e bloqueio de XML duplicado.</p>
         </div>
       </div>
-      <div class="fin-dropzone" id="dropzone">
-        <input type="file" id="imp_arquivo" accept=".xml,text/xml,application/xml" hidden>
-        <div class="fin-dropzone-inner">
-          <span class="fin-dropzone-icon">📄</span>
-          <p><b>Arraste e solte o XML aqui</b></p>
-          <p class="muted">ou clique para selecionar o arquivo NF-e</p>
-          <p id="imp_nome_arquivo" class="fin-dropzone-file"></p>
-        </div>
+      <label class="fin-imp-check">
+        <input type="checkbox" id="imp_lancar_cp">
+        <span class="fin-imp-check-box"></span>
+        <span class="fin-imp-check-text">Lançar contas a pagar automaticamente</span>
+      </label>
+      <div class="fin-imp-field" id="imp_conta_wrap" style="display:none">
+        <label for="imp_conta_fin">Conta financeira (opcional)</label>
+        <select id="imp_conta_fin"><option value="">— Definir na baixa —</option></select>
+        <p class="fin-hint">O débito no banco só ocorre ao baixar/pagar em Contas a Pagar.</p>
       </div>
-      <div class="cad-modal-footer" style="margin-top:16px">
+      <div class="fin-imp-actions">
         <button type="button" class="fin-btn fin-btn-outline" id="btnFecharImport">Cancelar</button>
-        <button type="button" class="fin-btn fin-btn-primary" id="btnEnviarImport">Importar nota</button>
+        <button type="button" class="fin-btn fin-btn-primary" id="btnEnviarImport" disabled>Importar Nota</button>
       </div>
-    </main>
+    </aside>
+    <section class="fin-imp-upload-col" id="finImpUploadCol">
+      <input type="file" id="imp_arquivo" class="fin-file-input-hidden" accept=".xml,application/xml,text/xml">
+      <div class="fin-dropzone" id="dropzone" role="button" tabindex="0" aria-label="Área para arrastar ou selecionar XML">
+        <div class="fin-dropzone-inner">
+          <div class="fin-dropzone-icon-wrap" aria-hidden="true">
+            <svg class="fin-dropzone-svg" viewBox="0 0 64 80" fill="none"><path d="M12 4h28l12 12v64H12V4z" stroke="currentColor" stroke-width="2.5" fill="#fff"/><path d="M40 4v12h12" stroke="currentColor" stroke-width="2.5"/><path d="M20 36h24M20 48h24M20 60h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          </div>
+          <p class="fin-dropzone-title">Arraste o XML aqui</p>
+          <p class="fin-dropzone-sub">ou clique para selecionar o arquivo</p>
+          <p class="fin-dropzone-ext">Somente arquivos .xml</p>
+        </div>
+      </div>
+      <div id="imp_status_ok" class="fin-imp-status-ok" hidden>
+        <span>✓</span> XML válido — pronto para importar
+      </div>
+      <div id="imp_preview" class="fin-imp-preview" hidden>
+        <div class="fin-imp-preview-head">
+          <span class="fin-imp-preview-badge">Arquivo selecionado</span>
+          <button type="button" class="fin-imp-preview-clear" id="btnLimparArquivo" title="Remover arquivo">✕</button>
+        </div>
+        <p id="imp_nome_arquivo" class="fin-imp-preview-name"></p>
+        <dl class="fin-imp-preview-meta">
+          <div><dt>Tamanho</dt><dd id="imp_arquivo_tamanho">—</dd></div>
+          <div><dt>Tipo</dt><dd id="imp_arquivo_tipo">—</dd></div>
+        </dl>
+      </div>
+      <div class="fin-imp-extract-card">
+        <h4>O que será extraído do XML</h4>
+        <ul class="fin-imp-extract-list">
+          <li>Número, série e chave de acesso</li>
+          <li>CNPJ e razão social do fornecedor</li>
+          <li>Datas de emissão e entrada</li>
+          <li>Valor total e itens da nota</li>
+          <li>Parcelas e vencimentos (duplicatas)</li>
+        </ul>
+      </div>
+      <p id="imp_drop_hint" class="fin-imp-drop-hint muted">Nenhum arquivo selecionado. Arraste a NF-e do fornecedor ou clique na área acima.</p>
+    </section>
   </div>
 </div>
 
@@ -171,8 +226,31 @@
   </div>
 </div>
 
+<!-- Modal lançar CP -->
+<div id="modalLancar" class="cad-modal" aria-hidden="true">
+  <div class="cad-modal-shell fin-modal-import">
+    <main class="cad-modal-main">
+      <h2 class="cad-modal-title">Lançar em Contas a Pagar</h2>
+      <p id="lancarErro" class="cad-erro" style="display:none"></p>
+      <p id="lancarResumo" class="fin-lancar-resumo"></p>
+      <div class="cad-form-grid">
+        <div class="full">
+          <label>Conta financeira (opcional)</label>
+          <select id="lancar_conta_fin"><option value="">— Sem banco definido (baixa depois) —</option></select>
+        </div>
+      </div>
+      <p class="muted fin-hint">Será criada uma conta a pagar por parcela/vencimento do XML. Status: Em aberto. Caixa e Bancos só movimenta na baixa.</p>
+      <div class="cad-modal-footer" style="margin-top:16px">
+        <button type="button" class="fin-btn fin-btn-outline" id="btnFecharLancar">Cancelar</button>
+        <button type="button" class="fin-btn fin-btn-primary" id="btnConfirmarLancar">Confirmar lançamento</button>
+      </div>
+    </main>
+  </div>
+</div>
+
 <div id="menuContexto" class="fin-menu-ctx" style="display:none"></div>
 
+{% include "partials/app_shell_end.html" %}
 <script src="/static/financeiro_shared.js"></script>
 <script src="/static/financeiro_notas_entrada.js"></script>
 </body>

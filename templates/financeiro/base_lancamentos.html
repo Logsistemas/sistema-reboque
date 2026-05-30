@@ -9,9 +9,10 @@
   <link rel="stylesheet" href="/static/controle.css">
   <link rel="stylesheet" href="/static/cadastros.css">
   <link rel="stylesheet" href="/static/financeiro.css">
+  {% include "partials/head_premium.html" %}
 </head>
-<body class="fin-body" data-fin-page="{% block fin_page %}pagar{% endblock %}" data-fin-api="{% block fin_api %}/api/financeiro/contas-pagar{% endblock %}" data-fin-tipo="{% block fin_tipo %}pagar{% endblock %}">
-{% include "partials/nav_principal.html" %}
+<body class="ess-app fin-body" data-fin-page="{% block fin_page %}pagar{% endblock %}" data-fin-api="{% block fin_api %}/api/financeiro/contas-pagar{% endblock %}" data-fin-tipo="{% block fin_tipo %}pagar{% endblock %}">
+{% include "partials/app_shell_start.html" %}
 <div id="finToast"></div>
 <div class="fin-shell">
   <aside class="fin-sidebar-left">
@@ -157,6 +158,7 @@
   </aside>
 </div>
 {% include "financeiro/_modal_lancamento.html" %}
+{% include "partials/app_shell_end.html" %}
 <script src="/static/financeiro_shared.js"></script>
 <script src="/static/financeiro_lancamento.js"></script>
 </body>

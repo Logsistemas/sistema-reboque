@@ -108,10 +108,19 @@ def register(app, templates):
         return (sub.text or "").strip() if sub is not None else default
 
     def _parse_nfe_xml(xml_bytes):
+        if not xml_bytes or not xml_bytes.strip():
+            raise ValueError("Arquivo XML vazio")
+        raw = xml_bytes
+        if raw[:3] == b"\xef\xbb\xbf":
+            raw = raw[3:]
         try:
-            root = ET.fromstring(xml_bytes)
+            text = raw.decode("utf-8")
+        except UnicodeDecodeError:
+            text = raw.decode("latin-1", errors="replace")
+        try:
+            root = ET.fromstring(text)
         except ET.ParseError as exc:
-            raise ValueError(f"XML inválido: {exc}") from exc
+            raise ValueError(f"XML inválido. Verifique se o arquivo é uma NF-e válida. ({exc})") from exc
 
         inf = None
         for el in root.iter():
@@ -119,9 +128,14 @@ def register(app, templates):
                 inf = el
                 break
         if inf is None:
-            raise ValueError("Arquivo não é uma NF-e válida (infNFe não encontrado)")
+            raise ValueError("Arquivo não é uma NF-e válida (estrutura infNFe não encontrada)")
 
         chave = (inf.attrib.get("Id") or "").replace("NFe", "").strip()
+        if len(chave) != 44:
+            prot = _find_first(root, "protNFe")
+            inf_prot = _find_first(prot, "infProt") if prot is not None else None
+            if inf_prot is not None:
+                chave = _text(inf_prot, "chNFe") or chave
         if len(chave) != 44:
             chave = chave or ""
 
@@ -188,13 +202,25 @@ def register(app, templates):
             })
 
         parcelas = []
-        for dup in root.iter():
-            if _local(dup.tag) != "dup":
+        cobr = _find_first(inf, "cobr")
+        dup_nodes = []
+        if cobr is not None:
+            for ch in cobr:
+                if _local(ch.tag) == "dup":
+                    dup_nodes.append(ch)
+        if not dup_nodes:
+            for dup in root.iter():
+                if _local(dup.tag) == "dup":
+                    dup_nodes.append(dup)
+        for dup in dup_nodes:
+            venc = parse_dt(_text(dup, "dVenc"))
+            valor_dup = _num(_text(dup, "vDup"), 0)
+            if valor_dup <= 0:
                 continue
             parcelas.append({
-                "numero_parcela": _text(dup, "nDup"),
-                "vencimento": parse_dt(_text(dup, "dVenc")),
-                "valor": _num(_text(dup, "vDup"), 0),
+                "numero_parcela": _text(dup, "nDup") or str(len(parcelas) + 1).zfill(3),
+                "vencimento": venc,
+                "valor": valor_dup,
             })
 
         pag = _find_first(inf, "pag")
@@ -261,24 +287,40 @@ def register(app, templates):
             return n
         return n
 
-    def buscar_fornecedor_por_cnpj(cnpj):
+    def buscar_contato_por_cnpj(cnpj):
         cnpj = re.sub(r"\D", "", cnpj or "")
         if not cnpj:
             return None
-        row = one(
+        return one(
             """
-            select id from cadastro_contatos
+            select id, coalesce(fornecedor, false) as fornecedor,
+                   coalesce(razao_social, nome_fantasia, '') as nome
+              from cadastro_contatos
              where regexp_replace(coalesce(cnpj,''), '[^0-9]', '', 'g') = %s
-               and coalesce(fornecedor, false) = true
              limit 1
             """,
             (cnpj,),
         )
-        return str(row["id"]) if row else None
+
+    def nome_fornecedor_nota(nota):
+        if nota.get("contato_id"):
+            row = one(
+                "select coalesce(razao_social, nome_fantasia, '') as nome from cadastro_contatos where id=%s",
+                (str(nota["contato_id"]),),
+            )
+            if row and row.get("nome"):
+                return row["nome"]
+        return nota.get("nome_fornecedor") or "Fornecedor"
 
     def criar_fornecedor(dados):
-        cid = buscar_fornecedor_por_cnpj(dados.get("cnpj_fornecedor"))
-        if cid:
+        row = buscar_contato_por_cnpj(dados.get("cnpj_fornecedor"))
+        if row:
+            cid = str(row["id"])
+            if not row.get("fornecedor"):
+                q(
+                    "update cadastro_contatos set fornecedor=true, updated_at=now() where id=%s",
+                    (cid,),
+                )
             return cid
         contato = salvar_contato({
             "tipo_pessoa": "juridica",
@@ -405,7 +447,36 @@ def register(app, templates):
         n["tem_xml"] = bool(n.get("xml_caminho") or n.get("xml_conteudo"))
         return n
 
-    def lancar_contas_pagar_nota(nid, forcar=False):
+    def listar_contas_financeiras():
+        rows = q(
+            """
+            select id, nome, saldo_atual, tipo
+              from financeiro_contas_financeiras
+             where coalesce(status,'ativo')='ativo'
+             order by nome asc
+            """,
+            fetch=True,
+        )
+        out = []
+        for r in rows or []:
+            c = {"id": str(r["id"]), "nome": r.get("nome") or "Conta"}
+            c["saldo_atual_fmt"] = _fmt_valor(r.get("saldo_atual"))
+            out.append(c)
+        return out
+
+    def _validar_conta_financeira(conta_id):
+        cid = (conta_id or "").strip() or None
+        if not cid:
+            return None
+        row = one(
+            "select id from financeiro_contas_financeiras where id=%s and coalesce(status,'ativo')='ativo'",
+            (cid,),
+        )
+        if not row:
+            raise ValueError("Conta financeira inválida ou inativa")
+        return cid
+
+    def lancar_contas_pagar_nota(nid, conta_financeira_id=None, forcar=False):
         nota = nota_por_id(nid)
         if not nota:
             raise ValueError("Nota não encontrada")
@@ -414,19 +485,28 @@ def register(app, templates):
         if nota.get("situacao") == "cancelada":
             raise ValueError("Nota cancelada")
 
-        parcelas = q(
+        conta_fin_id = _validar_conta_financeira(conta_financeira_id)
+
+        parcelas_db = q(
             "select * from financeiro_notas_entrada_parcelas where nota_id=%s order by vencimento",
             (str(nid),),
             fetch=True,
         )
-        if not parcelas:
-            parcelas = [{"numero_parcela": "001", "vencimento": nota.get("data_entrada"), "valor": nota["valor_total"]}]
+        if not parcelas_db:
+            parcelas_db = [{
+                "id": None,
+                "numero_parcela": "001",
+                "vencimento": nota.get("data_entrada"),
+                "valor": nota["valor_total"],
+            }]
 
-        fornecedor = nota.get("nome_fornecedor") or "Fornecedor"
-        desc_base = f"NF-e {nota.get('numero') or ''} série {nota.get('serie') or ''}".strip()
+        fornecedor = nome_fornecedor_nota(nota)
+        num_nf = nota.get("numero") or "—"
+        hist_base = f"NF-e nº {num_nf} - {fornecedor}"
         criados = []
+        qtd_parcelas = len([p for p in parcelas_db if float(p.get("valor") or 0) > 0]) or 1
 
-        for pr in parcelas:
+        for pr in parcelas_db:
             if pr.get("conta_pagar_id"):
                 continue
             valor = float(pr.get("valor") or 0)
@@ -435,32 +515,41 @@ def register(app, templates):
             venc = pr.get("vencimento")
             if venc and hasattr(venc, "strftime"):
                 venc = venc.strftime("%Y-%m-%d")
+            nparc = pr.get("numero_parcela") or ""
+            desc = hist_base if qtd_parcelas <= 1 else f"{hist_base} — parc. {nparc}"
             row = one(
                 """
                 insert into financeiro_contas_pagar (
                   fornecedor, descricao, categoria, emissao, vencimento, valor, parcelas,
-                  forma_pagamento, status, observacoes, nota_entrada_id, updated_at
-                ) values (%s,%s,%s,%s,%s,%s,%s,%s,'em_aberto',%s,%s,now()) returning id
+                  conta_financeira_id, forma_pagamento, status, observacoes, numero_documento,
+                  nota_entrada_id, updated_at
+                ) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,'em_aberto',%s,%s,%s,now()) returning id
                 """,
                 (
                     fornecedor,
-                    f"{desc_base} — parcela {pr.get('numero_parcela') or ''}".strip(),
+                    desc,
                     "NF-e Entrada",
                     _parse_data(nota.get("data_emissao")),
                     _parse_data(venc) or date.today(),
                     valor,
-                    len(parcelas),
+                    qtd_parcelas,
+                    conta_fin_id,
                     nota.get("forma_pagamento"),
-                    f"Gerado da NF-e chave {nota.get('chave_acesso')}",
+                    f"Importado da NF-e. Chave {nota.get('chave_acesso') or ''}".strip(),
+                    num_nf,
                     str(nid),
                 ),
             )
             pid = str(row["id"])
-            q(
-                "update financeiro_notas_entrada_parcelas set conta_pagar_id=%s where id=%s",
-                (pid, str(pr["id"])),
-            )
+            if pr.get("id"):
+                q(
+                    "update financeiro_notas_entrada_parcelas set conta_pagar_id=%s where id=%s",
+                    (pid, str(pr["id"])),
+                )
             criados.append(pid)
+
+        if not criados:
+            raise ValueError("Nenhuma parcela pendente para lançar")
 
         q(
             "update financeiro_notas_entrada set vinculacao='lancado_contas_pagar', situacao='registrada', updated_at=now() where id=%s",
@@ -468,7 +557,7 @@ def register(app, templates):
         )
         return criados
 
-    def importar_xml_nfe(xml_bytes, loja_unidade="", lancar_cp=False):
+    def importar_xml_nfe(xml_bytes, loja_unidade="", lancar_cp=False, conta_financeira_id=None):
         dados = _parse_nfe_xml(xml_bytes)
         exist = one(
             "select id from financeiro_notas_entrada where chave_acesso=%s",
@@ -558,7 +647,7 @@ def register(app, templates):
             )
 
         if lancar_cp:
-            lancar_contas_pagar_nota(nid)
+            lancar_contas_pagar_nota(nid, conta_financeira_id=conta_financeira_id)
 
         return nota_por_id(nid)
 
@@ -687,6 +776,7 @@ def register(app, templates):
             "ok": True,
             "itens": listar_notas(filtros),
             "painel": resumo_painel_notas(filtros),
+            "contas": listar_contas_financeiras(),
         }
 
     @app.get("/api/financeiro/notas-entrada/{nid}")
@@ -702,30 +792,52 @@ def register(app, templates):
         arquivo = form.get("arquivo")
         if not arquivo or not getattr(arquivo, "filename", None):
             return JSONResponse({"ok": False, "erro": "Arquivo XML obrigatório"}, 400)
+        fn = (arquivo.filename or "").lower()
+        if not fn.endswith(".xml"):
+            return JSONResponse({"ok": False, "erro": "Envie apenas arquivo .xml"}, 400)
         loja = (form.get("loja_unidade") or "").strip()
         lancar = str(form.get("lancar_contas_pagar") or "").lower() in ("1", "true", "on", "sim")
+        conta_fin = (form.get("conta_financeira_id") or "").strip() or None
         try:
             content = await arquivo.read()
-            item = importar_xml_nfe(content, loja, lancar)
+            if not content.strip():
+                return JSONResponse({"ok": False, "erro": "Arquivo XML vazio"}, 400)
+            item = importar_xml_nfe(content, loja, lancar, conta_fin)
+            msg = "NF-e importada com sucesso"
+            if lancar and item.get("vinculacao") == "lancado_contas_pagar":
+                msg = "NF-e importada e lançada em Contas a Pagar"
             return {
                 "ok": True,
                 "item": item,
                 "painel": resumo_painel_notas(),
-                "mensagem": "NF-e importada com sucesso",
+                "contas": listar_contas_financeiras(),
+                "mensagem": msg,
             }
-        except Exception as exc:
+        except ValueError as exc:
             return JSONResponse({"ok": False, "erro": str(exc)}, 400)
+        except Exception as exc:
+            return JSONResponse({"ok": False, "erro": f"Falha ao importar XML: {exc}"}, 400)
 
     @app.post("/api/financeiro/notas-entrada/{nid}/lancar-contas-pagar")
-    def api_lancar_cp(nid: str):
+    async def api_lancar_cp(nid: str, request: Request):
+        payload = {}
         try:
-            ids = lancar_contas_pagar_nota(nid)
+            if "application/json" in (request.headers.get("content-type") or ""):
+                payload = await request.json()
+        except Exception:
+            payload = {}
+        conta_fin = (payload.get("conta_financeira_id") or "").strip() or None
+        try:
+            ids = lancar_contas_pagar_nota(nid, conta_financeira_id=conta_fin)
             return {
                 "ok": True,
                 "contas_pagar_ids": ids,
                 "item": nota_por_id(nid),
                 "painel": resumo_painel_notas(),
+                "mensagem": f"{len(ids)} conta(s) a pagar gerada(s) em aberto",
             }
+        except ValueError as exc:
+            return JSONResponse({"ok": False, "erro": str(exc)}, 400)
         except Exception as exc:
             return JSONResponse({"ok": False, "erro": str(exc)}, 400)
 

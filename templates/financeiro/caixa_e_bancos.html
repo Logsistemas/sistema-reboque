@@ -9,9 +9,10 @@
   <link rel="stylesheet" href="/static/controle.css">
   <link rel="stylesheet" href="/static/cadastros.css">
   <link rel="stylesheet" href="/static/financeiro.css">
+  {% include "partials/head_premium.html" %}
 </head>
-<body class="fin-body" data-fin-page="caixa">
-{% include "partials/nav_principal.html" %}
+<body class="ess-app fin-body" data-fin-page="caixa">
+{% include "partials/app_shell_start.html" %}
 <div id="finToast"></div>
 <div class="fin-shell">
   <aside class="fin-sidebar-left">
@@ -168,6 +169,7 @@
     </main>
   </div>
 </div>
+{% include "partials/app_shell_end.html" %}
 <script src="/static/financeiro_shared.js"></script>
 <script src="/static/financeiro_caixa.js"></script>
 </body>

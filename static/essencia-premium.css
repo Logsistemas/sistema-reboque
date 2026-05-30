@@ -1,0 +1,364 @@
+/* Essência Logística — Design System Premium */
+:root {
+  --ess-bg: #f8fafc;
+  --ess-surface: #ffffff;
+  --ess-sidebar-from: #0b1f3a;
+  --ess-sidebar-to: #1a3a6b;
+  --ess-primary-from: #2563eb;
+  --ess-primary-to: #7c3aed;
+  --ess-navy: #0f2744;
+  --ess-text: #1e293b;
+  --ess-muted: #64748b;
+  --ess-border: #e2e8f0;
+  --ess-radius: 14px;
+  --ess-shadow: 0 4px 24px rgba(15, 39, 68, 0.08);
+  --ess-font: "Inter", system-ui, -apple-system, sans-serif;
+}
+
+.ess-app,
+.ess-app .fin-body,
+body.ess-app {
+  font-family: var(--ess-font);
+  background: var(--ess-bg) !important;
+  min-height: 100vh;
+}
+
+.ess-app-layout {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.ess-sidebar {
+  background: linear-gradient(180deg, var(--ess-sidebar-from) 0%, var(--ess-sidebar-to) 100%);
+  color: #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 14px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  z-index: 100;
+}
+
+.ess-sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 28px;
+  padding: 0 6px;
+}
+
+.ess-logo-mark {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--ess-primary-from), var(--ess-primary-to));
+  color: #fff;
+  font-weight: 800;
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.35);
+}
+
+.ess-sidebar-brand strong {
+  display: block;
+  color: #fff;
+  font-size: 1rem;
+  line-height: 1.2;
+}
+
+.ess-sidebar-brand span {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.ess-nav-group {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #64748b;
+  margin: 18px 8px 8px;
+}
+
+.ess-nav-link {
+  display: block;
+  padding: 10px 12px;
+  border-radius: 10px;
+  color: #cbd5e1;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+  transition: background 0.15s, color 0.15s;
+}
+
+.ess-nav-link:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.ess-nav-link.active {
+  background: linear-gradient(90deg, rgba(37, 99, 235, 0.35), rgba(124, 58, 237, 0.25));
+  color: #fff;
+  border-left: 3px solid #60a5fa;
+  padding-left: 9px;
+}
+
+.ess-sidebar-footer {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #e2e8f0;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ess-sidebar-footer:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.ess-app-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 100vh;
+}
+
+.ess-topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 24px;
+  background: var(--ess-surface);
+  border-bottom: 1px solid var(--ess-border);
+  box-shadow: 0 1px 0 rgba(15, 39, 68, 0.04);
+  position: sticky;
+  top: 0;
+  z-index: 90;
+}
+
+.ess-topbar-menu {
+  display: none;
+  border: 1px solid var(--ess-border);
+  background: var(--ess-bg);
+  border-radius: 10px;
+  width: 40px;
+  height: 40px;
+  cursor: pointer;
+}
+
+.ess-topbar-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  flex: 1;
+}
+
+.ess-top-link {
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ess-muted);
+  text-decoration: none;
+  padding: 8px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.ess-top-link:hover,
+.ess-top-link.active {
+  color: var(--ess-navy);
+  background: var(--ess-bg);
+}
+
+.ess-top-dropdown {
+  position: relative;
+}
+
+.ess-top-dropdown:hover .ess-top-submenu {
+  display: block;
+}
+
+.ess-top-submenu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  min-width: 200px;
+  background: var(--ess-surface);
+  border: 1px solid var(--ess-border);
+  border-radius: 12px;
+  box-shadow: var(--ess-shadow);
+  padding: 8px;
+  z-index: 200;
+}
+
+.ess-top-submenu a {
+  display: block;
+  padding: 10px 12px;
+  border-radius: 8px;
+  color: var(--ess-text);
+  text-decoration: none;
+  font-size: 13px;
+}
+
+.ess-top-submenu a:hover {
+  background: var(--ess-bg);
+}
+
+.ess-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ess-top-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid var(--ess-border);
+  background: var(--ess-bg);
+  cursor: pointer;
+}
+
+.ess-top-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px 6px 6px;
+  border-radius: 12px;
+  border: 1px solid var(--ess-border);
+  background: var(--ess-bg);
+}
+
+.ess-top-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--ess-primary-from), var(--ess-primary-to));
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ess-top-user-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ess-text);
+}
+
+.ess-page {
+  flex: 1;
+  padding: 0;
+  min-height: 0;
+}
+
+/* Esconde nav antiga quando shell premium ativo */
+.ess-app > .top,
+.ess-app > .app-top,
+.ess-page ~ .top {
+  display: none !important;
+}
+
+body.ess-app .top.app-top {
+  display: none !important;
+}
+
+/* Financeiro dentro do shell */
+.ess-app .fin-body {
+  background: transparent !important;
+}
+
+.ess-app .fin-shell {
+  min-height: calc(100vh - 64px);
+}
+
+.ess-app .fin-sidebar-left,
+.ess-app .fin-card {
+  background: var(--ess-surface);
+  border-radius: var(--ess-radius);
+  box-shadow: var(--ess-shadow);
+}
+
+.ess-app .fin-btn-primary,
+.ess-app .ctrl-btn-primary {
+  background: linear-gradient(135deg, var(--ess-primary-from), var(--ess-primary-to)) !important;
+  border: none !important;
+  color: #fff !important;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+}
+
+.ess-app .fin-table-wrap {
+  border-radius: var(--ess-radius);
+  box-shadow: var(--ess-shadow);
+}
+
+.ess-app .ctrl-wrap {
+  padding: 24px;
+  max-width: 1400px;
+}
+
+.ess-app .ctrl-header h1 {
+  font-family: var(--ess-font);
+  font-weight: 800;
+  color: var(--ess-navy);
+}
+
+.ess-app .ctrl-hub-card {
+  border-radius: var(--ess-radius);
+  box-shadow: var(--ess-shadow);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.ess-app .ctrl-hub-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(15, 39, 68, 0.12);
+}
+
+/* Hub KPIs */
+.ess-app .fin-kpis,
+.ess-app .ctrl-kpis {
+  border-radius: var(--ess-radius);
+}
+
+@media (max-width: 1100px) {
+  .ess-app-layout {
+    grid-template-columns: 1fr;
+  }
+  .ess-sidebar {
+    position: fixed;
+    left: 0;
+    transform: translateX(-100%);
+    transition: transform 0.25s;
+    width: 260px;
+  }
+  .ess-sidebar.open {
+    transform: translateX(0);
+  }
+  .ess-topbar-menu {
+    display: block;
+  }
+}
+
+@media (max-width: 768px) {
+  .ess-topbar-nav {
+    display: none;
+  }
+  .ess-app .fin-shell {
+    grid-template-columns: 1fr;
+  }
+}

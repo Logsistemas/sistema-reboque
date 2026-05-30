@@ -2,8 +2,10 @@
   const API = "/api/financeiro/notas-entrada";
   const S = window.FinShared;
   let itens = [];
+  let contasFin = [];
   let selecionadoId = null;
   let detalheAtual = null;
+  let lancarNotaId = null;
 
   function el(id) {
     return document.getElementById(id);
@@ -134,7 +136,7 @@
         const nid = b.dataset.id;
         fecharMenu();
         if (act === "detalhe") abrirDetalhe(nid);
-        else if (act === "lancar") lancarCp(nid);
+        else if (act === "lancar") abrirModalLancar(nid);
         else if (act === "xml") baixarXml(nid);
         else if (act === "excluir") excluirNota(nid);
       });
@@ -197,11 +199,34 @@
     atualizarBotoesSidebar();
   }
 
-  async function carregarLista() {
+  function preencherSelectContas(sel, valor) {
+    if (!sel) return;
+    const v = valor || "";
+    sel.innerHTML = '<option value="">— Sem banco definido (baixa depois) —</option>';
+    contasFin.forEach((c) => {
+      const o = document.createElement("option");
+      o.value = c.id;
+      o.textContent = `${c.nome}${c.saldo_atual_fmt ? " (" + c.saldo_atual_fmt + ")" : ""}`;
+      if (String(c.id) === String(v)) o.selected = true;
+      sel.appendChild(o);
+    });
+  }
+
+  async function carregarLista(flashId) {
     const j = await S.apiJson(montarQuery());
     itens = j.itens || [];
+    contasFin = j.contas || contasFin;
     S.atualizarPainel(j.painel);
+    preencherSelectContas(el("lancar_conta_fin"));
+    preencherSelectContas(el("imp_conta_fin"));
     render();
+    if (flashId) {
+      const tr = document.querySelector(`#tbodyNotas tr[data-id="${flashId}"]`);
+      if (tr) {
+        tr.classList.add("fin-success-flash");
+        setTimeout(() => tr.classList.remove("fin-success-flash"), 1400);
+      }
+    }
   }
 
   function abrirModal(id) {
@@ -305,15 +330,37 @@
     abrirModal("modalDetalhe");
   }
 
-  async function lancarCp(id) {
+  function abrirModalLancar(id) {
+    if (!id) return;
+    const nota = itens.find((i) => i.id === id) || detalheAtual;
+    if (!nota) return;
+    lancarNotaId = id;
+    setSelecionado(id);
+    S.mostrarErro(el("lancarErro"), "");
+    if (el("lancarResumo")) {
+      el("lancarResumo").innerHTML = `<b>${nota.nome_fornecedor || "Fornecedor"}</b><br>NF ${nota.numero_nota || nota.numero} · ${nota.valor_total_fmt}`;
+    }
+    preencherSelectContas(el("lancar_conta_fin"), "");
+    abrirModal("modalLancar");
+  }
+
+  async function executarLancarCp(id, contaFinanceiraId) {
     if (!id) return;
     try {
-      const j = await S.apiJson(`${API}/${id}/lancar-contas-pagar`, { method: "POST" });
-      S.toast("Lançado em Contas a Pagar.");
+      const body = {};
+      if (contaFinanceiraId) body.conta_financeira_id = contaFinanceiraId;
+      const j = await S.apiJson(`${API}/${id}/lancar-contas-pagar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      S.toast(j.mensagem || "Lançado em Contas a Pagar.");
+      fecharModal("modalLancar");
       if (j.painel) S.atualizarPainel(j.painel);
-      await carregarLista();
+      await carregarLista(id);
       if (detalheAtual && detalheAtual.id === id) await abrirDetalhe(id);
     } catch (err) {
+      S.mostrarErro(el("lancarErro"), err.message);
       S.toast(err.message || "Erro ao lançar");
     }
   }
@@ -335,46 +382,164 @@
     }
   }
 
+  function formatFileSize(bytes) {
+    if (!bytes && bytes !== 0) return "—";
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  }
+
+  function isXmlFile(file) {
+    if (!file) return false;
+    const name = (file.name || "").toLowerCase();
+    if (!name.endsWith(".xml")) return false;
+    const type = (file.type || "").toLowerCase();
+    if (type && !type.includes("xml") && type !== "text/plain" && type !== "application/octet-stream") {
+      return false;
+    }
+    return true;
+  }
+
   function initImportModal() {
     const drop = el("dropzone");
+    const uploadCol = el("finImpUploadCol");
     const input = el("imp_arquivo");
-    const nome = el("imp_nome_arquivo");
+    const preview = el("imp_preview");
+    const statusOk = el("imp_status_ok");
+    const hint = el("imp_drop_hint");
+    const btnImport = el("btnEnviarImport");
+    const modal = el("modalImport");
     let arquivo = null;
+    const dragState = { count: 0, targets: [] };
 
-    function setFile(file) {
+    function atualizarBotaoImportar() {
+      if (btnImport) btnImport.disabled = !arquivo;
+    }
+
+    function setDragHighlight(on) {
+      drop?.classList.toggle("dragover", on);
+      uploadCol?.classList.toggle("dragover", on);
+    }
+
+    function limparArquivo(mostrarErro) {
+      arquivo = null;
+      dragState.count = 0;
+      if (input) input.value = "";
+      drop?.classList.remove("has-file", "dragover");
+      uploadCol?.classList.remove("dragover");
+      if (preview) preview.hidden = true;
+      if (statusOk) statusOk.hidden = true;
+      if (hint) hint.classList.remove("is-hidden");
+      atualizarBotaoImportar();
+      if (mostrarErro) S.mostrarErro(el("importErro"), "");
+    }
+
+    function aplicarArquivo(file) {
       if (!file) return;
-      const n = (file.name || "").toLowerCase();
-      if (!n.endsWith(".xml")) {
-        S.toast("Selecione um arquivo .xml");
+      if (!isXmlFile(file)) {
+        S.mostrarErro(el("importErro"), "Envie apenas arquivos com extensão .xml (NF-e).");
+        S.toast("Selecione um arquivo .xml válido.");
+        limparArquivo(false);
         return;
       }
       arquivo = file;
-      if (nome) nome.textContent = file.name;
+      S.mostrarErro(el("importErro"), "");
       drop?.classList.add("has-file");
+      setDragHighlight(false);
+
+      const nomeEl = el("imp_nome_arquivo");
+      const tamEl = el("imp_arquivo_tamanho");
+      const tipoEl = el("imp_arquivo_tipo");
+      if (nomeEl) nomeEl.textContent = file.name;
+      if (tamEl) tamEl.textContent = formatFileSize(file.size);
+      if (tipoEl) tipoEl.textContent = file.type || "application/xml";
+      if (preview) preview.hidden = false;
+      if (statusOk) statusOk.hidden = false;
+      if (hint) hint.classList.add("is-hidden");
+      atualizarBotaoImportar();
+      S.toast("XML selecionado com sucesso.");
     }
 
-    drop?.addEventListener("click", () => input?.click());
-    drop?.addEventListener("dragover", (e) => {
-      e.preventDefault();
-      drop.classList.add("dragover");
+    function bindDropTarget(node) {
+      if (!node || dragState.targets.includes(node)) return;
+      dragState.targets.push(node);
+
+      node.addEventListener("dragenter", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dragState.count += 1;
+        setDragHighlight(true);
+      });
+      node.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+        setDragHighlight(true);
+      });
+      node.addEventListener("dragleave", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dragState.count = Math.max(0, dragState.count - 1);
+        if (dragState.count === 0) setDragHighlight(false);
+      });
+      node.addEventListener("drop", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dragState.count = 0;
+        setDragHighlight(false);
+        const files = e.dataTransfer?.files;
+        if (files?.length) aplicarArquivo(files[0]);
+      });
+    }
+
+    bindDropTarget(drop);
+    bindDropTarget(uploadCol);
+
+    if (modal) {
+      modal.addEventListener("dragover", (e) => e.preventDefault());
+      modal.addEventListener("drop", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+    }
+
+    function abrirSeletor() {
+      input?.click();
+    }
+
+    drop?.addEventListener("click", (e) => {
+      if (e.target.closest("#btnLimparArquivo")) return;
+      abrirSeletor();
     });
-    drop?.addEventListener("dragleave", () => drop.classList.remove("dragover"));
-    drop?.addEventListener("drop", (e) => {
-      e.preventDefault();
-      drop.classList.remove("dragover");
-      const f = e.dataTransfer?.files?.[0];
-      if (f) setFile(f);
+    drop?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        abrirSeletor();
+      }
     });
+
     input?.addEventListener("change", () => {
-      if (input.files?.[0]) setFile(input.files[0]);
+      const f = input.files?.[0];
+      if (f) aplicarArquivo(f);
+      else limparArquivo(false);
+    });
+
+    el("btnLimparArquivo")?.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      limparArquivo(true);
+    });
+
+    el("imp_lancar_cp")?.addEventListener("change", () => {
+      const on = el("imp_lancar_cp")?.checked;
+      const wrap = el("imp_conta_wrap");
+      if (wrap) wrap.style.display = on ? "block" : "none";
     });
 
     el("btnImportarXml")?.addEventListener("click", () => {
-      arquivo = null;
-      if (input) input.value = "";
-      if (nome) nome.textContent = "";
-      drop?.classList.remove("has-file");
-      S.mostrarErro(el("importErro"), "");
+      limparArquivo(true);
+      if (el("imp_lancar_cp")) el("imp_lancar_cp").checked = false;
+      if (el("imp_conta_wrap")) el("imp_conta_wrap").style.display = "none";
       abrirModal("modalImport");
     });
 
@@ -382,32 +547,41 @@
 
     el("btnEnviarImport")?.addEventListener("click", async () => {
       if (!arquivo) {
-        S.mostrarErro(el("importErro"), "Selecione o arquivo XML da NF-e.");
+        S.mostrarErro(el("importErro"), "Selecione o arquivo XML da NF-e antes de importar.");
         return;
       }
       const fd = new FormData();
-      fd.append("arquivo", arquivo);
-      fd.append("loja_unidade", el("imp_loja")?.value || "");
-      if (el("imp_lancar_cp")?.checked) fd.append("lancar_contas_pagar", "1");
+      fd.append("arquivo", arquivo, arquivo.name);
+      const lojaEl = el("imp_loja");
+      fd.append("loja_unidade", lojaEl?.value || lojaEl?.selectedOptions?.[0]?.text || "");
+      if (el("imp_lancar_cp")?.checked) {
+        fd.append("lancar_contas_pagar", "1");
+        const cf = el("imp_conta_fin")?.value;
+        if (cf) fd.append("conta_financeira_id", cf);
+      }
 
-      el("btnEnviarImport").disabled = true;
+      btnImport.disabled = true;
       S.mostrarErro(el("importErro"), "");
       try {
         const j = await S.apiJson(`${API}/importar-xml`, { method: "POST", body: fd });
-        S.toast(j.mensagem || "NF-e importada.");
+        S.toast(j.mensagem || "NF-e importada com sucesso.");
+        if (j.contas) contasFin = j.contas;
         if (j.painel) S.atualizarPainel(j.painel);
         fecharModal("modalImport");
-        await carregarLista();
-        if (j.item?.id) {
-          setSelecionado(j.item.id);
-          abrirDetalhe(j.item.id);
-        }
+        limparArquivo(false);
+        const nid = j.item?.id;
+        if (nid) setSelecionado(nid);
+        await carregarLista(nid);
       } catch (err) {
-        S.mostrarErro(el("importErro"), err.message);
+        S.mostrarErro(el("importErro"), err.message || "Não foi possível importar o XML.");
       } finally {
-        el("btnEnviarImport").disabled = false;
+        atualizarBotaoImportar();
       }
     });
+
+    const shell = document.querySelector(".fin-modal-import-shell");
+    shell?.addEventListener("click", (e) => e.stopPropagation());
+    atualizarBotaoImportar();
   }
 
   function bindEvents() {
@@ -430,10 +604,15 @@
       else if (!on) setSelecionado(null);
     });
 
-    el("btnLancarSel")?.addEventListener("click", () => lancarCp(selecionadoId));
+    el("btnLancarSel")?.addEventListener("click", () => abrirModalLancar(selecionadoId));
     el("btnVerDetalhe")?.addEventListener("click", () => abrirDetalhe(selecionadoId));
     el("btnFecharDet")?.addEventListener("click", () => fecharModal("modalDetalhe"));
-    el("btnLancarDet")?.addEventListener("click", () => lancarCp(detalheAtual?.id));
+    el("btnLancarDet")?.addEventListener("click", () => abrirModalLancar(detalheAtual?.id));
+    el("btnFecharLancar")?.addEventListener("click", () => fecharModal("modalLancar"));
+    el("btnConfirmarLancar")?.addEventListener("click", () => {
+      const cf = el("lancar_conta_fin")?.value || "";
+      executarLancarCp(lancarNotaId, cf);
+    });
     el("btnExcluirDet")?.addEventListener("click", () => excluirNota(detalheAtual?.id));
 
     document.addEventListener("click", fecharMenu);
@@ -442,6 +621,9 @@
     });
     el("modalDetalhe")?.addEventListener("click", (e) => {
       if (e.target === el("modalDetalhe")) fecharModal("modalDetalhe");
+    });
+    el("modalLancar")?.addEventListener("click", (e) => {
+      if (e.target === el("modalLancar")) fecharModal("modalLancar");
     });
   }
 
