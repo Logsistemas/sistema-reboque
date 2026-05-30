@@ -4,11 +4,24 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Área do Motorista</title>
-  <link rel="stylesheet" href="/static/style.css">
+  {% include "partials/head_premium.html" %}
+  <style>
+    .mot-area{padding:20px;max-width:900px;margin:0 auto}
+    .mot-area .card{background:#fff;border-radius:14px;padding:18px;margin-bottom:14px;border:1px solid #e2e8f0;box-shadow:0 4px 20px rgba(15,23,42,.06)}
+    .mot-area button,.mot-area .btn{border:0;border-radius:10px;padding:9px 13px;font-weight:700;cursor:pointer;margin:4px 4px 4px 0;background:#2563eb;color:#fff}
+    .mot-area .btn.gray,.mot-area button.btn.gray{background:#64748b}
+    .mot-area .btn.green{background:#16a34a}
+    .mot-area .btn.red{background:#dc2626}
+    .mot-area .btn.dark{background:#0f172a}
+    .mot-area .pill{display:inline-block;padding:4px 10px;border-radius:999px;background:#e0f2fe;color:#0369a1;font-size:12px;font-weight:700}
+    .mot-area .service-card{border-top:3px solid #7c3aed;padding-top:12px;margin-top:12px}
+    .mot-toplink{margin-left:auto}
+  </style>
 </head>
-<body>
-  <div class="top"><span>🚛 Área do Motorista</span><span><a href="/motorista/login">Trocar login/placa</a></span></div>
-  <div class="center-wrap">
+<body class="ess-app ess-mot-public">
+{% include "partials/app_shell_start.html" %}
+  <div class="full ess-page-inner mot-area">
+    <p style="text-align:right;margin:0 0 12px"><a class="mot-toplink" href="/motorista/login">Trocar login/placa</a></p>
     {% if not m %}
     <div class="card"><h1>Motorista não encontrado</h1><p>Confirme o link com a central.</p></div>
     {% else %}
@@ -179,5 +192,6 @@ document.addEventListener('click', function(){
 }, {once:false});
 
 </script>
+{% include "partials/app_shell_end.html" %}
 </body>
 </html>

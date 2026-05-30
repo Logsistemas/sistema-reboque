@@ -6,6 +6,9 @@
   let selecionadoId = null;
   let detalheAtual = null;
   let lancarNotaId = null;
+  /** Arquivo XML escolhido por clique ou drag-and-drop */
+  let selectedXmlFile = null;
+  window.selectedXmlFile = null;
 
   function el(id) {
     return document.getElementById(id);
@@ -229,20 +232,41 @@
     }
   }
 
+  let ativarDnDImport = function () {};
+  let desativarDnDImport = function () {};
+
   function abrirModal(id) {
     const m = el(id);
-    if (m) {
-      m.classList.add("open");
-      m.setAttribute("aria-hidden", "false");
-    }
+    if (!m) return;
+    m.classList.add("open");
+    m.setAttribute("aria-hidden", "false");
   }
 
   function fecharModal(id) {
     const m = el(id);
-    if (m) {
-      m.classList.remove("open");
-      m.setAttribute("aria-hidden", "true");
+    if (!m) return;
+    m.classList.remove("open");
+    m.setAttribute("aria-hidden", "true");
+    if (id === "modalImport") document.body.classList.remove("nf-modal-open");
+  }
+
+  function abrirModalImport() {
+    console.log("[NF-e] Abrindo modal de importação XML");
+    const m = el("modalImport");
+    if (!m) {
+      console.error("[NF-e] Elemento #modalImport não encontrado");
+      S.toast("Erro: modal de importação não encontrado.");
+      return;
     }
+    abrirModal("modalImport");
+    document.body.classList.add("nf-modal-open");
+    ativarDnDImport();
+    console.log("[NF-e] Modal aberto com sucesso");
+  }
+
+  function fecharModalImport() {
+    desativarDnDImport();
+    fecharModal("modalImport");
   }
 
   function campoDet(label, val) {
@@ -298,13 +322,19 @@
 
     const cp = n.contas_pagar_vinculadas || [];
     el("detCp").innerHTML = cp.length
-      ? `<ul class="fin-cp-list">${cp
+      ? `<table class="fin-table fin-hist-table"><thead><tr><th>Fornecedor</th><th>Descrição</th><th>Vencimento</th><th>Valor</th><th>Status</th></tr></thead><tbody>${cp
           .map(
             (c) =>
-              `<li><a href="/financeiro/contas-a-pagar" target="_blank">${c.fornecedor || "Conta"}</a> — ${c.valor_fmt} <span class="fin-status ${c.status}">${c.status}</span></li>`
+              `<tr>
+                <td>${c.fornecedor || "—"}</td>
+                <td>${c.descricao || "—"}</td>
+                <td>${c.vencimento_fmt || "—"}</td>
+                <td class="fin-valor">${c.valor_fmt || "—"}</td>
+                <td><span class="fin-status ${c.status || ""}">${c.status || "—"}</span></td>
+              </tr>`
           )
-          .join("")}</ul>`
-      : '<p class="muted">Nenhuma conta a pagar vinculada.</p>';
+          .join("")}</tbody></table>`
+      : '<p class="muted">Nenhuma conta a pagar vinculada. Use &quot;Lançar em contas a pagar&quot; para gerar as parcelas.</p>';
 
     const xmlPre = el("detXml");
     if (n.xml_conteudo) {
@@ -403,17 +433,35 @@
   function initImportModal() {
     const drop = el("dropzone");
     const uploadCol = el("finImpUploadCol");
+    const shell = document.querySelector("#modalImport .fin-modal-import-shell");
     const input = el("imp_arquivo");
     const preview = el("imp_preview");
     const statusOk = el("imp_status_ok");
     const hint = el("imp_drop_hint");
     const btnImport = el("btnEnviarImport");
     const modal = el("modalImport");
-    let arquivo = null;
-    const dragState = { count: 0, targets: [] };
+    let dragDepth = 0;
+    let dndDocBound = false;
+    let lastDropAt = 0;
+
+    const CAPTURE = true;
+    const DND_EVENTS = ["dragenter", "dragover", "dragleave", "drop"];
+
+    function modalAberto() {
+      return !!modal?.classList.contains("open");
+    }
+
+    function alvoPermiteDrop(target) {
+      if (!modal || !target) return false;
+      if (target === modal) return true;
+      if (shell && shell.contains(target)) return true;
+      if (uploadCol && (target === uploadCol || uploadCol.contains(target))) return true;
+      if (drop && (target === drop || drop.contains(target))) return true;
+      return false;
+    }
 
     function atualizarBotaoImportar() {
-      if (btnImport) btnImport.disabled = !arquivo;
+      if (btnImport) btnImport.disabled = !selectedXmlFile;
     }
 
     function setDragHighlight(on) {
@@ -421,9 +469,21 @@
       uploadCol?.classList.toggle("dragover", on);
     }
 
+    function syncInputFile(file) {
+      if (!input || !file) return;
+      try {
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        input.files = dt.files;
+      } catch (_) {
+        /* selectedXmlFile é a fonte principal */
+      }
+    }
+
     function limparArquivo(mostrarErro) {
-      arquivo = null;
-      dragState.count = 0;
+      selectedXmlFile = null;
+      window.selectedXmlFile = null;
+      dragDepth = 0;
       if (input) input.value = "";
       drop?.classList.remove("has-file", "dragover");
       uploadCol?.classList.remove("dragover");
@@ -436,13 +496,16 @@
 
     function aplicarArquivo(file) {
       if (!file) return;
-      if (!isXmlFile(file)) {
+      const nome = (file.name || "").toLowerCase();
+      if (!nome.endsWith(".xml")) {
         S.mostrarErro(el("importErro"), "Envie apenas arquivos com extensão .xml (NF-e).");
         S.toast("Selecione um arquivo .xml válido.");
         limparArquivo(false);
         return;
       }
-      arquivo = file;
+      selectedXmlFile = file;
+      window.selectedXmlFile = file;
+      syncInputFile(file);
       S.mostrarErro(el("importErro"), "");
       drop?.classList.add("has-file");
       setDragHighlight(false);
@@ -460,48 +523,105 @@
       S.toast("XML selecionado com sucesso.");
     }
 
-    function bindDropTarget(node) {
-      if (!node || dragState.targets.includes(node)) return;
-      dragState.targets.push(node);
+    function onDragOver(e) {
+      if (!modalAberto()) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+      if (alvoPermiteDrop(e.target)) setDragHighlight(true);
+    }
 
-      node.addEventListener("dragenter", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        dragState.count += 1;
-        setDragHighlight(true);
-      });
-      node.addEventListener("dragover", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
-        setDragHighlight(true);
-      });
-      node.addEventListener("dragleave", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        dragState.count = Math.max(0, dragState.count - 1);
-        if (dragState.count === 0) setDragHighlight(false);
-      });
-      node.addEventListener("drop", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        dragState.count = 0;
-        setDragHighlight(false);
-        const files = e.dataTransfer?.files;
-        if (files?.length) aplicarArquivo(files[0]);
+    function onDragEnter(e) {
+      if (!modalAberto()) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+      if (!alvoPermiteDrop(e.target)) return;
+      dragDepth += 1;
+      setDragHighlight(true);
+    }
+
+    function onDragLeave(e) {
+      if (!modalAberto()) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (!alvoPermiteDrop(e.target)) return;
+      dragDepth = Math.max(0, dragDepth - 1);
+      if (dragDepth === 0) setDragHighlight(false);
+    }
+
+    function onDrop(e) {
+      if (!modalAberto()) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const now = Date.now();
+      if (now - lastDropAt < 80) return;
+      lastDropAt = now;
+
+      if (!alvoPermiteDrop(e.target)) return;
+
+      dragDepth = 0;
+      setDragHighlight(false);
+      const file = e.dataTransfer?.files?.[0];
+      if (!file) return;
+      console.log("drop XML", file.name);
+      aplicarArquivo(file);
+    }
+
+    function bindDnd(node) {
+      if (!node || node.dataset.nfDndBound === "1") return;
+      node.dataset.nfDndBound = "1";
+      DND_EVENTS.forEach((ev) => {
+        const fn =
+          ev === "dragenter" ? onDragEnter : ev === "dragleave" ? onDragLeave : ev === "drop" ? onDrop : onDragOver;
+        node.addEventListener(ev, fn, false);
       });
     }
 
-    bindDropTarget(drop);
-    bindDropTarget(uploadCol);
-
-    if (modal) {
-      modal.addEventListener("dragover", (e) => e.preventDefault());
-      modal.addEventListener("drop", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-      });
+    function onDocDragOver(e) {
+      if (!modalAberto()) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+      if (e.type === "dragover") console.log("dragover XML");
     }
+
+    function onDocDrop(e) {
+      if (!modalAberto()) return;
+      e.preventDefault();
+      e.stopPropagation();
+      onDrop(e);
+    }
+
+    function ligarDnDDocumento() {
+      if (dndDocBound) return;
+      dndDocBound = true;
+      document.addEventListener("dragenter", onDocDragOver, CAPTURE);
+      document.addEventListener("dragover", onDocDragOver, CAPTURE);
+      document.addEventListener("drop", onDocDrop, CAPTURE);
+    }
+
+    function desligarDnDDocumento() {
+      if (!dndDocBound) return;
+      dndDocBound = false;
+      document.removeEventListener("dragenter", onDocDragOver, CAPTURE);
+      document.removeEventListener("dragover", onDocDragOver, CAPTURE);
+      document.removeEventListener("drop", onDocDrop, CAPTURE);
+    }
+
+    bindDnd(modal);
+    bindDnd(shell);
+    bindDnd(uploadCol);
+    bindDnd(drop);
+
+    ativarDnDImport = ligarDnDDocumento;
+    desativarDnDImport = () => {
+      desligarDnDDocumento();
+      dragDepth = 0;
+      setDragHighlight(false);
+    };
+
+    ligarDnDDocumento();
 
     function abrirSeletor() {
       input?.click();
@@ -509,6 +629,8 @@
 
     drop?.addEventListener("click", (e) => {
       if (e.target.closest("#btnLimparArquivo")) return;
+      e.preventDefault();
+      e.stopPropagation();
       abrirSeletor();
     });
     drop?.addEventListener("keydown", (e) => {
@@ -536,22 +658,32 @@
       if (wrap) wrap.style.display = on ? "block" : "none";
     });
 
-    el("btnImportarXml")?.addEventListener("click", () => {
-      limparArquivo(true);
-      if (el("imp_lancar_cp")) el("imp_lancar_cp").checked = false;
-      if (el("imp_conta_wrap")) el("imp_conta_wrap").style.display = "none";
-      abrirModal("modalImport");
-    });
+    const btnImpXml = el("btnImportarXml");
+    if (btnImpXml) {
+      btnImpXml.dataset.nfBound = "1";
+      btnImpXml.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        console.log("[NF-e] Botão Importar XML clicado");
+        limparArquivo(true);
+        if (el("imp_lancar_cp")) el("imp_lancar_cp").checked = false;
+        if (el("imp_conta_wrap")) el("imp_conta_wrap").style.display = "none";
+        abrirModalImport();
+      });
+    } else {
+      console.error("[NF-e] Botão #btnImportarXml não encontrado");
+    }
 
-    el("btnFecharImport")?.addEventListener("click", () => fecharModal("modalImport"));
+    el("btnFecharImport")?.addEventListener("click", () => fecharModalImport());
 
     el("btnEnviarImport")?.addEventListener("click", async () => {
-      if (!arquivo) {
+      const fileSend = selectedXmlFile || input?.files?.[0];
+      if (!fileSend) {
         S.mostrarErro(el("importErro"), "Selecione o arquivo XML da NF-e antes de importar.");
         return;
       }
       const fd = new FormData();
-      fd.append("arquivo", arquivo, arquivo.name);
+      fd.append("arquivo", fileSend, fileSend.name);
       const lojaEl = el("imp_loja");
       fd.append("loja_unidade", lojaEl?.value || lojaEl?.selectedOptions?.[0]?.text || "");
       if (el("imp_lancar_cp")?.checked) {
@@ -567,7 +699,7 @@
         S.toast(j.mensagem || "NF-e importada com sucesso.");
         if (j.contas) contasFin = j.contas;
         if (j.painel) S.atualizarPainel(j.painel);
-        fecharModal("modalImport");
+        fecharModalImport();
         limparArquivo(false);
         const nid = j.item?.id;
         if (nid) setSelecionado(nid);
@@ -579,12 +711,23 @@
       }
     });
 
-    const shell = document.querySelector(".fin-modal-import-shell");
-    shell?.addEventListener("click", (e) => e.stopPropagation());
     atualizarBotaoImportar();
   }
 
   function bindEvents() {
+    document.addEventListener("click", (ev) => {
+      const t = ev.target.closest("#btnImportarXml");
+      if (!t || t.id !== "btnImportarXml") return;
+      if (t.dataset.nfBound === "1") return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      console.log("[NF-e] Importar XML (delegação)");
+      const imp = el("imp_lancar_cp");
+      if (imp) imp.checked = false;
+      if (el("imp_conta_wrap")) el("imp_conta_wrap").style.display = "none";
+      abrirModalImport();
+    });
+
     el("btnFiltrar")?.addEventListener("click", () => carregarLista().catch((e) => S.toast(e.message)));
     el("btnLimpar")?.addEventListener("click", () => {
       ["ff_produto", "ff_lote", "ff_uf", "ff_busca", "ff_data_ini", "ff_data_fim"].forEach((id) => {
@@ -617,7 +760,9 @@
 
     document.addEventListener("click", fecharMenu);
     el("modalImport")?.addEventListener("click", (e) => {
-      if (e.target === el("modalImport")) fecharModal("modalImport");
+      if (e.target === el("modalImport")) {
+        fecharModalImport();
+      }
     });
     el("modalDetalhe")?.addEventListener("click", (e) => {
       if (e.target === el("modalDetalhe")) fecharModal("modalDetalhe");
@@ -627,9 +772,22 @@
     });
   }
 
-  initPills();
-  initTabsDetalhe();
-  initImportModal();
-  bindEvents();
-  carregarLista().catch((e) => S.toast(e.message));
+  function boot() {
+    if (!window.FinShared) {
+      console.error("[NF-e] financeiro_shared.js não carregou (FinShared ausente)");
+      return;
+    }
+    initPills();
+    initTabsDetalhe();
+    initImportModal();
+    bindEvents();
+    carregarLista().catch((e) => S.toast(e.message));
+    console.log("[NF-e] Módulo Notas Entrada inicializado");
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", boot);
+  } else {
+    boot();
+  }
 })();

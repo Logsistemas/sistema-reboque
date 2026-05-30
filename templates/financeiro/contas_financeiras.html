@@ -4,15 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Contas Financeiras</title>
-  <link rel="stylesheet" href="/static/style.css">
-  <link rel="stylesheet" href="/static/dashboard.css">
-  <link rel="stylesheet" href="/static/controle.css">
-  <link rel="stylesheet" href="/static/cadastros.css">
-  <link rel="stylesheet" href="/static/financeiro.css">
+  {% include "partials/head_financeiro_v2.html" %}
 </head>
-<body class="ctrl-body dash-body" data-fin-page="contas">
-{% include "partials/nav_principal.html" %}
-<div class="ctrl-wrap">
+<body class="ess-app ess-fin-v2 ctrl-body" data-fin-page="contas">
+{% include "partials/app_shell_start.html" %}
+<div class="ctrl-wrap ess-cad-wrap">
   <header class="ctrl-header">
     <div>
       <p class="ctrl-breadcrumb"><a href="/financeiro">Financeiro</a> / Contas Financeiras</p>
@@ -79,6 +75,7 @@
     </main>
   </div>
 </div>
+{% include "partials/app_shell_end.html" %}
 <script src="/static/financeiro_shared.js"></script>
 <script src="/static/financeiro_contas_financeiras.js"></script>
 </body>

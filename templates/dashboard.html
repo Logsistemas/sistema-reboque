@@ -4,14 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Dashboard — Sistema Reboque</title>
-  <link rel="stylesheet" href="/static/style.css">
   <link rel="stylesheet" href="/static/dashboard.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  {% include "partials/head_pages_v2.html" %}
 </head>
-<body class="dash-body">
-  {% include "partials/nav_principal.html" %}
-
-  <div class="dash-wrap">
+<body class="ess-app dash-body">
+  {% include "partials/app_shell_start.html" %}
+  <div class="dash-wrap ess-page-inner">
     <div class="dash-header">
       <div>
         <h1>Dashboard</h1>
@@ -179,6 +178,7 @@
     </div>
   </div>
 
+  {% include "partials/app_shell_end.html" %}
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script src="/static/dashboard.js"></script>
   <script>

@@ -4,8 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Motoristas</title>
-<link rel="stylesheet" href="/static/style.css">
-<link rel="stylesheet" href="/static/dashboard.css">
+  {% include "partials/head_pages_v2.html" %}
 <style>
 body{background:#f3f6fb}
 .page{max-width:1500px;margin:18px auto;padding:0 16px}
@@ -40,10 +39,9 @@ textarea{min-height:70px}
 @media(max-width:900px){.form-grid{grid-template-columns:1fr} table{font-size:12px}}
 </style>
 </head>
-<body>
-{% include "partials/nav_principal.html" %}
-
-<div class="page">
+<body class="ess-app">
+{% include "partials/app_shell_start.html" %}
+<div class="full ess-page-inner page">
   <div class="card">
     <div class="header-row">
       <div>
@@ -167,5 +165,6 @@ textarea{min-height:70px}
   </div>
 </div>
 {% endfor %}
+{% include "partials/app_shell_end.html" %}
 </body>
 </html>

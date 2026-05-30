@@ -4,14 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Central de Serviços — Essência Logística</title>
-  <link rel="stylesheet" href="/static/style.css">
   <link rel="stylesheet" href="/static/dashboard.css">
   <link rel="stylesheet" href="/static/central.css">
+  {% include "partials/head_pages_v2.html" %}
 </head>
-<body class="central-body">
-  {% include "partials/nav_principal.html" %}
-
-  <div class="central-wrap">
+<body class="ess-app central-body">
+  {% include "partials/app_shell_start.html" %}
+  <div class="central-wrap ess-page-inner">
     <div class="central-header">
       <div>
         <h1>Serviços</h1>
@@ -224,6 +223,7 @@
     </div>
   </div>
 
+{% include "partials/app_shell_end.html" %}
 <script>
 function abrirModal(id) {
   const el = document.getElementById(id);

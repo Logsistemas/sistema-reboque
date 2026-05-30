@@ -265,6 +265,15 @@ body.ess-app {
   flex: 1;
   padding: 0;
   min-height: 0;
+  overflow: visible;
+}
+
+body.nf-modal-open {
+  overflow: hidden;
+}
+
+.fin-modal-import-wrap {
+  pointer-events: auto;
 }
 
 /* Esconde nav antiga quando shell premium ativo */
@@ -274,8 +283,74 @@ body.ess-app {
   display: none !important;
 }
 
-body.ess-app .top.app-top {
+body.ess-app .top,
+body.ess-app .app-top,
+body.ess-app .dash-nav,
+body.ess-app > .top.app-top {
   display: none !important;
+}
+
+/* Área do motorista (login público) — shell sem sidebar */
+body.ess-mot-public .ess-sidebar,
+body.ess-mot-public #essToggleSidebar {
+  display: none !important;
+}
+body.ess-mot-public .ess-main {
+  margin-left: 0 !important;
+  width: 100% !important;
+}
+body.ess-mot-public .ess-topbar {
+  padding-left: 20px;
+}
+
+/* Financeiro V2 — apenas shell premium + fin-shell interno */
+.ess-fin-v2 .fin-sidebar-left {
+  background: var(--ess-surface);
+  border-right: 1px solid var(--ess-border);
+}
+
+.ess-fin-v2 .fin-sidebar-right {
+  background: linear-gradient(180deg, #0f2744 0%, #1a3a6b 100%);
+  color: #e2e8f0;
+  border-left: none;
+}
+
+.ess-fin-v2 .fin-side-section-title {
+  color: #94a3b8;
+}
+
+.ess-fin-v2 .fin-page-head h1 {
+  font-weight: 800;
+  color: var(--ess-navy);
+}
+
+.ess-fin-v2 .fin-shell {
+  background: var(--ess-bg);
+}
+
+.ess-app .ctrl-panel,
+.ess-app .ctrl-table-wrap {
+  background: var(--ess-surface);
+  border-radius: var(--ess-radius);
+  box-shadow: var(--ess-shadow);
+  border: 1px solid var(--ess-border);
+}
+
+.ess-app .ctrl-panel {
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.ess-app .ctrl-table-wrap {
+  overflow: hidden;
+}
+
+.ess-app .ctrl-table th {
+  background: var(--ess-bg);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ess-muted);
 }
 
 /* Financeiro dentro do shell */

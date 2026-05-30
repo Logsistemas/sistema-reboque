@@ -4,7 +4,11 @@
   document.querySelectorAll("[data-ess-nav]").forEach((a) => {
     const p = a.getAttribute("data-ess-nav");
     if (!p) return;
-    if (p === "/financeiro" && path === "/financeiro") {
+    if (p === "/" && path === "/") {
+      a.classList.add("active");
+    } else if (p === "/financeiro" && path === "/financeiro") {
+      a.classList.add("active");
+    } else if (p === "/financeiro/extrato" && path.includes("caixa-e-bancos")) {
       a.classList.add("active");
     } else if (p !== "/financeiro" && path.startsWith(p)) {
       a.classList.add("active");

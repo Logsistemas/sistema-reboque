@@ -4,14 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Faturamento — Essência Logística</title>
-<link rel="stylesheet" href="/static/style.css">
-<link rel="stylesheet" href="/static/dashboard.css">
 <link rel="stylesheet" href="/static/faturamento.css">
+  {% include "partials/head_pages_v2.html" %}
 </head>
-<body class="fat-body">
-{% include "partials/nav_principal.html" %}
-
-<div class="fat-wrap">
+<body class="ess-app fat-body">
+{% include "partials/app_shell_start.html" %}
+<div class="fat-wrap ess-page-inner">
   <header class="fat-header">
     <div>
       <h1>Faturamento</h1>
@@ -234,5 +232,6 @@ function acaoMassa(status) {
   form.submit();
 }
 </script>
+{% include "partials/app_shell_end.html" %}
 </body>
 </html>

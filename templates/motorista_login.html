@@ -4,31 +4,34 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Login do Motorista</title>
-  <link rel="stylesheet" href="/static/style.css">
+  {% include "partials/head_premium.html" %}
   <style>
-    body{background:#eef2f7}
-    .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
-    .login-card{background:#fff;border-radius:16px;box-shadow:0 10px 40px rgba(15,23,42,.12);width:100%;max-width:430px;padding:28px}
-    .login-card h1{margin:0 0 8px}
-    .login-card form{display:grid;gap:12px;margin-top:18px}
-    .erro{background:#fee2e2;color:#991b1b;border-radius:8px;padding:10px;margin-top:12px;font-weight:700}
-    .help{font-size:13px;color:#64748b;line-height:1.45}
+    .mot-login-wrap{min-height:calc(100vh - 64px);display:flex;align-items:center;justify-content:center;padding:32px 20px}
+    .mot-login-card{background:#fff;border-radius:16px;box-shadow:0 10px 40px rgba(15,23,42,.12);width:100%;max-width:430px;padding:28px;border:1px solid #e2e8f0}
+    .mot-login-card h1{margin:0 0 8px;font-size:1.35rem;color:#0f172a}
+    .mot-login-card form{display:grid;gap:12px;margin-top:18px}
+    .mot-login-card input{border:1px solid #cbd5e1;border-radius:10px;padding:12px 14px;font-size:15px}
+    .mot-login-card button{background:linear-gradient(135deg,#2563eb,#7c3aed);color:#fff;border:0;border-radius:10px;padding:12px;font-weight:700;cursor:pointer}
+    .mot-erro{background:#fee2e2;color:#991b1b;border-radius:8px;padding:10px;margin-top:12px;font-weight:700}
+    .mot-help{font-size:13px;color:#64748b;line-height:1.45}
   </style>
 </head>
-<body>
-  <div class="login-wrap">
-    <div class="login-card">
-      <h1>🚛 Área do Motorista</h1>
-      <p class="help">Entre com seu login/senha e informe a placa do veículo que você vai trabalhar hoje.</p>
-      {% if erro %}<div class="erro">{{erro}}</div>{% endif %}
-      <form method="post" action="/motorista/login">
-        <input name="login" placeholder="Login ou CPF" required>
-        <input name="senha" type="password" placeholder="Senha" required>
-        <input name="placa" placeholder="Placa do veículo do dia. Ex: ABC1D23" required>
-        <button>Entrar</button>
-      </form>
-      <p class="help">A placa informada aqui aparece automaticamente para a central.</p>
-    </div>
+<body class="ess-app ess-mot-public">
+{% include "partials/app_shell_start.html" %}
+<div class="full ess-page-inner mot-login-wrap">
+  <div class="mot-login-card">
+    <h1>Área do Motorista</h1>
+    <p class="mot-help">Entre com seu login/senha e informe a placa do veículo que você vai trabalhar hoje.</p>
+    {% if erro %}<div class="mot-erro">{{erro}}</div>{% endif %}
+    <form method="post" action="/motorista/login">
+      <input name="login" placeholder="Login ou CPF" required>
+      <input name="senha" type="password" placeholder="Senha" required>
+      <input name="placa" placeholder="Placa do veículo do dia. Ex: ABC1D23" required>
+      <button type="submit">Entrar</button>
+    </form>
+    <p class="mot-help" style="margin-top:14px">A placa informada aqui aparece automaticamente para a central.</p>
   </div>
+</div>
+{% include "partials/app_shell_end.html" %}
 </body>
 </html>

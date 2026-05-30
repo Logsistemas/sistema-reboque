@@ -4,14 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Serviço {{ s.protocolo }} — Auditoria</title>
-<link rel="stylesheet" href="/static/style.css">
-<link rel="stylesheet" href="/static/dashboard.css">
+  {% include "partials/head_pages_v2.html" %}
 <link rel="stylesheet" href="/static/servico_detalhe.css">
 </head>
-<body>
-{% include "partials/nav_principal.html" %}
-
-<div class="sd-page">
+<body class="ess-app">
+{% include "partials/app_shell_start.html" %}
+<div class="full ess-page-inner sd-page">
   <div class="sd-shell">
     <header class="sd-header">
       <div>
@@ -428,5 +426,6 @@ document.querySelectorAll('.sd-nav-item[data-aba]').forEach((btn) => {
 
 calcularTotal();
 </script>
+{% include "partials/app_shell_end.html" %}
 </body>
 </html>

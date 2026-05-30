@@ -4,17 +4,17 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>{{ titulo_modulo }} — Cadastros</title>
-  <link rel="stylesheet" href="/static/style.css">
-  <link rel="stylesheet" href="/static/dashboard.css">
   <link rel="stylesheet" href="/static/controle.css">
   <link rel="stylesheet" href="/static/cadastros.css">
+  <link rel="stylesheet" href="/static/financeiro.css">
+  {% include "partials/head_premium.html" %}
 </head>
-<body class="ctrl-body dash-body cad-body"
+<body class="ess-app ess-fin-v2 ctrl-body cad-body"
   data-modo="{{ modo }}"
   data-filtro-cliente="{{ '1' if filtro_cliente else '0' }}"
   data-filtro-fornecedor="{{ '1' if filtro_fornecedor else '0' }}">
-{% include "partials/nav_principal.html" %}
-<div class="ctrl-wrap">
+{% include "partials/app_shell_start.html" %}
+<div class="ctrl-wrap ess-cad-wrap">
   <header class="ctrl-header">
     <div>
       <p class="ctrl-breadcrumb"><a href="/cadastros">Cadastros</a> / {{ titulo_modulo }}</p>
@@ -200,6 +200,7 @@
   </div>
 </div>
 
+{% include "partials/app_shell_end.html" %}
 <script src="/static/cadastros_contatos.js"></script>
 </body>
 </html>

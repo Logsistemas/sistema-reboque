@@ -4,14 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Controle — Essência Logística</title>
-  <link rel="stylesheet" href="/static/style.css">
-  <link rel="stylesheet" href="/static/dashboard.css">
-  <link rel="stylesheet" href="/static/controle.css">
+  {% include "partials/head_pages_v2.html" %}
 </head>
-<body class="ctrl-body dash-body">
-{% include "partials/nav_principal.html" %}
-
-<div class="ctrl-wrap">
+<body class="ess-app">
+{% include "partials/app_shell_start.html" %}
+<div class="full ess-page-inner ctrl-wrap">
   <header class="ctrl-header">
     <div>
       <span class="ctrl-badge">Módulo premium</span>
@@ -38,5 +35,6 @@
     {% endfor %}
   </div>
 </div>
+{% include "partials/app_shell_end.html" %}
 </body>
 </html>

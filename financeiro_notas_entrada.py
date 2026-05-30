@@ -83,29 +83,58 @@ def register(app, templates):
         return tag.split("}")[-1] if "}" in tag else tag
 
     def _find_first(root, name):
+        if root is None:
+            return None
         for el in root.iter():
             if _local(el.tag) == name:
                 return el
         return None
 
-    def _find_all_parent(root, parent_name, child_name):
-        out = []
-        for el in root.iter():
-            if _local(el.tag) != parent_name:
-                continue
-            for ch in el:
-                if _local(ch.tag) == child_name:
-                    out.append(ch)
-        return out
+    def _find_all_local(root, name):
+        if root is None:
+            return []
+        return [el for el in root.iter() if _local(el.tag) == name]
+
+    def _child(node, name):
+        if node is None:
+            return None
+        for ch in node:
+            if _local(ch.tag) == name:
+                return ch
+        return None
+
+    def _attr(node, name, default=""):
+        if node is None:
+            return default
+        for key in (name, name.lower(), name.upper()):
+            if key in node.attrib:
+                return (node.attrib.get(key) or "").strip()
+        return default
 
     def _text(node, name, default=""):
         if node is None:
             return default
-        for ch in node:
-            if _local(ch.tag) == name:
-                return (ch.text or "").strip()
+        ch = _child(node, name)
+        if ch is not None and (ch.text or "").strip():
+            return (ch.text or "").strip()
         sub = _find_first(node, name)
         return (sub.text or "").strip() if sub is not None else default
+
+    def _parse_data_nfe(s):
+        if not s:
+            return None
+        s = str(s).strip()
+        if "T" in s:
+            s = s.split("T")[0]
+        digits = re.sub(r"\D", "", s)
+        if len(digits) == 8:
+            return f"{digits[0:4]}-{digits[4:6]}-{digits[6:8]}"
+        if len(s) == 10 and s[4] == "-":
+            return s
+        m = re.match(r"(\d{2})/(\d{2})/(\d{4})", s)
+        if m:
+            return f"{m.group(3)}-{m.group(2)}-{m.group(1)}"
+        return _parse_data(s)
 
     def _parse_nfe_xml(xml_bytes):
         if not xml_bytes or not xml_bytes.strip():
@@ -117,6 +146,8 @@ def register(app, templates):
             text = raw.decode("utf-8")
         except UnicodeDecodeError:
             text = raw.decode("latin-1", errors="replace")
+        # Facilita ElementTree quando o XML usa xmlns padrão da NF-e
+        text = re.sub(r'\sxmlns(:\w+)?="[^"]+"', "", text, count=0)
         try:
             root = ET.fromstring(text)
         except ET.ParseError as exc:
@@ -127,6 +158,13 @@ def register(app, templates):
             if _local(el.tag) == "infNFe":
                 inf = el
                 break
+        if inf is None:
+            for el in root.iter():
+                if _local(el.tag) == "NFe":
+                    sub = _find_first(el, "infNFe")
+                    if sub is not None:
+                        inf = sub
+                        break
         if inf is None:
             raise ValueError("Arquivo não é uma NF-e válida (estrutura infNFe não encontrada)")
 
@@ -149,22 +187,6 @@ def register(app, templates):
         dh_emi = _text(ide, "dhEmi") or _text(ide, "dEmi")
         dh_ent = _text(ide, "dhSaiEnt") or _text(ide, "dSaiEnt") or dh_emi
 
-        def parse_dt(s):
-            if not s:
-                return None
-            s = s.strip()
-            if "T" in s:
-                s = s.split("T")[0]
-            if len(s) == 10 and s[4] == "-":
-                return s
-            m = re.match(r"(\d{4})-(\d{2})-(\d{2})", s)
-            if m:
-                return f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
-            m = re.match(r"(\d{2})/(\d{2})/(\d{4})", s)
-            if m:
-                return f"{m.group(3)}-{m.group(2)}-{m.group(1)}"
-            return _parse_data(s)
-
         cnpj = re.sub(r"\D", "", _text(emit, "CNPJ") or _text(emit, "CPF"))
         nome = _text(emit, "xNome") or _text(emit, "xFant")
         ender = _find_first(emit, "enderEmit")
@@ -182,38 +204,46 @@ def register(app, templates):
 
         itens = []
         seq = 0
-        for el in inf:
-            if _local(el.tag) != "det":
-                continue
-            prod = _find_first(el, "prod")
+        for el in _find_all_local(inf, "det"):
+            prod = _child(el, "prod") or _find_first(el, "prod")
             if prod is None:
                 continue
             seq += 1
+            n_item = _attr(el, "nItem") or _text(el, "nItem") or str(seq)
+            imposto = _child(el, "imposto") or _find_first(el, "imposto")
+            v_tot_trib = _num(_text(imposto, "vTotTrib"), 0) if imposto is not None else 0
             itens.append({
-                "sequencia": int(_num(_text(el, "nItem"), seq) or seq),
+                "sequencia": int(_num(n_item, seq) or seq),
                 "codigo": _text(prod, "cProd"),
                 "descricao": _text(prod, "xProd"),
                 "ncm": _text(prod, "NCM"),
                 "cfop": _text(prod, "CFOP"),
-                "unidade": _text(prod, "uCom"),
-                "quantidade": _num(_text(prod, "qCom"), 0),
-                "valor_unitario": _num(_text(prod, "vUnCom"), 0),
+                "unidade": _text(prod, "uCom") or _text(prod, "uTrib"),
+                "quantidade": _num(_text(prod, "qCom") or _text(prod, "qTrib"), 0),
+                "valor_unitario": _num(_text(prod, "vUnCom") or _text(prod, "vUnTrib"), 0),
                 "valor_total": _num(_text(prod, "vProd"), 0),
+                "valor_impostos_item": v_tot_trib,
             })
 
         parcelas = []
         cobr = _find_first(inf, "cobr")
-        dup_nodes = []
-        if cobr is not None:
-            for ch in cobr:
-                if _local(ch.tag) == "dup":
-                    dup_nodes.append(ch)
+        dup_nodes = _find_all_local(cobr, "dup") if cobr is not None else []
         if not dup_nodes:
-            for dup in root.iter():
-                if _local(dup.tag) == "dup":
-                    dup_nodes.append(dup)
+            dup_nodes = _find_all_local(inf, "dup")
+        v_fat_orig = 0.0
+        v_fat_liq = 0.0
+        if cobr is not None:
+            fat = _child(cobr, "fat") or _find_first(cobr, "fat")
+            if fat is not None:
+                v_fat_orig = _num(_text(fat, "vOrig"), 0)
+                v_fat_liq = _num(_text(fat, "vLiq"), 0)
+        seen_dup = set()
         for dup in dup_nodes:
-            venc = parse_dt(_text(dup, "dVenc"))
+            dup_id = id(dup)
+            if dup_id in seen_dup:
+                continue
+            seen_dup.add(dup_id)
+            venc = _parse_data_nfe(_text(dup, "dVenc"))
             valor_dup = _num(_text(dup, "vDup"), 0)
             if valor_dup <= 0:
                 continue
@@ -221,6 +251,12 @@ def register(app, templates):
                 "numero_parcela": _text(dup, "nDup") or str(len(parcelas) + 1).zfill(3),
                 "vencimento": venc,
                 "valor": valor_dup,
+            })
+        if not parcelas and cobr is not None and (v_fat_liq > 0 or v_fat_orig > 0):
+            parcelas.append({
+                "numero_parcela": "001",
+                "vencimento": _parse_data_nfe(dh_ent),
+                "valor": v_fat_liq or v_fat_orig,
             })
 
         pag = _find_first(inf, "pag")
@@ -238,8 +274,10 @@ def register(app, templates):
             "chave_acesso": chave,
             "numero": numero,
             "serie": serie,
-            "data_emissao": parse_dt(dh_emi),
-            "data_entrada": parse_dt(dh_ent) or date.today().isoformat(),
+            "data_emissao": _parse_data_nfe(dh_emi),
+            "data_entrada": _parse_data_nfe(dh_ent) or date.today().isoformat(),
+            "cobr_v_orig": v_fat_orig,
+            "cobr_v_liq": v_fat_liq,
             "cnpj_fornecedor": cnpj,
             "nome_fornecedor": nome,
             "endereco_fornecedor": endereco,
@@ -400,10 +438,91 @@ def register(app, templates):
         )
         return [normalizar_nota(r, resumo=True) for r in rows]
 
+    def _salvar_itens_parcelas_nota(nid, dados):
+        q("delete from financeiro_notas_entrada_itens where nota_id=%s", (str(nid),))
+        q(
+            "delete from financeiro_notas_entrada_parcelas where nota_id=%s and conta_pagar_id is null",
+            (str(nid),),
+        )
+        for it in dados.get("itens") or []:
+            one(
+                """
+                insert into financeiro_notas_entrada_itens (
+                  nota_id, sequencia, codigo, descricao, ncm, cfop, unidade,
+                  quantidade, valor_unitario, valor_total
+                ) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                """,
+                (
+                    str(nid),
+                    int(it.get("sequencia") or 1),
+                    it.get("codigo"),
+                    it.get("descricao"),
+                    it.get("ncm"),
+                    it.get("cfop"),
+                    it.get("unidade"),
+                    it.get("quantidade"),
+                    it.get("valor_unitario"),
+                    it.get("valor_total"),
+                ),
+            )
+        parcelas_data = dados.get("parcelas") or []
+        if not parcelas_data:
+            parcelas_data = [{
+                "numero_parcela": "001",
+                "vencimento": dados.get("data_entrada"),
+                "valor": dados.get("valor_total"),
+            }]
+        existentes = q(
+            "select numero_parcela from financeiro_notas_entrada_parcelas where nota_id=%s",
+            (str(nid),),
+            fetch=True,
+        ) or []
+        nums_cp = {str(r.get("numero_parcela") or "") for r in existentes}
+        for pr in parcelas_data:
+            nparc = pr.get("numero_parcela") or ""
+            if nparc in nums_cp:
+                continue
+            one(
+                """
+                insert into financeiro_notas_entrada_parcelas (nota_id, numero_parcela, vencimento, valor)
+                values (%s,%s,%s,%s)
+                """,
+                (str(nid), nparc, _parse_data(pr.get("vencimento")), pr.get("valor")),
+            )
+
+    def _reidratar_nota_de_xml(nid):
+        """Reprocessa XML armazenado se itens/parcelas não foram gravados na importação."""
+        row = one(
+            "select xml_conteudo, vinculacao from financeiro_notas_entrada where id=%s",
+            (str(nid),),
+        )
+        if not row or not row.get("xml_conteudo"):
+            return False
+        if row.get("vinculacao") == "lancado_contas_pagar":
+            return False
+        n_it = one(
+            "select count(*)::int as c from financeiro_notas_entrada_itens where nota_id=%s",
+            (str(nid),),
+        )
+        n_par = one(
+            "select count(*)::int as c from financeiro_notas_entrada_parcelas where nota_id=%s",
+            (str(nid),),
+        )
+        if int(n_it.get("c") or 0) > 0 and int(n_par.get("c") or 0) > 0:
+            return False  # já possui itens e parcelas gravados
+        try:
+            xml_txt = row["xml_conteudo"]
+            dados = _parse_nfe_xml(xml_txt.encode("utf-8") if isinstance(xml_txt, str) else xml_txt)
+            _salvar_itens_parcelas_nota(nid, dados)
+            return True
+        except Exception:
+            return False
+
     def nota_por_id(nid):
         row = one("select * from financeiro_notas_entrada where id=%s", (str(nid),))
         if not row:
             return None
+        _reidratar_nota_de_xml(nid)
         n = normalizar_nota(row)
         itens = q(
             "select * from financeiro_notas_entrada_itens where nota_id=%s order by sequencia",
@@ -417,32 +536,46 @@ def register(app, templates):
             i["valor_total_fmt"] = _fmt_valor(i.get("valor_total"))
             n["itens"].append(i)
         parcelas = q(
-            "select * from financeiro_notas_entrada_parcelas where nota_id=%s order by vencimento",
+            "select * from financeiro_notas_entrada_parcelas where nota_id=%s order by vencimento, numero_parcela",
             (str(nid),),
             fetch=True,
         )
         n["parcelas"] = []
-        contas_vinc = []
         for p in parcelas:
             pr = dict(p)
             pr["id"] = str(pr["id"])
             pr["valor_fmt"] = _fmt_valor(pr.get("valor"))
-            if pr.get("vencimento") and hasattr(pr["vencimento"], "strftime"):
-                pr["vencimento_fmt"] = pr["vencimento"].strftime("%d/%m/%Y")
+            venc = pr.get("vencimento")
+            if venc and hasattr(venc, "strftime"):
+                pr["vencimento"] = venc.strftime("%Y-%m-%d")
+                pr["vencimento_fmt"] = venc.strftime("%d/%m/%Y")
             if pr.get("conta_pagar_id"):
                 pr["conta_pagar_id"] = str(pr["conta_pagar_id"])
-                cp = one(
-                    "select id, fornecedor, valor, status, vencimento from financeiro_contas_pagar where id=%s",
-                    (pr["conta_pagar_id"],),
-                )
-                if cp:
-                    contas_vinc.append({
-                        "id": str(cp["id"]),
-                        "fornecedor": cp.get("fornecedor"),
-                        "valor_fmt": _fmt_valor(cp.get("valor")),
-                        "status": cp.get("status"),
-                    })
             n["parcelas"].append(pr)
+
+        contas_rows = q(
+            """
+            select id, fornecedor, descricao, valor, status, vencimento, numero_documento
+              from financeiro_contas_pagar
+             where nota_entrada_id=%s
+             order by vencimento, created_at
+            """,
+            (str(nid),),
+            fetch=True,
+        ) or []
+        contas_vinc = []
+        for cp in contas_rows:
+            item_cp = {
+                "id": str(cp["id"]),
+                "fornecedor": cp.get("fornecedor"),
+                "descricao": cp.get("descricao"),
+                "valor_fmt": _fmt_valor(cp.get("valor")),
+                "status": cp.get("status"),
+                "numero_documento": cp.get("numero_documento"),
+            }
+            if cp.get("vencimento") and hasattr(cp["vencimento"], "strftime"):
+                item_cp["vencimento_fmt"] = cp["vencimento"].strftime("%d/%m/%Y")
+            contas_vinc.append(item_cp)
         n["contas_pagar_vinculadas"] = contas_vinc
         n["tem_xml"] = bool(n.get("xml_caminho") or n.get("xml_conteudo"))
         return n
@@ -488,12 +621,16 @@ def register(app, templates):
         conta_fin_id = _validar_conta_financeira(conta_financeira_id)
 
         parcelas_db = q(
-            "select * from financeiro_notas_entrada_parcelas where nota_id=%s order by vencimento",
+            "select * from financeiro_notas_entrada_parcelas where nota_id=%s order by vencimento, numero_parcela",
             (str(nid),),
             fetch=True,
-        )
-        if not parcelas_db:
-            parcelas_db = [{
+        ) or []
+        parcelas_pendentes = [
+            p for p in parcelas_db
+            if not p.get("conta_pagar_id") and float(p.get("valor") or 0) > 0
+        ]
+        if not parcelas_pendentes:
+            parcelas_pendentes = [{
                 "id": None,
                 "numero_parcela": "001",
                 "vencimento": nota.get("data_entrada"),
@@ -502,21 +639,20 @@ def register(app, templates):
 
         fornecedor = nome_fornecedor_nota(nota)
         num_nf = nota.get("numero") or "—"
-        hist_base = f"NF-e nº {num_nf} - {fornecedor}"
         criados = []
-        qtd_parcelas = len([p for p in parcelas_db if float(p.get("valor") or 0) > 0]) or 1
+        total_parc = len(parcelas_pendentes) or 1
 
-        for pr in parcelas_db:
-            if pr.get("conta_pagar_id"):
-                continue
+        for idx, pr in enumerate(parcelas_pendentes, start=1):
             valor = float(pr.get("valor") or 0)
             if valor <= 0:
                 continue
             venc = pr.get("vencimento")
             if venc and hasattr(venc, "strftime"):
                 venc = venc.strftime("%Y-%m-%d")
-            nparc = pr.get("numero_parcela") or ""
-            desc = hist_base if qtd_parcelas <= 1 else f"{hist_base} — parc. {nparc}"
+            if total_parc <= 1:
+                desc = f"NF-e {num_nf} - {fornecedor}"
+            else:
+                desc = f"NF-e {num_nf} - {fornecedor} - Parcela {idx}/{total_parc}"
             row = one(
                 """
                 insert into financeiro_contas_pagar (
@@ -532,7 +668,7 @@ def register(app, templates):
                     _parse_data(nota.get("data_emissao")),
                     _parse_data(venc) or date.today(),
                     valor,
-                    qtd_parcelas,
+                    1,
                     conta_fin_id,
                     nota.get("forma_pagamento"),
                     f"Importado da NF-e. Chave {nota.get('chave_acesso') or ''}".strip(),
@@ -608,43 +744,7 @@ def register(app, templates):
             (caminho, xml_bytes.decode("utf-8", errors="replace")[:500000], nid),
         )
 
-        for it in dados["itens"]:
-            one(
-                """
-                insert into financeiro_notas_entrada_itens (
-                  nota_id, sequencia, codigo, descricao, ncm, cfop, unidade,
-                  quantidade, valor_unitario, valor_total
-                ) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-                """,
-                (
-                    nid,
-                    int(it.get("sequencia") or 1),
-                    it.get("codigo"),
-                    it.get("descricao"),
-                    it.get("ncm"),
-                    it.get("cfop"),
-                    it.get("unidade"),
-                    it.get("quantidade"),
-                    it.get("valor_unitario"),
-                    it.get("valor_total"),
-                ),
-            )
-
-        parcelas_data = dados["parcelas"]
-        if not parcelas_data:
-            parcelas_data = [{
-                "numero_parcela": "001",
-                "vencimento": dados["data_entrada"],
-                "valor": dados["valor_total"],
-            }]
-        for pr in parcelas_data:
-            one(
-                """
-                insert into financeiro_notas_entrada_parcelas (nota_id, numero_parcela, vencimento, valor)
-                values (%s,%s,%s,%s)
-                """,
-                (nid, pr.get("numero_parcela"), _parse_data(pr.get("vencimento")), pr.get("valor")),
-            )
+        _salvar_itens_parcelas_nota(nid, dados)
 
         if lancar_cp:
             lancar_contas_pagar_nota(nid, conta_financeira_id=conta_financeira_id)

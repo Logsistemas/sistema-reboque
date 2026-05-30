@@ -4,14 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>{% block titulo_pagina %}Financeiro{% endblock %} — Essência</title>
-  <link rel="stylesheet" href="/static/style.css">
-  <link rel="stylesheet" href="/static/dashboard.css">
-  <link rel="stylesheet" href="/static/controle.css">
-  <link rel="stylesheet" href="/static/cadastros.css">
-  <link rel="stylesheet" href="/static/financeiro.css">
-  {% include "partials/head_premium.html" %}
+  {% include "partials/head_financeiro_v2.html" %}
 </head>
-<body class="ess-app fin-body" data-fin-page="{% block fin_page %}pagar{% endblock %}" data-fin-api="{% block fin_api %}/api/financeiro/contas-pagar{% endblock %}" data-fin-tipo="{% block fin_tipo %}pagar{% endblock %}">
+<body class="ess-app ess-fin-v2 fin-body" data-fin-page="{% block fin_page %}pagar{% endblock %}" data-fin-api="{% block fin_api %}/api/financeiro/contas-pagar{% endblock %}" data-fin-tipo="{% block fin_tipo %}pagar{% endblock %}">
 {% include "partials/app_shell_start.html" %}
 <div id="finToast"></div>
 <div class="fin-shell">
@@ -157,8 +152,8 @@
     </div>
   </aside>
 </div>
-{% include "financeiro/_modal_lancamento.html" %}
 {% include "partials/app_shell_end.html" %}
+{% include "financeiro/_modal_lancamento.html" %}
 <script src="/static/financeiro_shared.js"></script>
 <script src="/static/financeiro_lancamento.js"></script>
 </body>
