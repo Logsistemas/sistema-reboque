@@ -1,0 +1,289 @@
+/* Cadastros premium — AutEM-style */
+.cad-body .cad-badge {
+  background: linear-gradient(135deg, #0f766e, #0d9488);
+}
+
+.cad-radio-row, .cad-check-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: center;
+}
+.cad-radio, .cad-check {
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.cad-cep-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.cad-cep-row input {
+  flex: 1;
+}
+
+.cad-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  z-index: 10000;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.cad-modal.open {
+  display: flex;
+}
+
+.cad-modal-shell {
+  background: #f8fafc;
+  border-radius: 16px;
+  width: min(1100px, 98vw);
+  max-height: 94vh;
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  grid-template-rows: 1fr auto;
+  overflow: hidden;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.28);
+}
+
+.cad-modal-prof {
+  width: min(1180px, 98vw);
+}
+
+.cad-modal-nav {
+  background: linear-gradient(180deg, #0b2f57 0%, #123d6b 100%);
+  padding: 18px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  grid-row: 1 / 3;
+}
+
+.cad-modal-nav h3 {
+  color: #94a3b8;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin: 0 8px 10px;
+}
+
+.cad-nav-btn {
+  border: 0;
+  background: transparent;
+  color: #cbd5e1;
+  text-align: left;
+  padding: 11px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cad-nav-btn.active,
+.cad-nav-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.cad-modal-main {
+  padding: 20px 24px;
+  overflow: auto;
+  background: #fff;
+}
+
+.cad-modal-title {
+  margin: 0 0 16px;
+  font-size: 20px;
+  color: #0b2f57;
+}
+
+.cad-panel {
+  display: none;
+}
+
+.cad-panel.active {
+  display: block;
+}
+
+.cad-form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px 14px;
+}
+
+.cad-form-grid .full {
+  grid-column: 1 / -1;
+}
+
+.cad-form-grid label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.cad-form-grid input,
+.cad-form-grid select,
+.cad-form-grid textarea {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+
+.cad-empty-box {
+  text-align: center;
+  padding: 40px 20px;
+  color: #64748b;
+  background: #f8fafc;
+  border-radius: 12px;
+  border: 1px dashed #cbd5e1;
+}
+
+.cad-modal-foot {
+  grid-column: 2;
+  padding: 14px 24px;
+  background: #fff;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.cad-foot-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.cad-status-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #334155;
+}
+
+.cad-arquivos-list {
+  margin-top: 14px;
+}
+
+.cad-arquivos-list table {
+  width: 100%;
+  font-size: 13px;
+}
+
+.cad-msg-erro {
+  color: #b91c1c;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.cad-btn-danger {
+  background: #dc2626;
+  color: #fff;
+}
+
+.cad-section-title {
+  margin: 18px 0 12px;
+  padding-bottom: 8px;
+  font-size: 14px;
+  font-weight: 800;
+  color: #0b2f57;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.cad-section-title:first-child {
+  margin-top: 0;
+}
+
+.cad-detalhes-box {
+  background: linear-gradient(135deg, #f0f9ff 0%, #f8fafc 100%);
+  border: 1px solid #bae6fd;
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+
+.cad-detalhes-box h4 {
+  margin: 0 0 10px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #0369a1;
+}
+
+.cad-detalhes-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 20px;
+}
+
+.cad-detalhes-grid span {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.cad-detalhes-grid b {
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.cad-arquivos-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.cad-upload-panel {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 14px;
+}
+
+.cad-arq-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 900px) {
+  .cad-modal-shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr auto;
+  }
+  .cad-modal-nav {
+    grid-row: auto;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .cad-form-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .cad-form-grid {
+    grid-template-columns: 1fr;
+  }
+}

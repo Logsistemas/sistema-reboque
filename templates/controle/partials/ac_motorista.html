@@ -1,0 +1,7 @@
+<div class="ctrl-field ctrl-ac-wrap" data-ctrl-ac="motorista" data-field="{{ field }}"{% if required %} data-required="1"{% endif %}>
+  <label>{{ label }}</label>
+  <input type="text" class="ctrl-ac-input" autocomplete="off" placeholder="Digite para buscar...">
+  <input type="hidden" name="{{ field }}"{% if required %} required{% endif %}>
+  <input type="hidden" name="{{ field }}_id">
+  <ul class="ctrl-ac-list" role="listbox"></ul>
+</div>

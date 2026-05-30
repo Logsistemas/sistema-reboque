@@ -1,0 +1,17 @@
+<div class="ctrl-form-grid">
+  <div class="ctrl-field"><label>Data e hora do dano</label><input type="datetime-local" name="data_hora_dano"></div>
+  <div class="ctrl-field"><label>Tipo de dano</label><input type="text" name="tipo_dano" placeholder="Ex.: Colisão, arranhão"></div>
+  <div class="ctrl-field"><label>Origem</label><input type="text" name="origem"></div>
+  {% with field='profissional', label='Profissional' %}{% include 'controle/partials/ac_motorista.html' %}{% endwith %}
+  <div class="ctrl-field"><label>Aviso</label><input type="text" name="aviso"></div>
+  <div class="ctrl-field"><label>Situação</label><input type="text" name="situacao" placeholder="Ex.: Em análise"></div>
+  <div class="ctrl-field"><label>Assistência</label><input type="text" name="assistencia"></div>
+  {% with required=true %}{% include 'controle/partials/ac_viatura.html' %}{% endwith %}
+  <div class="ctrl-field"><label>Objeto</label><input type="text" name="objeto"></div>
+  <div class="ctrl-field"><label>Identificação do objeto</label><input type="text" name="identificacao_objeto"></div>
+  <div class="ctrl-field"><label>Valor total do dano</label><input type="number" step="0.01" min="0" name="valor"></div>
+  <div class="ctrl-field"><label>Parcelas</label><input type="number" min="1" name="parcelas" value="1"></div>
+  <div class="ctrl-field"><label>Data do desconto</label><input type="date" name="data_desconto"></div>
+  <div class="ctrl-field full"><label>Descrição do dano</label><textarea name="descricao_dano" rows="3"></textarea></div>
+  <div class="ctrl-field full"><label>Análise interna</label><textarea name="analise_interna" rows="3"></textarea></div>
+</div>

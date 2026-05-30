@@ -1,0 +1,16 @@
+<div class="ctrl-form-grid">
+  {% with required=true %}{% include 'controle/partials/ac_viatura.html' %}{% endwith %}
+  <div class="ctrl-field"><label>Data e hora</label><input type="datetime-local" name="data_hora"></div>
+  <div class="ctrl-field"><label>Posto</label><input type="text" name="posto"></div>
+  {% with field='profissional', label='Profissional' %}{% include 'controle/partials/ac_motorista.html' %}{% endwith %}
+  <div class="ctrl-field"><label>Combustível</label><input type="text" name="combustivel" placeholder="Gasolina, diesel..."></div>
+  <div class="ctrl-field"><label>Litros abastecidos</label><input type="number" step="0.001" min="0" name="litros" id="ctrlLitros"></div>
+  <div class="ctrl-field"><label>Valor unitário</label><input type="number" step="0.01" min="0" name="valor_unitario" id="ctrlValorUnit"></div>
+  <div class="ctrl-field"><label>Valor total</label><input type="number" step="0.01" min="0" name="valor_total" id="ctrlValorTotal"></div>
+  <div class="ctrl-field"><label>Hodômetro</label><input type="number" min="0" name="hodometro"></div>
+  <div class="ctrl-field full"><label>Observação</label><textarea name="observacao" rows="2"></textarea></div>
+  <div class="ctrl-field full ctrl-check-row">
+    <label><input type="checkbox" name="desconsiderar_ultimo_km" value="1"> Desconsiderar último KM</label>
+    <label><input type="checkbox" name="gerar_contas_pagar" value="1"> Gerar lançamento em contas a pagar</label>
+  </div>
+</div>

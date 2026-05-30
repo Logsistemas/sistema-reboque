@@ -11,7 +11,16 @@
       </div>
     </div>
     <a href="/motoristas" class="{% if nav_ativo == 'motoristas' %}nav-active{% endif %}">Motoristas</a>
-    <a href="/faturamento" class="{% if nav_ativo == 'faturamento' %}nav-active{% endif %}">Faturamento</a>
+    <a href="/cadastros" class="{% if nav_ativo == 'cadastros' %}nav-active{% endif %}">Cadastros</a>
+    <a href="/controle" class="{% if nav_ativo == 'controle' %}nav-active{% endif %}">Controle</a>
+    <div class="menu-item">
+      <button type="button" class="{% if nav_ativo in ('faturamento', 'financeiro') %}nav-active{% endif %}">Faturamento ▾</button>
+      <div class="submenu">
+        <a href="/faturamento" class="{% if nav_ativo == 'faturamento' %}nav-active{% endif %}">Serviços (auditoria)</a>
+        <a href="/financeiro" class="{% if nav_ativo == 'financeiro' %}nav-active{% endif %}">Financeiro</a>
+        <a href="/financeiro/notas-entrada">Notas Fiscais de Entrada</a>
+      </div>
+    </div>
     <a href="/historico" class="{% if nav_ativo == 'relatorios' %}nav-active{% endif %}">Relatórios</a>
     <a href="/operacao" class="{% if nav_ativo == 'operacao' %}nav-active{% endif %}">Operação ao vivo</a>
     <a href="/motorista/login">Área do Motorista</a>

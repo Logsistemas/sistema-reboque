@@ -1,0 +1,22 @@
+<div class="ctrl-form-grid">
+  {% with required=true %}{% include 'controle/partials/ac_viatura.html' %}{% endwith %}
+  <div class="ctrl-field"><label>Auto de infração</label><input type="text" name="auto_infracao"></div>
+  <div class="ctrl-field"><label>Data e hora da infração</label><input type="datetime-local" name="data_hora_infracao"></div>
+  <div class="ctrl-field"><label>Data limite de indicação</label><input type="date" name="data_limite_indicacao"></div>
+  <div class="ctrl-field"><label>Município</label><input type="text" name="municipio"></div>
+  <div class="ctrl-field full"><label>Endereço</label><input type="text" name="endereco"></div>
+  <div class="ctrl-field full"><label>Descrição da multa</label><textarea name="descricao_multa" rows="2"></textarea></div>
+  <div class="ctrl-field"><label>Natureza</label><input type="text" name="natureza"></div>
+  {% with field='condutor', label='Condutor' %}{% include 'controle/partials/ac_motorista.html' %}{% endwith %}
+  {% with field='condutor_responsavel', label='Condutor responsável' %}{% include 'controle/partials/ac_motorista.html' %}{% endwith %}
+  <div class="ctrl-field"><label>Parcelas</label><input type="number" min="1" name="parcelas" value="1"></div>
+  <div class="ctrl-field"><label>Data de vencimento</label><input type="date" name="vencimento"></div>
+  <div class="ctrl-field"><label>Valor</label><input type="number" step="0.01" min="0" name="valor"></div>
+  <div class="ctrl-field"><label>Valor pago</label><input type="number" step="0.01" min="0" name="valor_pago"></div>
+  <div class="ctrl-field"><label>Situação</label><input type="text" name="situacao" value="pendente"></div>
+  <div class="ctrl-field full"><label>Observação</label><textarea name="observacao" rows="2"></textarea></div>
+  <div class="ctrl-field full ctrl-check-row">
+    <label><input type="checkbox" name="contas_pagar" value="1"> Contas a pagar</label>
+    <label><input type="checkbox" name="extrato_profissional" value="1"> Extrato do profissional</label>
+  </div>
+</div>

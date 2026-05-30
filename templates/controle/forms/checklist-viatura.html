@@ -1,0 +1,24 @@
+<div class="ctrl-form-grid">
+  {% with required=true %}{% include 'controle/partials/ac_viatura.html' %}{% endwith %}
+  {% with field='motorista', label='Motorista' %}{% include 'controle/partials/ac_motorista.html' %}{% endwith %}
+  <div class="ctrl-field"><label>Tipo de checklist</label>
+    <select name="tipo_checklist">
+      <option value="">Selecione</option>
+      <option value="Saída">Saída</option>
+      <option value="Retorno">Retorno</option>
+      <option value="Inspeção">Inspeção</option>
+    </select>
+  </div>
+  <div class="ctrl-field"><label>Data e hora</label><input type="datetime-local" name="data_hora"></div>
+  <div class="ctrl-field"><label>KM</label><input type="number" min="0" name="km"></div>
+  <div class="ctrl-field"><label>Status</label>
+    <select name="status_checklist">
+      <option value="Conforme">Conforme</option>
+      <option value="Com ressalvas">Com ressalvas</option>
+      <option value="Não conforme">Não conforme</option>
+    </select>
+  </div>
+  <div class="ctrl-field full"><label>Observações</label><textarea name="observacoes" rows="2"></textarea></div>
+  <div class="ctrl-field full"><label>Itens conferidos</label><textarea name="itens_conferidos" rows="3" placeholder="Um item por linha"></textarea></div>
+  <div class="ctrl-field full"><label>Itens com problema</label><textarea name="itens_problema" rows="3" placeholder="Um item por linha"></textarea></div>
+</div>

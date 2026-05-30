@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Caixas e Bancos — Essência</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/dashboard.css">
+  <link rel="stylesheet" href="/static/controle.css">
+  <link rel="stylesheet" href="/static/cadastros.css">
+  <link rel="stylesheet" href="/static/financeiro.css">
+</head>
+<body class="fin-body" data-fin-page="caixa">
+{% include "partials/nav_principal.html" %}
+<div id="finToast"></div>
+<div class="fin-shell">
+  <aside class="fin-sidebar-left">
+    <a href="/financeiro" class="fin-link-hub">← Hub Financeiro</a>
+
+    <div class="fin-card">
+      <div class="fin-card-head">
+        <span class="fin-card-icon">🏦</span>
+        <span>Conta / banco</span>
+      </div>
+      <div class="fin-field">
+        <label>Conta financeira</label>
+        <select id="filtroContaCaixa"><option value="">Selecione uma conta</option></select>
+      </div>
+    </div>
+
+    <div class="fin-card">
+      <div class="fin-card-head">
+        <span class="fin-card-icon">📅</span>
+        <span>Período</span>
+      </div>
+      <div class="fin-filters-grid">
+        <div class="fin-field"><label>Data inicial</label><input type="date" id="filtroDataIni"></div>
+        <div class="fin-field"><label>Data final</label><input type="date" id="filtroDataFim"></div>
+      </div>
+      <div class="fin-filter-actions">
+        <button type="button" class="fin-btn fin-btn-primary" id="btnFiltrarCaixa">🔍 Aplicar filtros</button>
+        <button type="button" class="fin-btn fin-btn-outline" id="btnLimparCaixa">Limpar</button>
+      </div>
+    </div>
+  </aside>
+
+  <main class="fin-main">
+    <div class="fin-page-head">
+      <h1>Caixas e Bancos</h1>
+    </div>
+    <div class="fin-quick-bar">
+      <div class="fin-quick-item fin-quick-search">
+        <span class="fin-quick-icon">🔎</span>
+        <input type="search" id="topBuscaCaixa" placeholder="Histórico, categoria, cliente ou fornecedor...">
+      </div>
+      <div class="fin-quick-item">
+        <span class="fin-quick-icon">📆</span>
+        <input type="month" id="topMes" title="Mês de referência">
+      </div>
+    </div>
+    <div class="fin-tabs" id="abasCaixa">
+      <button type="button" class="active" data-aba="movimentacoes">Movimentações</button>
+      <button type="button" data-aba="entradas">Entradas</button>
+      <button type="button" data-aba="saidas">Saídas</button>
+      <button type="button" data-aba="conciliacao">Conciliação</button>
+    </div>
+    <div class="fin-table-area">
+      <div class="fin-table-wrap">
+        <table class="fin-table">
+          <thead>
+            <tr>
+              <th style="width:36px"><input type="checkbox" id="chkTodosMov"></th>
+              <th>Data</th>
+              <th>Categoria</th>
+              <th>Histórico</th>
+              <th>Cliente / Fornecedor</th>
+              <th>Valor</th>
+              <th>Origem</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyMov"></tbody>
+        </table>
+      </div>
+      <div id="msgConciliacao" class="fin-card" style="display:none;margin-top:14px;text-align:center">
+        <div class="fin-empty-inner">
+          <div class="fin-empty-icon">🔗</div>
+          <p class="fin-empty-title">Conciliação bancária</p>
+          <p class="fin-empty-text">Módulo em evolução. Use Movimentações para conferir lançamentos.</p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <aside class="fin-sidebar-right">
+    <p class="fin-side-section-title">Ações principais</p>
+    <button type="button" class="fin-action-btn fin-action-btn-primary" id="btnIncluirMov">
+      <span class="fin-action-btn-icon">+</span>
+      <span>Incluir lançamento</span>
+    </button>
+    <button type="button" class="fin-action-btn fin-tool-stub">
+      <span class="fin-action-btn-icon">⇄</span>
+      <span>Transferência entre contas</span>
+    </button>
+    <button type="button" class="fin-action-btn fin-tool-stub">
+      <span class="fin-action-btn-icon">▦</span>
+      <span>Alterar categorias</span>
+    </button>
+    <button type="button" class="fin-action-btn fin-tool-stub">
+      <span class="fin-action-btn-icon">⚖</span>
+      <span>Ajustar saldos</span>
+    </button>
+
+    <p class="fin-side-section-title">Resumo da conta</p>
+    <div class="fin-stats">
+      <div class="fin-stat-card">
+        <label>Registros</label>
+        <b id="painelQtdMov">0</b>
+      </div>
+      <div class="fin-stat-card full">
+        <label>Saldo atual</label>
+        <b id="painelSaldoAtual">—</b>
+      </div>
+      <div class="fin-stat-card">
+        <label>Saldo inicial</label>
+        <b id="painelSaldoIni">—</b>
+      </div>
+      <div class="fin-stat-card">
+        <label>Saldo final</label>
+        <b id="painelSaldoFinal">—</b>
+      </div>
+      <div class="fin-stat-card">
+        <label>Entradas</label>
+        <b id="painelEntradas" class="fin-stat-green">—</b>
+      </div>
+      <div class="fin-stat-card">
+        <label>Saídas</label>
+        <b id="painelSaidas" class="fin-stat-red">—</b>
+      </div>
+    </div>
+
+    <p class="fin-side-section-title">Ferramentas</p>
+    <div class="fin-tool-list">
+      <button type="button" class="fin-action-btn fin-tool-stub">
+        <span class="fin-action-btn-icon">⬆</span>
+        <span>Importar registros</span>
+      </button>
+    </div>
+  </aside>
+</div>
+
+<div id="modalMov" class="cad-modal" aria-hidden="true">
+  <div class="cad-modal-shell" style="grid-template-columns:1fr">
+    <main class="cad-modal-main">
+      <h2 class="cad-modal-title">Incluir lançamento manual</h2>
+      <p id="movErro" class="cad-erro" style="display:none"></p>
+      <div class="cad-form-grid">
+        <div><label>Conta financeira *</label><select id="m_conta"><option value="">—</option></select></div>
+        <div><label>Tipo *</label><select id="m_tipo"><option value="entrada">Entrada</option><option value="saida">Saída</option></select></div>
+        <div><label>Categoria</label><input id="m_categoria"></div>
+        <div><label>Valor *</label><input type="number" step="0.01" id="m_valor"></div>
+        <div><label>Data</label><input type="date" id="m_data"></div>
+        <div class="full"><label>Histórico / descrição</label><input id="m_descricao"></div>
+      </div>
+      <div class="cad-modal-footer" style="margin-top:16px">
+        <button type="button" class="fin-btn fin-btn-outline" id="btnFecharMov">Cancelar</button>
+        <button type="button" class="fin-btn fin-btn-primary" id="btnSalvarMov">Registrar</button>
+      </div>
+    </main>
+  </div>
+</div>
+<script src="/static/financeiro_shared.js"></script>
+<script src="/static/financeiro_caixa.js"></script>
+</body>
+</html>

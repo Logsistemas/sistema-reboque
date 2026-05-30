@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Financeiro — Essência Logística</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/dashboard.css">
+  <link rel="stylesheet" href="/static/controle.css">
+  <link rel="stylesheet" href="/static/cadastros.css">
+  <link rel="stylesheet" href="/static/financeiro.css">
+</head>
+<body class="ctrl-body dash-body">
+{% include "partials/nav_principal.html" %}
+<div class="ctrl-wrap">
+  <header class="ctrl-header">
+    <div>
+      <span class="ctrl-badge fin-badge">💰 Financeiro premium</span>
+      <h1>Hub Financeiro</h1>
+      <p>Contas a pagar e receber, caixa, bancos e contas financeiras — fluxo integrado.</p>
+    </div>
+    <a href="/faturamento" class="ctrl-btn ctrl-btn-outline">Faturamento de serviços</a>
+  </header>
+  {% include "financeiro/_kpis.html" %}
+  <div class="ctrl-hub-grid">
+    {% for m in modulos %}
+    <a href="{{ m.rota }}" class="ctrl-hub-card ctrl-hub-card-link">
+      <div class="ctrl-hub-icon">{{ m.icone }}</div>
+      <h2>{{ m.titulo }}</h2>
+      <p>{{ m.descricao }}</p>
+      <span class="ctrl-btn ctrl-btn-primary">Abrir módulo</span>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+</body>
+</html>

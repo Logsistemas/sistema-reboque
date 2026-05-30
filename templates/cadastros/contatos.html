@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{{ titulo_modulo }} — Cadastros</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/dashboard.css">
+  <link rel="stylesheet" href="/static/controle.css">
+  <link rel="stylesheet" href="/static/cadastros.css">
+</head>
+<body class="ctrl-body dash-body cad-body"
+  data-modo="{{ modo }}"
+  data-filtro-cliente="{{ '1' if filtro_cliente else '0' }}"
+  data-filtro-fornecedor="{{ '1' if filtro_fornecedor else '0' }}">
+{% include "partials/nav_principal.html" %}
+<div class="ctrl-wrap">
+  <header class="ctrl-header">
+    <div>
+      <p class="ctrl-breadcrumb"><a href="/cadastros">Cadastros</a> / {{ titulo_modulo }}</p>
+      <span class="ctrl-badge cad-badge">{{ icone_modulo }} Contatos</span>
+      <h1>{{ titulo_modulo }}</h1>
+      <p>{{ descricao_modulo }} Cadastro mestre único — marque Cliente e/ou Fornecedor conforme necessário.</p>
+    </div>
+    <div class="ctrl-mod-actions">
+      <a href="/cadastros" class="ctrl-btn ctrl-btn-outline">← Hub Cadastros</a>
+      <button type="button" class="ctrl-btn ctrl-btn-primary" id="btnNovoContato">+ Cadastrar</button>
+    </div>
+  </header>
+
+  <div class="ctrl-kpis" id="cadKpisContato">
+    <div class="ctrl-kpi accent"><small>Total cadastrados</small><b id="kpiCTotal">{{ kpis.total }}</b></div>
+    <div class="ctrl-kpi"><small>Ativos</small><b id="kpiCAtivos">{{ kpis.ativos }}</b></div>
+    <div class="ctrl-kpi"><small>Novos no mês</small><b id="kpiCNovos">{{ kpis.novos_mes }}</b></div>
+  </div>
+
+  <section class="ctrl-panel">
+    <h2>Filtros</h2>
+    <div class="ctrl-filters">
+      <div class="ctrl-field"><label>Nome</label><input type="search" id="filtroNome" placeholder="Nome, fantasia, razão..."></div>
+      <div class="ctrl-field"><label>CPF/CNPJ</label><input type="search" id="filtroDoc" placeholder="Documento"></div>
+      <div class="ctrl-field"><label>Cidade</label><input type="text" id="filtroCidade"></div>
+      <div class="ctrl-field"><label>Status</label>
+        <select id="filtroStatus"><option value="">Todos</option><option value="ativo">Ativo</option><option value="inativo">Inativo</option></select>
+      </div>
+      <div class="ctrl-field"><label>&nbsp;</label><button type="button" class="ctrl-btn ctrl-btn-outline" style="width:100%" id="btnLimparFiltrosC">Limpar</button></div>
+    </div>
+  </section>
+
+  <section class="ctrl-panel">
+    <h2>Registros</h2>
+    <div class="ctrl-table-wrap">
+      <table class="ctrl-table" id="tabelaContatos">
+        <thead>
+          <tr><th>Nome</th><th>CPF/CNPJ</th><th>Cidade</th><th>Classificação</th><th>Status</th><th>Ações</th></tr>
+        </thead>
+        <tbody id="tbodyContatos"></tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<div id="modalContato" class="cad-modal" aria-hidden="true">
+  <div class="cad-modal-shell cad-modal-prof">
+    <nav class="cad-modal-nav">
+      <h3>Contato</h3>
+      <button type="button" class="cad-nav-btn active" data-cad-tab="geral">📋 Dados gerais</button>
+      <button type="button" class="cad-nav-btn" data-cad-tab="endereco">📍 Endereço</button>
+      <button type="button" class="cad-nav-btn" data-cad-tab="comunicacao">✉️ Contatos</button>
+      <button type="button" class="cad-nav-btn" data-cad-tab="comercial">💼 Comercial</button>
+      <button type="button" class="cad-nav-btn" data-cad-tab="observacoes">📝 Observações</button>
+      <button type="button" class="cad-nav-btn" data-cad-tab="arquivos">📎 Arquivos</button>
+    </nav>
+    <main class="cad-modal-main">
+      <h2 class="cad-modal-title" id="modalContatoTitulo">Novo contato</h2>
+      <input type="hidden" id="contatoId">
+
+      <div class="cad-panel active" data-cad-panel="geral">
+        <h3 class="cad-section-title">Status e tipo</h3>
+        <div class="cad-form-grid">
+          <div class="full cad-radio-row">
+            <label>Status</label>
+            <label class="cad-radio"><input type="radio" name="c_status" value="ativo" checked> Ativo</label>
+            <label class="cad-radio"><input type="radio" name="c_status" value="inativo"> Inativo</label>
+          </div>
+          <div class="full cad-radio-row">
+            <label>Tipo de pessoa</label>
+            <label class="cad-radio"><input type="radio" name="c_tipo_pessoa" value="fisica"> Pessoa Física</label>
+            <label class="cad-radio"><input type="radio" name="c_tipo_pessoa" value="juridica" checked> Pessoa Jurídica</label>
+          </div>
+        </div>
+        <div id="blocoPF" class="cad-form-grid" style="display:none">
+          <div class="full"><label>Nome *</label><input id="c_nome"></div>
+          <div><label>CPF</label><input id="c_cpf"></div>
+          <div><label>RG</label><input id="c_rg"></div>
+          <div><label>Data nascimento</label><input type="date" id="c_data_nascimento"></div>
+        </div>
+        <div id="blocoPJ" class="cad-form-grid">
+          <div class="full"><label>Razão Social *</label><input id="c_razao_social"></div>
+          <div><label>Nome Fantasia</label><input id="c_nome_fantasia"></div>
+          <div><label>CNPJ</label><input id="c_cnpj"></div>
+          <div><label>Inscrição Estadual</label><input id="c_inscricao_estadual"></div>
+          <div><label>Contribuinte ICMS</label><input id="c_contribuinte_icms" placeholder="Ex.: Sim, Isento, Não"></div>
+        </div>
+        <h3 class="cad-section-title">Classificação</h3>
+        <div class="cad-check-row">
+          <label class="cad-check"><input type="checkbox" id="c_cliente"> Cliente</label>
+          <label class="cad-check"><input type="checkbox" id="c_fornecedor"> Fornecedor</label>
+        </div>
+      </div>
+
+      <div class="cad-panel" data-cad-panel="endereco">
+        <div class="cad-form-grid">
+          <div><label>CEP</label>
+            <div class="cad-cep-row">
+              <input id="c_cep" maxlength="9" placeholder="00000-000">
+              <button type="button" class="ctrl-btn ctrl-btn-outline" id="btnBuscarCep">Buscar CEP</button>
+            </div>
+          </div>
+          <div><label>UF</label><input id="c_uf" maxlength="2"></div>
+          <div><label>Cidade</label><input id="c_cidade"></div>
+          <div><label>Bairro</label><input id="c_bairro"></div>
+          <div class="full"><label>Logradouro</label><input id="c_logradouro"></div>
+          <div><label>Número</label><input id="c_numero"></div>
+          <div><label>Complemento</label><input id="c_complemento"></div>
+        </div>
+      </div>
+
+      <div class="cad-panel" data-cad-panel="comunicacao">
+        <div class="cad-form-grid">
+          <div><label>E-mail</label><input type="email" id="c_email"></div>
+          <div><label>E-mail financeiro</label><input type="email" id="c_email_financeiro"></div>
+          <div><label>Celular</label><input id="c_celular"></div>
+          <div><label>Telefone</label><input id="c_telefone"></div>
+        </div>
+      </div>
+
+      <div class="cad-panel" data-cad-panel="comercial">
+        <div id="blocoComercialCliente">
+          <h3 class="cad-section-title">Cliente</h3>
+          <div class="cad-form-grid">
+            <div><label>Limite de crédito</label><input type="number" step="0.01" id="c_limite_credito" value="0"></div>
+            <div><label>Prazo padrão recebimento</label><input id="c_prazo_recebimento" placeholder="Ex.: 30 dias"></div>
+            <div class="full"><label>Observações comerciais (cliente)</label><textarea id="c_obs_comercial_cliente" rows="2"></textarea></div>
+          </div>
+        </div>
+        <div id="blocoComercialFornecedor">
+          <h3 class="cad-section-title">Fornecedor</h3>
+          <div class="cad-form-grid">
+            <div><label>Prazo padrão pagamento</label><input id="c_prazo_pagamento" placeholder="Ex.: 15 dias"></div>
+            <div><label>Categoria fornecedor</label><input id="c_categoria_fornecedor"></div>
+            <div class="full"><label>Observações fornecedor</label><textarea id="c_obs_comercial_fornecedor" rows="2"></textarea></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="cad-panel" data-cad-panel="observacoes">
+        <div class="cad-form-grid">
+          <div class="full"><label>Observações gerais</label><textarea id="c_observacoes" rows="8"></textarea></div>
+        </div>
+      </div>
+
+      <div class="cad-panel" data-cad-panel="arquivos">
+        <div class="cad-arquivos-head">
+          <h3 class="cad-section-title" style="margin:0">Anexos</h3>
+          <button type="button" class="ctrl-btn ctrl-btn-primary" id="btnToggleUploadContato">+ Adicionar arquivo</button>
+        </div>
+        <form id="formArquivoContato" class="cad-upload-panel" style="display:none">
+          <div class="cad-form-grid">
+            <div><label>Nome</label><input name="nome" id="arq_c_nome"></div>
+            <div><label>Tipo</label>
+              <select name="tipo" id="arq_c_tipo">
+                <option>Contrato</option>
+                <option>Documento</option>
+                <option>Comprovante</option>
+                <option>Outros</option>
+              </select>
+            </div>
+            <div><label>Data</label><input type="date" name="data_documento" id="arq_c_data"></div>
+            <div class="full"><label>Arquivo</label><input type="file" name="arquivo" id="arq_c_file" required></div>
+            <div class="full"><button type="submit" class="ctrl-btn ctrl-btn-primary">Enviar</button></div>
+          </div>
+        </form>
+        <div class="ctrl-table-wrap" style="margin-top:12px">
+          <table class="ctrl-table">
+            <thead><tr><th>Data</th><th>Tipo</th><th>Arquivo</th><th></th><th></th></tr></thead>
+            <tbody id="tbodyArquivosContato"></tbody>
+          </table>
+        </div>
+      </div>
+      <p id="cadErroContato" class="cad-msg-erro" style="display:none"></p>
+    </main>
+    <footer class="cad-modal-foot">
+      <div class="cad-foot-actions">
+        <button type="button" class="ctrl-btn ctrl-btn-outline cad-btn-danger" id="btnExcluirContato" style="display:none">Excluir</button>
+        <button type="button" class="ctrl-btn ctrl-btn-outline" id="btnFecharContato">Cancelar</button>
+        <button type="button" class="ctrl-btn ctrl-btn-primary" id="btnSalvarContato">Salvar</button>
+      </div>
+    </footer>
+  </div>
+</div>
+
+<script src="/static/cadastros_contatos.js"></script>
+</body>
+</html>

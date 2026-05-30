@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Viaturas — Cadastros</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/dashboard.css">
+  <link rel="stylesheet" href="/static/controle.css">
+  <link rel="stylesheet" href="/static/cadastros.css">
+</head>
+<body class="ctrl-body dash-body cad-body">
+{% include "partials/nav_principal.html" %}
+<div class="ctrl-wrap">
+  <header class="ctrl-header">
+    <div>
+      <p class="ctrl-breadcrumb"><a href="/cadastros">Cadastros</a> / Viaturas</p>
+      <span class="ctrl-badge cad-badge">🚚 Frota</span>
+      <h1>Viaturas</h1>
+      <p>Cadastro completo de frota, documentos e configurações operacionais.</p>
+    </div>
+    <div class="ctrl-mod-actions">
+      <a href="/cadastros" class="ctrl-btn ctrl-btn-outline">← Hub Cadastros</a>
+      <button type="button" class="ctrl-btn ctrl-btn-primary" id="btnNovaViatura">+ Cadastrar</button>
+    </div>
+  </header>
+
+  <div class="ctrl-kpis" id="cadKpisViaturas">
+    <div class="ctrl-kpi accent"><small>Total</small><b id="kpiVTotal">{{ kpis.total }}</b></div>
+    <div class="ctrl-kpi"><small>Ativas</small><b id="kpiVAtivas">{{ kpis.ativas }}</b></div>
+    <div class="ctrl-kpi"><small>Inativas</small><b id="kpiVInativas">{{ kpis.inativas }}</b></div>
+    <div class="ctrl-kpi"><small>Com documentos</small><b id="kpiVDocs">{{ kpis.com_documentos }}</b></div>
+  </div>
+
+  <section class="ctrl-panel">
+    <h2>Filtros</h2>
+    <div class="ctrl-filters">
+      <div class="ctrl-field"><label>Busca rápida</label><input type="search" id="filtroBuscaV" placeholder="Placa, marca, modelo..."></div>
+      <div class="ctrl-field"><label>Status</label>
+        <select id="filtroStatusV"><option value="">Todos</option><option value="ativo">Ativo</option><option value="inativo">Inativo</option></select>
+      </div>
+      <div class="ctrl-field"><label>Tipo</label><input type="text" id="filtroTipoV" placeholder="Tipo de viatura"></div>
+      <div class="ctrl-field"><label>Ano / modelo</label><input type="text" id="filtroAnoV" placeholder="Ex.: 2022"></div>
+      <div class="ctrl-field"><label>&nbsp;</label><button type="button" class="ctrl-btn ctrl-btn-outline" style="width:100%" id="btnLimparFiltrosV">Limpar</button></div>
+    </div>
+  </section>
+
+  <section class="ctrl-panel">
+    <h2>Registros</h2>
+    <div class="ctrl-table-wrap">
+      <table class="ctrl-table" id="tabelaViaturas">
+        <thead>
+          <tr>
+            <th>Exibição</th><th>Placa</th><th>Marca</th><th>Modelo</th><th>Ano Fab.</th><th>Ano Modelo</th><th>Tipo</th><th>Status</th><th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="tbodyViaturas"></tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<div id="modalViatura" class="cad-modal" aria-hidden="true">
+  <div class="cad-modal-shell">
+    <nav class="cad-modal-nav">
+      <h3>Menu</h3>
+      <button type="button" class="cad-nav-btn active" data-cad-tab="editar">✏️ Editar</button>
+      <button type="button" class="cad-nav-btn" data-cad-tab="config">⚙️ Configurações</button>
+      <button type="button" class="cad-nav-btn" data-cad-tab="servicos">🔧 Serviços</button>
+      <button type="button" class="cad-nav-btn" data-cad-tab="arquivos">📎 Arquivos</button>
+    </nav>
+    <main class="cad-modal-main">
+      <h2 class="cad-modal-title" id="modalViaturaTitulo">Nova viatura</h2>
+      <input type="hidden" id="viaturaId">
+
+      <div class="cad-panel active" data-cad-panel="editar">
+        <div class="cad-form-grid">
+          <div><label>Placa</label><input id="v_placa" required></div>
+          <div><label>Marca</label><input id="v_marca"></div>
+          <div><label>Modelo</label><input id="v_modelo"></div>
+          <div><label>Renavam</label><input id="v_renavam"></div>
+          <div><label>Chassi</label><input id="v_chassi"></div>
+          <div><label>Ano fabricação</label><input id="v_ano_fabricacao"></div>
+          <div><label>Ano modelo</label><input id="v_ano_modelo"></div>
+          <div><label>Combustível</label><input id="v_combustivel"></div>
+          <div><label>Capacidade (L)</label><input type="number" step="0.01" id="v_capacidade_litros"></div>
+          <div><label>Cor predominante</label><input id="v_cor"></div>
+          <div><label>Estado da placa</label><input id="v_estado_placa"></div>
+          <div><label>Tipo da viatura</label><input id="v_tipo_viatura"></div>
+          <div><label>Status</label><select id="v_status"><option value="ativo">Ativo</option><option value="inativo">Inativo</option></select></div>
+          <div class="full"><label>Observações</label><textarea id="v_observacoes" rows="3"></textarea></div>
+        </div>
+      </div>
+
+      <div class="cad-panel" data-cad-panel="config">
+        <div class="cad-form-grid">
+          <div><label>CPF/CNPJ no CRLV</label><input id="v_cpf_cnpj_crlv"></div>
+          <div><label>Exibição no sistema</label><input id="v_exibicao"></div>
+          <div><label>Telefone da viatura</label><input id="v_telefone"></div>
+          <div><label>Personalização</label><input id="v_personalizacao"></div>
+          <div><label>Consumo km/L</label><input type="number" step="0.01" id="v_consumo_km_l"></div>
+          <div><label>Hodômetro</label><input type="number" id="v_hodometro"></div>
+          <div><label>Terceiro</label><select id="v_terceiro"><option value="false">Não</option><option value="true">Sim</option></select></div>
+        </div>
+      </div>
+
+      <div class="cad-panel" data-cad-panel="servicos">
+        <div class="cad-empty-box">
+          <p>Nenhum serviço vinculado a esta viatura ainda.</p>
+          <p style="font-size:12px;margin-top:8px">Em breve: serviços, abastecimentos, manutenções, multas, seguros e checklist.</p>
+        </div>
+      </div>
+
+      <div class="cad-panel" data-cad-panel="arquivos">
+        <form id="formArquivoViatura" class="cad-form-grid" style="margin-bottom:16px">
+          <div><label>Nome do arquivo</label><input name="nome" id="arq_nome"></div>
+          <div><label>Tipo</label>
+            <select name="tipo_documento" id="arq_tipo">
+              <option value="CRLV">CRLV</option>
+              <option value="Apólice">Apólice</option>
+              <option value="Nota fiscal">Nota fiscal</option>
+              <option value="Manutenção">Documento de manutenção</option>
+              <option value="Outros">Outros</option>
+            </select>
+          </div>
+          <div><label>Data</label><input type="date" name="data_documento" id="arq_data"></div>
+          <div class="full"><label>Upload</label><input type="file" name="arquivo" id="arq_file" required></div>
+          <div class="full"><button type="submit" class="ctrl-btn ctrl-btn-primary">Anexar documento</button></div>
+        </form>
+        <div class="cad-arquivos-list" id="listaArquivosViatura"></div>
+      </div>
+      <p id="cadErroViatura" class="cad-msg-erro" style="display:none"></p>
+    </main>
+    <footer class="cad-modal-foot">
+      <label class="cad-status-toggle"><input type="checkbox" id="v_status_toggle" checked> Registro ativo</label>
+      <div class="cad-foot-actions">
+        <button type="button" class="ctrl-btn ctrl-btn-outline cad-btn-danger" id="btnExcluirViatura" style="display:none">Excluir</button>
+        <button type="button" class="ctrl-btn ctrl-btn-outline" id="btnFecharViatura">Cancelar</button>
+        <button type="button" class="ctrl-btn ctrl-btn-primary" id="btnSalvarViatura">Salvar</button>
+      </div>
+    </footer>
+  </div>
+</div>
+
+<script src="/static/cadastros_viaturas.js"></script>
+</body>
+</html>

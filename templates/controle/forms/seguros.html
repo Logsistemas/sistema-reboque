@@ -1,0 +1,13 @@
+<div class="ctrl-form-grid">
+  {% with required=true %}{% include 'controle/partials/ac_viatura.html' %}{% endwith %}
+  <div class="ctrl-field"><label>Seguradora</label><input type="text" name="seguradora"></div>
+  <div class="ctrl-field"><label>Número da apólice</label><input type="text" name="apolice"></div>
+  <div class="ctrl-field"><label>Corretor</label><input type="text" name="corretor"></div>
+  <div class="ctrl-field"><label>Telefone</label><input type="text" name="telefone"></div>
+  <div class="ctrl-field"><label>Vigência inicial</label><input type="date" name="vigencia_inicial"></div>
+  <div class="ctrl-field"><label>Vigência final</label><input type="date" name="vigencia_final"></div>
+  <div class="ctrl-field"><label>Valor total</label><input type="number" step="0.01" min="0" name="valor"></div>
+  <div class="ctrl-field"><label>Parcelas</label><input type="number" min="1" name="parcelas" value="1"></div>
+  <div class="ctrl-field"><label>Vencimento</label><input type="date" name="vencimento"></div>
+  <div class="ctrl-field full"><label>Observações</label><textarea name="observacoes" rows="3"></textarea></div>
+</div>

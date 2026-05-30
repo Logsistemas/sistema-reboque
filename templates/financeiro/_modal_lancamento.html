@@ -1,0 +1,83 @@
+<div id="modalFin" class="cad-modal" aria-hidden="true">
+  <div class="cad-modal-shell cad-modal-prof">
+    <nav class="cad-modal-nav">
+      <h3 id="modalNavTitulo">Lançamento</h3>
+      <button type="button" class="cad-nav-btn active" data-fin-tab="geral">📋 Dados gerais</button>
+      <button type="button" class="cad-nav-btn" data-fin-tab="parcelas">📑 Parcelas</button>
+      <button type="button" class="cad-nav-btn" data-fin-tab="baixa">✅ Baixa</button>
+      <button type="button" class="cad-nav-btn" data-fin-tab="anexos">📎 Anexos</button>
+      <button type="button" class="cad-nav-btn" data-fin-tab="historico">🕐 Histórico</button>
+    </nav>
+    <main class="cad-modal-main">
+      <h2 class="cad-modal-title" id="modalTitulo">Novo lançamento</h2>
+      <input type="hidden" id="regId">
+      <p id="finErro" class="cad-erro" style="display:none"></p>
+
+      <div class="fin-tab-panel active" data-fin-panel="geral">
+        <div class="cad-form-grid">
+          <div class="full"><label id="lblParte">Fornecedor</label>
+            <input id="f_parte" list="dlContatosCadastro" placeholder="Selecione ou digite..." autocomplete="off">
+            <datalist id="dlContatosCadastro"></datalist>
+          </div>
+          <div class="full"><label>Histórico / descrição</label><input id="f_descricao"></div>
+          <div><label>Nº documento</label><input id="f_numero_documento"></div>
+          <div><label>Categoria</label><input id="f_categoria"></div>
+          <div><label id="lblTipoPgto">Tipo de pagamento</label><input id="f_tipo_pagamento"></div>
+          <div><label>Competência</label><input type="date" id="f_competencia"></div>
+          <div><label>Emissão</label><input type="date" id="f_emissao"></div>
+          <div><label>Vencimento</label><input type="date" id="f_vencimento"></div>
+          <div><label>Valor *</label><input type="number" step="0.01" id="f_valor" required></div>
+          <div><label>Parcelas</label><input type="number" min="1" id="f_parcelas" value="1"></div>
+          <div><label>Conta financeira (previsão)</label><select id="f_conta_financeira_id"><option value="">— Opcional no cadastro —</option></select></div>
+          <div><label id="lblForma">Forma de pagamento</label><input id="f_forma"></div>
+          <div><label>Situação</label><div class="f_status_readonly" id="f_status_label">Em aberto</div><input type="hidden" id="f_status" value="em_aberto"></div>
+          <div class="full"><label>Observações</label><textarea id="f_observacoes" rows="2"></textarea></div>
+        </div>
+      </div>
+
+      <div class="fin-tab-panel" data-fin-panel="parcelas">
+        <p class="muted">Nesta etapa o lançamento é registrado em parcela única. Baixa parcial será habilitada em versão futura.</p>
+        <div class="cad-form-grid">
+          <div><label>Número de parcelas</label><input type="number" min="1" id="f_parcelas_dup" value="1" disabled></div>
+          <div><label>Valor total</label><input type="text" id="f_valor_parcelas" readonly></div>
+        </div>
+      </div>
+
+      <div class="fin-tab-panel" data-fin-panel="baixa">
+        <p class="muted" id="baixaHint">Confirme a baixa total. Será gerada movimentação automática em Caixa e Bancos.</p>
+        <div class="cad-form-grid">
+          <div><label>Conta financeira</label><select id="bx_conta_financeira_id"><option value="">—</option></select></div>
+          <div><label id="lblDataBaixa">Data pagamento</label><input type="date" id="bx_data"></div>
+          <div><label>Valor</label><input type="number" step="0.01" id="bx_valor"></div>
+        </div>
+        <button type="button" class="ctrl-btn ctrl-btn-primary" id="btnConfirmarBaixa" style="margin-top:12px">Confirmar baixa total</button>
+      </div>
+
+      <div class="fin-tab-panel" data-fin-panel="anexos">
+        <form id="formAnexo" class="cad-form-grid">
+          <div><label>Nome</label><input name="nome" id="anexoNome"></div>
+          <div><label>Tipo</label><input name="tipo" id="anexoTipo" placeholder="NF, Boleto..."></div>
+          <div class="full"><label>Arquivo</label><input type="file" name="arquivo" id="anexoArquivo" required></div>
+          <div><button type="submit" class="ctrl-btn ctrl-btn-primary">Enviar anexo</button></div>
+        </form>
+        <table class="ctrl-table fin-hist-table" style="margin-top:14px">
+          <thead><tr><th>Nome</th><th>Tipo</th><th>Data</th><th></th></tr></thead>
+          <tbody id="tbodyAnexos"></tbody>
+        </table>
+      </div>
+
+      <div class="fin-tab-panel" data-fin-panel="historico">
+        <table class="ctrl-table fin-hist-table">
+          <thead><tr><th>Data</th><th>Tipo</th><th>Conta</th><th>Valor</th><th>Descrição</th></tr></thead>
+          <tbody id="tbodyHistorico"></tbody>
+        </table>
+      </div>
+
+      <div class="cad-modal-footer">
+        <button type="button" class="ctrl-btn ctrl-btn-outline" id="btnFechar">Fechar</button>
+        <button type="button" class="ctrl-btn ctrl-btn-danger" id="btnExcluir" style="display:none">Excluir</button>
+        <button type="button" class="ctrl-btn ctrl-btn-primary" id="btnSalvar">Salvar</button>
+      </div>
+    </main>
+  </div>
+</div>

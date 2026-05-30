@@ -4,7 +4,11 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # .env na raiz do projeto; não sobrescreve variáveis já definidas (ex.: Render).
-load_dotenv(Path(__file__).resolve().parent / ".env")
+load_dotenv(dotenv_path=Path(__file__).resolve().parent / ".env", encoding="utf-8-sig")
+
+DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
+if DATABASE_URL and "sslmode=" not in DATABASE_URL:
+    DATABASE_URL += ("&" if "?" in DATABASE_URL else "?") + "sslmode=require"
 
 import urllib
 import urllib.request
@@ -35,6 +39,158 @@ app.mount('/static', StaticFiles(directory='static'), name='static')
 templates = Jinja2Templates(directory='templates')
 UPLOAD_DIR = os.path.join('static', 'uploads')
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+CADASTROS_UPLOAD_DIR = os.path.join('static', 'uploads', 'cadastros')
+os.makedirs(CADASTROS_UPLOAD_DIR, exist_ok=True)
+FINANCEIRO_UPLOAD_DIR = os.path.join('static', 'uploads', 'financeiro')
+os.makedirs(FINANCEIRO_UPLOAD_DIR, exist_ok=True)
+
+MODULOS_CONTROLE_HUB = [
+    {"titulo": "Danos", "icone": "💥", "descricao": "Registro e acompanhamento de danos em viaturas, objetos e operações.", "indicador": "Frota", "rota": "/controle/danos"},
+    {"titulo": "Abastecimentos", "icone": "⛽", "descricao": "Controle de combustível, postos, litros e custos por viatura.", "indicador": "Combustível", "rota": "/controle/abastecimentos"},
+    {"titulo": "Checklist Viatura", "icone": "✅", "descricao": "Checklists de saída, retorno e inspeção das viaturas da frota.", "indicador": "Inspeção", "rota": "/controle/checklist-viatura"},
+    {"titulo": "Manutenções", "icone": "🔧", "descricao": "Ordens de serviço, fornecedores e custos de manutenção.", "indicador": "Oficina", "rota": "/controle/manutencoes"},
+    {"titulo": "Multas", "icone": "🚨", "descricao": "Infrações, condutores, vencimentos e situação de pagamento.", "indicador": "Compliance", "rota": "/controle/multas"},
+    {"titulo": "Seguros", "icone": "🛡️", "descricao": "Apólices, vigências, parcelas e situação dos seguros da frota.", "indicador": "Apólices", "rota": "/controle/seguros"},
+]
+
+
+@app.get("/controle", response_class=HTMLResponse)
+def controle_home(request: Request):
+    return templates.TemplateResponse(
+        "controle.html",
+        {
+            "request": request,
+            "nav_ativo": "controle",
+            "nav_som": False,
+            "modulos": MODULOS_CONTROLE_HUB,
+        },
+    )
+
+MODULOS_CADASTROS_HUB = [
+    {
+        "titulo": "Viaturas",
+        "icone": "🚚",
+        "descricao": "Frota, documentos, configurações e histórico operacional por viatura.",
+        "indicador": "Frota",
+        "rota": "/cadastros/viaturas",
+        "ativos": 0,
+    },
+    {
+        "titulo": "Profissionais",
+        "icone": "👤",
+        "descricao": "Motoristas, prestadores e equipe com documentos e permissões de operação.",
+        "indicador": "Equipe",
+        "rota": "/cadastros/profissionais",
+        "ativos": 0,
+    },
+    {
+        "titulo": "Clientes",
+        "icone": "🤝",
+        "descricao": "Cadastro mestre de contatos classificados como clientes.",
+        "indicador": "Receber",
+        "rota": "/cadastros/clientes",
+        "ativos": 0,
+    },
+    {
+        "titulo": "Fornecedores",
+        "icone": "🏭",
+        "descricao": "Cadastro mestre de contatos classificados como fornecedores.",
+        "indicador": "Pagar",
+        "rota": "/cadastros/fornecedores",
+        "ativos": 0,
+    },
+]
+
+
+def _hub_cadastros_modulos():
+    v = resumo_viaturas_cadastro()
+    p = resumo_profissionais_cadastro()
+    c = resumo_contatos_cadastro(cliente=True)
+    f = resumo_contatos_cadastro(fornecedor=True)
+    return [
+        {**MODULOS_CADASTROS_HUB[0], "ativos": v.get("ativas", 0)},
+        {**MODULOS_CADASTROS_HUB[1], "ativos": p.get("ativos", 0)},
+        {**MODULOS_CADASTROS_HUB[2], "ativos": c.get("ativos", 0)},
+        {**MODULOS_CADASTROS_HUB[3], "ativos": f.get("ativos", 0)},
+    ]
+
+
+@app.get("/cadastros", response_class=HTMLResponse)
+def cadastros_home(request: Request):
+    return templates.TemplateResponse(
+        "cadastros/hub.html",
+        {
+            "request": request,
+            "nav_ativo": "cadastros",
+            "nav_som": False,
+            "modulos": _hub_cadastros_modulos(),
+        },
+    )
+
+
+@app.get("/cadastros/viaturas", response_class=HTMLResponse)
+def cadastros_pagina_viaturas(request: Request):
+    return templates.TemplateResponse(
+        "cadastros/viaturas.html",
+        {
+            "request": request,
+            "nav_ativo": "cadastros",
+            "nav_som": False,
+            "kpis": resumo_viaturas_cadastro(),
+        },
+    )
+
+
+@app.get("/cadastros/profissionais", response_class=HTMLResponse)
+def cadastros_pagina_profissionais(request: Request):
+    return templates.TemplateResponse(
+        "cadastros/profissionais.html",
+        {
+            "request": request,
+            "nav_ativo": "cadastros",
+            "nav_som": False,
+            "kpis": resumo_profissionais_cadastro(),
+        },
+    )
+
+
+def _ctx_pagina_contatos(request: Request, modo: str):
+    cliente = modo == "cliente"
+    fornecedor = modo == "fornecedor"
+    titulos = {
+        "cliente": ("Clientes", "🤝", "Contatos classificados como clientes — usados em Contas a Receber."),
+        "fornecedor": ("Fornecedores", "🏭", "Contatos classificados como fornecedores — usados em Contas a Pagar."),
+    }
+    t, icone, desc = titulos.get(modo, titulos["cliente"])
+    return {
+        "request": request,
+        "nav_ativo": "cadastros",
+        "nav_som": False,
+        "modo": modo,
+        "titulo_modulo": t,
+        "icone_modulo": icone,
+        "descricao_modulo": desc,
+        "kpis": resumo_contatos_cadastro(cliente=cliente, fornecedor=fornecedor),
+        "filtro_cliente": cliente,
+        "filtro_fornecedor": fornecedor,
+    }
+
+
+@app.get("/cadastros/clientes", response_class=HTMLResponse)
+def cadastros_pagina_clientes(request: Request):
+    return templates.TemplateResponse(
+        "cadastros/contatos.html",
+        _ctx_pagina_contatos(request, "cliente"),
+    )
+
+
+@app.get("/cadastros/fornecedores", response_class=HTMLResponse)
+def cadastros_pagina_fornecedores(request: Request):
+    return templates.TemplateResponse(
+        "cadastros/contatos.html",
+        _ctx_pagina_contatos(request, "fornecedor"),
+    )
+
 
 PRICE_DATA = [
   {
@@ -434,10 +590,6 @@ def fmt_moeda(v):
         return "R$ 0,00"
 
 
-DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
-if DATABASE_URL and "sslmode=" not in DATABASE_URL:
-    DATABASE_URL += ("&" if "?" in DATABASE_URL else "?") + "sslmode=require"
-
 TZ_BR = ZoneInfo("America/Sao_Paulo")
 
 
@@ -628,6 +780,99 @@ def init_db():
               texto text not null,
               criado_em timestamp default now()
             );""")
+            cur.execute("""
+            create table if not exists controle_danos (
+              id uuid primary key default uuid_generate_v4(),
+              data_dano date,
+              profissional text,
+              viatura text,
+              origem text,
+              tipo_dano text,
+              objeto text,
+              valor numeric(12,2) default 0,
+              situacao text,
+              status text default 'ativo',
+              observacoes text,
+              created_at timestamp default now(),
+              updated_at timestamp default now()
+            );""")
+            cur.execute("""
+            create table if not exists controle_abastecimentos (
+              id uuid primary key default uuid_generate_v4(),
+              data_abastecimento date,
+              viatura text,
+              posto text,
+              combustivel text,
+              litros numeric(12,3) default 0,
+              valor_unitario numeric(12,2) default 0,
+              valor_total numeric(12,2) default 0,
+              hodometro numeric(12,0),
+              profissional text,
+              status text default 'ativo',
+              observacoes text,
+              created_at timestamp default now(),
+              updated_at timestamp default now()
+            );""")
+            cur.execute("""
+            create table if not exists controle_checklists_viatura (
+              id uuid primary key default uuid_generate_v4(),
+              data_checklist date,
+              viatura text,
+              motorista text,
+              tipo_checklist text,
+              km numeric(12,0),
+              status_checklist text,
+              status text default 'ativo',
+              observacoes text,
+              created_at timestamp default now(),
+              updated_at timestamp default now()
+            );""")
+            cur.execute("""
+            create table if not exists controle_manutencoes (
+              id uuid primary key default uuid_generate_v4(),
+              data_manutencao date,
+              documento text,
+              fornecedor text,
+              viatura text,
+              hodometro numeric(12,0),
+              total numeric(12,2) default 0,
+              status text default 'ativo',
+              observacoes text,
+              created_at timestamp default now(),
+              updated_at timestamp default now()
+            );""")
+            cur.execute("""
+            create table if not exists controle_multas (
+              id uuid primary key default uuid_generate_v4(),
+              data_infracao date,
+              viatura text,
+              auto_infracao text,
+              municipio text,
+              condutor text,
+              valor numeric(12,2) default 0,
+              vencimento date,
+              situacao text,
+              status text default 'ativo',
+              observacoes text,
+              created_at timestamp default now(),
+              updated_at timestamp default now()
+            );""")
+            cur.execute("""
+            create table if not exists controle_seguros (
+              id uuid primary key default uuid_generate_v4(),
+              viatura text,
+              seguradora text,
+              apolice text,
+              vigencia_inicial date,
+              vigencia_final date,
+              valor numeric(12,2) default 0,
+              parcelas integer default 1,
+              situacao text,
+              status text default 'ativo',
+              observacoes text,
+              created_at timestamp default now(),
+              updated_at timestamp default now()
+            );""")
             alters=[
             "alter table motoristas add column if not exists tipo text;",
             "alter table motoristas add column if not exists cpf text;",
@@ -675,7 +920,246 @@ def init_db():
             "alter table checklist_assinaturas add column if not exists origem_atualizada_em timestamp;",
             "alter table checklist_assinaturas add column if not exists destino_atualizada_em timestamp;",
             "alter table checklist_assinaturas alter column assinatura_base64 drop not null;"]
-            for a in alters: cur.execute(a)
+            controle_alters = [
+                "alter table controle_danos add column if not exists data_hora_dano timestamp;",
+                "alter table controle_danos add column if not exists aviso text;",
+                "alter table controle_danos add column if not exists assistencia text;",
+                "alter table controle_danos add column if not exists identificacao_objeto text;",
+                "alter table controle_danos add column if not exists parcelas integer default 1;",
+                "alter table controle_danos add column if not exists data_desconto date;",
+                "alter table controle_danos add column if not exists descricao_dano text;",
+                "alter table controle_danos add column if not exists analise_interna text;",
+                "alter table controle_abastecimentos add column if not exists data_hora timestamp;",
+                "alter table controle_abastecimentos add column if not exists desconsiderar_ultimo_km boolean default false;",
+                "alter table controle_abastecimentos add column if not exists gerar_contas_pagar boolean default false;",
+                "alter table controle_manutencoes add column if not exists itens jsonb default '[]'::jsonb;",
+                "alter table controle_manutencoes add column if not exists total_produtos numeric(12,2) default 0;",
+                "alter table controle_manutencoes add column if not exists total_servicos numeric(12,2) default 0;",
+                "alter table controle_multas add column if not exists data_hora_infracao timestamp;",
+                "alter table controle_multas add column if not exists data_limite_indicacao date;",
+                "alter table controle_multas add column if not exists endereco text;",
+                "alter table controle_multas add column if not exists descricao_multa text;",
+                "alter table controle_multas add column if not exists natureza text;",
+                "alter table controle_multas add column if not exists condutor_responsavel text;",
+                "alter table controle_multas add column if not exists parcelas integer default 1;",
+                "alter table controle_multas add column if not exists valor_pago numeric(12,2) default 0;",
+                "alter table controle_multas add column if not exists contas_pagar boolean default false;",
+                "alter table controle_multas add column if not exists extrato_profissional boolean default false;",
+                "alter table controle_seguros add column if not exists corretor text;",
+                "alter table controle_seguros add column if not exists telefone text;",
+                "alter table controle_seguros add column if not exists vencimento date;",
+                "alter table controle_checklists_viatura add column if not exists data_hora timestamp;",
+                "alter table controle_checklists_viatura add column if not exists itens_conferidos text;",
+                "alter table controle_checklists_viatura add column if not exists itens_problema text;",
+            ]
+            for a in alters:
+                cur.execute(a)
+            for a in controle_alters:
+                cur.execute(a)
+            cur.execute("""
+            create table if not exists cadastro_viaturas (
+              id uuid primary key default uuid_generate_v4(),
+              placa text,
+              marca text,
+              modelo text,
+              renavam text,
+              chassi text,
+              ano_fabricacao text,
+              ano_modelo text,
+              combustivel text,
+              capacidade_litros numeric(12,2),
+              cor text,
+              estado_placa text,
+              tipo_viatura text,
+              observacoes text,
+              status text default 'ativo',
+              cpf_cnpj_crlv text,
+              exibicao text,
+              telefone text,
+              personalizacao text,
+              consumo_km_l numeric(8,2),
+              hodometro numeric(12,0),
+              terceiro boolean default false,
+              created_at timestamp default now(),
+              updated_at timestamp default now()
+            );""")
+            cur.execute("""
+            create table if not exists cadastro_viatura_arquivos (
+              id uuid primary key default uuid_generate_v4(),
+              viatura_id uuid not null,
+              nome text,
+              tipo_documento text,
+              data_documento date,
+              filename text,
+              url text,
+              created_at timestamp default now()
+            );""")
+            cur.execute("""
+            create table if not exists cadastro_profissionais (
+              id uuid primary key default uuid_generate_v4(),
+              nome text,
+              cpf text,
+              rg text,
+              cnh text,
+              categoria_cnh text,
+              validade_cnh date,
+              telefone text,
+              email text,
+              endereco text,
+              funcao text,
+              observacoes text,
+              status text default 'ativo',
+              tipo_profissional text,
+              comissao_padrao numeric(12,2) default 0,
+              pode_receber_servicos boolean default true,
+              pode_aparecer_controle boolean default true,
+              motorista_id uuid,
+              created_at timestamp default now(),
+              updated_at timestamp default now()
+            );""")
+            cur.execute("""
+            create table if not exists cadastro_profissional_arquivos (
+              id uuid primary key default uuid_generate_v4(),
+              profissional_id uuid not null,
+              nome text,
+              tipo_documento text,
+              data_documento date,
+              filename text,
+              url text,
+              created_at timestamp default now()
+            );""")
+            profissionais_alters = [
+                "alter table cadastro_profissionais add column if not exists filial_cnpj text;",
+                "alter table cadastro_profissionais add column if not exists nome_completo text;",
+                "alter table cadastro_profissionais add column if not exists nome_trabalho text;",
+                "alter table cadastro_profissionais add column if not exists data_nascimento date;",
+                "alter table cadastro_profissionais add column if not exists telefone_fixo text;",
+                "alter table cadastro_profissionais add column if not exists telefone_movel text;",
+                "alter table cadastro_profissionais add column if not exists estado_civil text;",
+                "alter table cadastro_profissionais add column if not exists cep text;",
+                "alter table cadastro_profissionais add column if not exists logradouro text;",
+                "alter table cadastro_profissionais add column if not exists bairro text;",
+                "alter table cadastro_profissionais add column if not exists cidade text;",
+                "alter table cadastro_profissionais add column if not exists uf text;",
+                "alter table cadastro_profissionais add column if not exists terceiro boolean default false;",
+                "alter table cadastro_profissionais add column if not exists cnpj text;",
+                "alter table cadastro_profissionais add column if not exists remuneracao text;",
+                "alter table cadastro_profissionais add column if not exists forma_pagamento text;",
+                "alter table cadastro_profissionais add column if not exists data_admissao date;",
+                "alter table cadastro_profissionais add column if not exists data_demissao date;",
+                "alter table cadastro_profissionais add column if not exists hora_inicio text;",
+                "alter table cadastro_profissionais add column if not exists hora_termino text;",
+                "alter table cadastro_profissionais add column if not exists carga_horaria text;",
+                "alter table cadastro_profissionais add column if not exists intervalo text;",
+                "alter table cadastro_profissionais add column if not exists escala text;",
+                "alter table cadastro_profissionais add column if not exists registro_ctps text;",
+                "alter table cadastro_profissionais add column if not exists cnh_numero text;",
+                "alter table cadastro_profissionais add column if not exists cnh_vencimento date;",
+                "alter table cadastro_profissionais add column if not exists cnh_categoria text;",
+                "alter table cadastro_profissional_arquivos add column if not exists nome_arquivo text;",
+                "alter table cadastro_profissional_arquivos add column if not exists extensao text;",
+                "alter table cadastro_profissional_arquivos add column if not exists tipo text;",
+                "alter table cadastro_profissional_arquivos add column if not exists caminho_arquivo text;",
+            ]
+            for a in profissionais_alters:
+                cur.execute(a)
+            cur.execute("""
+            create table if not exists cadastro_contatos (
+              id uuid primary key default uuid_generate_v4(),
+              tipo_pessoa text default 'juridica',
+              status text default 'ativo',
+              razao_social text,
+              nome_fantasia text,
+              cnpj text,
+              inscricao_estadual text,
+              contribuinte_icms text,
+              nome text,
+              cpf text,
+              rg text,
+              data_nascimento date,
+              cep text,
+              logradouro text,
+              numero text,
+              complemento text,
+              bairro text,
+              cidade text,
+              uf text,
+              email text,
+              email_financeiro text,
+              telefone text,
+              celular text,
+              cliente boolean default false,
+              fornecedor boolean default false,
+              limite_credito numeric(14,2) default 0,
+              prazo_recebimento text,
+              observacoes_comercial_cliente text,
+              prazo_pagamento text,
+              categoria_fornecedor text,
+              observacoes_comercial_fornecedor text,
+              observacoes text,
+              created_at timestamp default now(),
+              updated_at timestamp default now()
+            );""")
+            cur.execute("""
+            create table if not exists cadastro_contato_arquivos (
+              id uuid primary key default uuid_generate_v4(),
+              contato_id uuid not null,
+              nome_arquivo text,
+              extensao text,
+              tipo text,
+              caminho_arquivo text,
+              nome text,
+              tipo_documento text,
+              data_documento date,
+              filename text,
+              url text,
+              created_at timestamp default now()
+            );""")
+            cur.execute("""
+                update cadastro_profissionais set
+                  nome_completo = coalesce(nullif(trim(nome_completo),''), nome),
+                  nome_trabalho = coalesce(nullif(trim(nome_trabalho),''), nome),
+                  telefone_movel = coalesce(nullif(trim(telefone_movel),''), telefone),
+                  cnh_numero = coalesce(nullif(trim(cnh_numero),''), cnh),
+                  cnh_vencimento = coalesce(cnh_vencimento, validade_cnh),
+                  cnh_categoria = coalesce(nullif(trim(cnh_categoria),''), categoria_cnh)
+            """)
+            cur.execute("""
+                update cadastro_profissional_arquivos set
+                  nome_arquivo = coalesce(nome_arquivo, nome),
+                  tipo = coalesce(tipo, tipo_documento),
+                  caminho_arquivo = coalesce(caminho_arquivo, url),
+                  extensao = coalesce(extensao, lower(regexp_replace(coalesce(filename,''), '^.*\\.', '')))
+                where nome_arquivo is null or caminho_arquivo is null
+            """)
+            cur.execute("""
+                insert into cadastro_viaturas (placa, modelo, tipo_viatura, status, exibicao, renavam, observacoes)
+                select upper(trim(placa)), modelo, tipo,
+                       case when coalesce(ativo,true) then 'ativo' else 'inativo' end,
+                       coalesce(nullif(trim(placa),''), modelo, tipo), renavam, observacao
+                  from veiculos v
+                 where not exists (
+                       select 1 from cadastro_viaturas c
+                        where upper(trim(coalesce(c.placa,''))) = upper(trim(coalesce(v.placa,'')))
+                          and coalesce(trim(c.placa),'') <> ''
+                 )
+                   and (coalesce(trim(v.placa),'') <> '' or coalesce(trim(v.modelo),'') <> '')
+            """)
+            cur.execute("""
+                insert into cadastro_profissionais (
+                  nome, telefone, funcao, status, motorista_id,
+                  pode_receber_servicos, pode_aparecer_controle, cpf, cnh
+                )
+                select nome, telefone, coalesce(tipo,'Motorista'),
+                       case when coalesce(ativo,true) then 'ativo' else 'inativo' end,
+                       id, true, true, cpf, cnh
+                  from motoristas m
+                 where coalesce(trim(nome),'') <> ''
+                   and not exists (
+                     select 1 from cadastro_profissionais p
+                      where p.motorista_id = m.id
+                   )
+            """)
             cur.execute("""
                 update checklist_assinaturas
                    set assinatura_origem_base64 = assinatura_base64,
@@ -683,6 +1167,10 @@ def init_db():
                  where coalesce(assinatura_origem_base64, '') = ''
                    and coalesce(assinatura_base64, '') <> ''
             """)
+            import financeiro_routes
+            financeiro_routes.init_financeiro_tables(cur)
+            import financeiro_notas_entrada
+            financeiro_notas_entrada.init_notas_entrada_tables(cur)
             cur.execute("select count(*) as total from tabela_precos")
             total_precos = cur.fetchone()["total"]
             if not total_precos:
@@ -1624,6 +2112,1732 @@ def resumo_financeiro_dashboard():
         item["valor_fmt"] = fmt_moeda(float(item.get("valor") or 0))
         out.append(item)
     return out
+
+
+# ============================================================
+# CONTROLE — frota, danos, abastecimentos e compliance
+# ============================================================
+
+CONTROLE_MODULOS = {
+    "danos": {
+        "slug": "danos",
+        "titulo": "Danos",
+        "icone": "💥",
+        "descricao": "Registro e acompanhamento de danos em viaturas, objetos e operações.",
+        "tabela": "controle_danos",
+        "rota": "/controle/danos",
+        "api": "/api/controle/danos",
+        "colunas": [
+            ("data_dano", "Data"),
+            ("profissional", "Profissional"),
+            ("viatura", "Viatura"),
+            ("origem", "Origem"),
+            ("tipo_dano", "Tipo"),
+            ("objeto", "Objeto"),
+            ("valor", "Valor"),
+            ("situacao", "Situação"),
+            ("status", "Status"),
+        ],
+    },
+    "abastecimentos": {
+        "slug": "abastecimentos",
+        "titulo": "Abastecimentos",
+        "icone": "⛽",
+        "descricao": "Controle de combustível, postos, litros e custos por viatura.",
+        "tabela": "controle_abastecimentos",
+        "rota": "/controle/abastecimentos",
+        "api": "/api/controle/abastecimentos",
+        "colunas": [
+            ("data_abastecimento", "Data"),
+            ("viatura", "Viatura"),
+            ("posto", "Posto"),
+            ("combustivel", "Combustível"),
+            ("litros", "Litros"),
+            ("valor_total", "Total"),
+            ("hodometro", "Hodômetro"),
+            ("profissional", "Profissional"),
+            ("status", "Status"),
+        ],
+    },
+    "checklist-viatura": {
+        "slug": "checklist-viatura",
+        "titulo": "Checklist Viatura",
+        "icone": "✅",
+        "descricao": "Checklists de saída, retorno e inspeção das viaturas da frota.",
+        "tabela": "controle_checklists_viatura",
+        "rota": "/controle/checklist-viatura",
+        "api": "/api/controle/checklist-viatura",
+        "colunas": [
+            ("data_checklist", "Data"),
+            ("viatura", "Viatura"),
+            ("motorista", "Motorista"),
+            ("tipo_checklist", "Tipo"),
+            ("km", "KM"),
+            ("status_checklist", "Checklist"),
+            ("status", "Status"),
+        ],
+    },
+    "manutencoes": {
+        "slug": "manutencoes",
+        "titulo": "Manutenções",
+        "icone": "🔧",
+        "descricao": "Ordens de serviço, fornecedores e custos de manutenção preventiva e corretiva.",
+        "tabela": "controle_manutencoes",
+        "rota": "/controle/manutencoes",
+        "api": "/api/controle/manutencoes",
+        "colunas": [
+            ("data_manutencao", "Data"),
+            ("documento", "Documento"),
+            ("fornecedor", "Fornecedor"),
+            ("viatura", "Viatura"),
+            ("hodometro", "Hodômetro"),
+            ("total", "Total"),
+            ("status", "Status"),
+        ],
+    },
+    "multas": {
+        "slug": "multas",
+        "titulo": "Multas",
+        "icone": "🚨",
+        "descricao": "Infrações, condutores, vencimentos e situação de pagamento.",
+        "tabela": "controle_multas",
+        "rota": "/controle/multas",
+        "api": "/api/controle/multas",
+        "colunas": [
+            ("data_infracao", "Data"),
+            ("viatura", "Viatura"),
+            ("auto_infracao", "Auto"),
+            ("municipio", "Município"),
+            ("condutor", "Condutor"),
+            ("valor", "Valor"),
+            ("vencimento", "Vencimento"),
+            ("situacao", "Situação"),
+            ("status", "Status"),
+        ],
+    },
+    "seguros": {
+        "slug": "seguros",
+        "titulo": "Seguros",
+        "icone": "🛡️",
+        "descricao": "Apólices, vigências, parcelas e situação dos seguros da frota.",
+        "tabela": "controle_seguros",
+        "rota": "/controle/seguros",
+        "api": "/api/controle/seguros",
+        "colunas": [
+            ("viatura", "Viatura"),
+            ("seguradora", "Seguradora"),
+            ("apolice", "Apólice"),
+            ("vigencia_inicial", "Início"),
+            ("vigencia_final", "Fim"),
+            ("valor", "Valor"),
+            ("parcelas", "Parcelas"),
+            ("situacao", "Situação"),
+            ("status", "Status"),
+        ],
+    },
+}
+
+
+def _formatar_valor_controle(campo, valor):
+    if valor is None or valor == "":
+        return "-"
+    if campo in ("valor", "valor_total", "valor_unitario", "total", "valor_pago", "total_produtos", "total_servicos"):
+        try:
+            return fmt_moeda(float(valor))
+        except Exception:
+            return str(valor)
+    if campo in ("litros", "hodometro", "km", "parcelas"):
+        try:
+            n = float(valor)
+            return str(int(n)) if n == int(n) else str(n)
+        except Exception:
+            return str(valor)
+    if hasattr(valor, "strftime"):
+        if isinstance(valor, datetime):
+            return valor.strftime("%d/%m/%Y %H:%M")
+        return valor.strftime("%d/%m/%Y")
+    texto = str(valor).strip()
+    if re.match(r"^\d{4}-\d{2}-\d{2}[T\s]", texto):
+        try:
+            return datetime.fromisoformat(texto.replace("Z", "+00:00")[:19]).strftime("%d/%m/%Y %H:%M")
+        except Exception:
+            pass
+    if re.match(r"^\d{4}-\d{2}-\d{2}", texto):
+        try:
+            return datetime.strptime(texto[:10], "%Y-%m-%d").strftime("%d/%m/%Y")
+        except Exception:
+            pass
+    return texto
+
+
+def _data_iso_controle(item):
+    for k in (
+        "data_hora_dano",
+        "data_hora",
+        "data_hora_infracao",
+        "data_abastecimento",
+        "data_checklist",
+        "data_manutencao",
+        "data_infracao",
+        "data_dano",
+        "vigencia_inicial",
+        "created_at",
+    ):
+        v = item.get(k)
+        if v and hasattr(v, "strftime"):
+            return v.strftime("%Y-%m-%d")
+    return ""
+
+
+def _txt_controle(v, max_len=2000):
+    if v is None:
+        return None
+    s = str(v).strip()
+    if not s:
+        return None
+    if max_len and len(s) > max_len:
+        return s[:max_len]
+    return s
+
+
+def _num_controle(v, default=0.0):
+    if v is None or v == "":
+        return default
+    s = str(v).strip().replace(" ", "")
+    if "," in s and "." in s:
+        s = s.replace(".", "").replace(",", ".")
+    elif "," in s:
+        s = s.replace(",", ".")
+    try:
+        return float(s)
+    except Exception:
+        return default
+
+
+def _int_controle(v, default=0):
+    try:
+        return int(float(_num_controle(v, default)))
+    except Exception:
+        return default
+
+
+def _bool_controle(v):
+    if isinstance(v, bool):
+        return v
+    return str(v or "").strip().lower() in ("1", "true", "sim", "on", "yes")
+
+
+def _parse_data_controle(v):
+    if not v:
+        return None
+    if hasattr(v, "strftime") and not isinstance(v, datetime):
+        return v
+    s = str(v).strip()
+    if not s:
+        return None
+    if "T" in s:
+        try:
+            return datetime.fromisoformat(s[:19]).date()
+        except Exception:
+            pass
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
+        try:
+            return datetime.strptime(s[:10] if fmt == "%Y-%m-%d" else s[:10], fmt).date()
+        except Exception:
+            continue
+    dt = parse_datetime_br(s)
+    return dt.date() if dt else None
+
+
+def _parse_datetime_controle(v):
+    if not v:
+        return None
+    if isinstance(v, datetime):
+        return v.replace(tzinfo=None) if v.tzinfo else v
+    s = str(v).strip()
+    if not s:
+        return None
+    if "T" in s:
+        try:
+            return datetime.fromisoformat(s.replace("Z", "")[:19])
+        except Exception:
+            pass
+    dt = parse_datetime_br(s)
+    if dt:
+        return dt
+    d = _parse_data_controle(s)
+    return datetime.combine(d, datetime.min.time()) if d else None
+
+
+def inserir_controle_danos(p):
+    data_hora = _parse_datetime_controle(p.get("data_hora_dano"))
+    data_dano = data_hora.date() if data_hora else _parse_data_controle(p.get("data_dano"))
+    row = one(
+        """
+        insert into controle_danos (
+          data_dano, data_hora_dano, tipo_dano, origem, profissional, aviso, situacao,
+          assistencia, viatura, objeto, identificacao_objeto, valor, parcelas,
+          data_desconto, descricao_dano, analise_interna, observacoes, status, updated_at
+        ) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'ativo',now())
+        returning *
+        """,
+        (
+            data_dano,
+            data_hora,
+            _txt_controle(p.get("tipo_dano"), 120),
+            _txt_controle(p.get("origem"), 120),
+            _txt_controle(p.get("profissional"), 200),
+            _txt_controle(p.get("aviso"), 200),
+            _txt_controle(p.get("situacao"), 120),
+            _txt_controle(p.get("assistencia"), 200),
+            _txt_controle(p.get("viatura"), 80),
+            _txt_controle(p.get("objeto"), 200),
+            _txt_controle(p.get("identificacao_objeto"), 200),
+            _num_controle(p.get("valor")),
+            _int_controle(p.get("parcelas"), 1) or 1,
+            _parse_data_controle(p.get("data_desconto")),
+            _txt_controle(p.get("descricao_dano")),
+            _txt_controle(p.get("analise_interna")),
+            _txt_controle(p.get("observacoes")),
+        ),
+    )
+    return normalizar_registro_controle(row)
+
+
+def inserir_controle_abastecimentos(p):
+    data_hora = _parse_datetime_controle(p.get("data_hora"))
+    data_abast = data_hora.date() if data_hora else _parse_data_controle(p.get("data_abastecimento"))
+    row = one(
+        """
+        insert into controle_abastecimentos (
+          data_abastecimento, data_hora, viatura, posto, profissional, combustivel,
+          litros, valor_unitario, valor_total, hodometro, observacoes,
+          desconsiderar_ultimo_km, gerar_contas_pagar, status, updated_at
+        ) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'ativo',now())
+        returning *
+        """,
+        (
+            data_abast,
+            data_hora,
+            _txt_controle(p.get("viatura"), 80),
+            _txt_controle(p.get("posto"), 200),
+            _txt_controle(p.get("profissional"), 200),
+            _txt_controle(p.get("combustivel"), 80),
+            _num_controle(p.get("litros")),
+            _num_controle(p.get("valor_unitario")),
+            _num_controle(p.get("valor_total")),
+            _int_controle(p.get("hodometro")) or None,
+            _txt_controle(p.get("observacao") or p.get("observacoes")),
+            _bool_controle(p.get("desconsiderar_ultimo_km")),
+            _bool_controle(p.get("gerar_contas_pagar")),
+        ),
+    )
+    return normalizar_registro_controle(row)
+
+
+def inserir_controle_manutencoes(p):
+    itens = p.get("itens") or []
+    if isinstance(itens, str):
+        try:
+            itens = json.loads(itens)
+        except Exception:
+            itens = []
+    itens_norm = []
+    for it in itens:
+        if not isinstance(it, dict):
+            continue
+        qtd = _num_controle(it.get("quantidade"), 1) or 1
+        vu = _num_controle(it.get("valor_unitario"))
+        vt = _num_controle(it.get("valor_total"), qtd * vu)
+        desc = _txt_controle(it.get("descricao"), 300)
+        if desc:
+            itens_norm.append(
+                {
+                    "descricao": desc,
+                    "valor_unitario": vu,
+                    "quantidade": qtd,
+                    "valor_total": vt,
+                    "tipo": _txt_controle(it.get("tipo"), 20) or "produto",
+                }
+            )
+    total_calc = sum(i["valor_total"] for i in itens_norm)
+    total_prod = _num_controle(p.get("total_produtos"))
+    total_serv = _num_controle(p.get("total_servicos"))
+    total_geral = _num_controle(p.get("total"), total_calc or (total_prod + total_serv))
+    data_hora = _parse_datetime_controle(p.get("data_hora"))
+    data_man = _parse_data_controle(p.get("data")) or (data_hora.date() if data_hora else None)
+    row = one(
+        """
+        insert into controle_manutencoes (
+          data_manutencao, viatura, hodometro, documento, fornecedor, observacoes,
+          itens, total_produtos, total_servicos, total, status, updated_at
+        ) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'ativo',now())
+        returning *
+        """,
+        (
+            data_man,
+            _txt_controle(p.get("viatura"), 80),
+            _int_controle(p.get("hodometro")) or None,
+            _txt_controle(p.get("documento"), 120),
+            _txt_controle(p.get("fornecedor"), 200),
+            _txt_controle(p.get("observacao") or p.get("observacoes")),
+            Json(itens_norm),
+            total_prod,
+            total_serv,
+            total_geral,
+        ),
+    )
+    return normalizar_registro_controle(row)
+
+
+def inserir_controle_multas(p):
+    data_hora = _parse_datetime_controle(p.get("data_hora_infracao"))
+    data_infracao = data_hora.date() if data_hora else _parse_data_controle(p.get("data_infracao"))
+    row = one(
+        """
+        insert into controle_multas (
+          viatura, auto_infracao, data_infracao, data_hora_infracao, data_limite_indicacao,
+          municipio, endereco, descricao_multa, natureza, condutor, condutor_responsavel,
+          parcelas, vencimento, valor, valor_pago, observacoes, situacao,
+          contas_pagar, extrato_profissional, status, updated_at
+        ) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'ativo',now())
+        returning *
+        """,
+        (
+            _txt_controle(p.get("viatura"), 80),
+            _txt_controle(p.get("auto_infracao"), 80),
+            data_infracao,
+            data_hora,
+            _parse_data_controle(p.get("data_limite_indicacao")),
+            _txt_controle(p.get("municipio"), 120),
+            _txt_controle(p.get("endereco")),
+            _txt_controle(p.get("descricao_multa")),
+            _txt_controle(p.get("natureza"), 120),
+            _txt_controle(p.get("condutor"), 200),
+            _txt_controle(p.get("condutor_responsavel"), 200),
+            _int_controle(p.get("parcelas"), 1) or 1,
+            _parse_data_controle(p.get("vencimento") or p.get("data_vencimento")),
+            _num_controle(p.get("valor")),
+            _num_controle(p.get("valor_pago")),
+            _txt_controle(p.get("observacao") or p.get("observacoes")),
+            _txt_controle(p.get("situacao"), 80) or "pendente",
+            _bool_controle(p.get("contas_pagar")),
+            _bool_controle(p.get("extrato_profissional")),
+        ),
+    )
+    return normalizar_registro_controle(row)
+
+
+def inserir_controle_seguros(p):
+    row = one(
+        """
+        insert into controle_seguros (
+          viatura, seguradora, apolice, corretor, telefone,
+          vigencia_inicial, vigencia_final, valor, parcelas, vencimento,
+          observacoes, situacao, status, updated_at
+        ) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'ativo',now())
+        returning *
+        """,
+        (
+            _txt_controle(p.get("viatura"), 80),
+            _txt_controle(p.get("seguradora"), 200),
+            _txt_controle(p.get("apolice") or p.get("numero_apolice"), 120),
+            _txt_controle(p.get("corretor"), 200),
+            _txt_controle(p.get("telefone"), 40),
+            _parse_data_controle(p.get("vigencia_inicial")),
+            _parse_data_controle(p.get("vigencia_final")),
+            _num_controle(p.get("valor") or p.get("valor_total")),
+            _int_controle(p.get("parcelas"), 1) or 1,
+            _parse_data_controle(p.get("vencimento")),
+            _txt_controle(p.get("observacoes") or p.get("observacao")),
+            _txt_controle(p.get("situacao"), 80) or "ativo",
+        ),
+    )
+    return normalizar_registro_controle(row)
+
+
+def inserir_controle_checklist_viatura(p):
+    data_hora = _parse_datetime_controle(p.get("data_hora"))
+    data_chk = data_hora.date() if data_hora else _parse_data_controle(p.get("data_checklist"))
+    row = one(
+        """
+        insert into controle_checklists_viatura (
+          viatura, motorista, tipo_checklist, data_checklist, data_hora, km,
+          status_checklist, observacoes, itens_conferidos, itens_problema, status, updated_at
+        ) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'ativo',now())
+        returning *
+        """,
+        (
+            _txt_controle(p.get("viatura"), 80),
+            _txt_controle(p.get("motorista"), 200),
+            _txt_controle(p.get("tipo_checklist"), 80),
+            data_chk,
+            data_hora,
+            _int_controle(p.get("km")) or None,
+            _txt_controle(p.get("status_checklist") or p.get("status"), 80),
+            _txt_controle(p.get("observacoes") or p.get("observacao")),
+            _txt_controle(p.get("itens_conferidos")),
+            _txt_controle(p.get("itens_problema")),
+        ),
+    )
+    return normalizar_registro_controle(row)
+
+
+CONTROLE_INSERIR = {
+    "danos": inserir_controle_danos,
+    "abastecimentos": inserir_controle_abastecimentos,
+    "checklist-viatura": inserir_controle_checklist_viatura,
+    "manutencoes": inserir_controle_manutencoes,
+    "multas": inserir_controle_multas,
+    "seguros": inserir_controle_seguros,
+}
+
+
+async def api_controle_salvar(slug: str, request: Request):
+    cfg = CONTROLE_MODULOS.get(slug)
+    if not cfg:
+        return JSONResponse({"ok": False, "erro": "Módulo inválido"}, status_code=404)
+    inserir = CONTROLE_INSERIR.get(slug)
+    if not inserir:
+        return JSONResponse({"ok": False, "erro": "Cadastro indisponível"}, status_code=400)
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    try:
+        registro = inserir(payload or {})
+        if not registro:
+            return JSONResponse({"ok": False, "erro": "Falha ao gravar registro"}, status_code=500)
+        return {
+            "ok": True,
+            "registro": registro,
+            "kpis": resumo_modulo_controle(cfg["tabela"]),
+        }
+    except Exception as exc:
+        return JSONResponse({"ok": False, "erro": str(exc)}, status_code=400)
+
+
+def normalizar_registro_controle(row):
+    if not row:
+        return None
+    item = dict(row)
+    item["id"] = str(item.get("id"))
+    item["_data_iso"] = _data_iso_controle(item)
+    item["created_at"] = dt_str(item.get("created_at"))
+    item["updated_at"] = dt_str(item.get("updated_at"))
+    exibicao = {}
+    for chave in item.keys():
+        if chave.startswith("_"):
+            continue
+        exibicao[chave] = _formatar_valor_controle(chave, item.get(chave))
+    item["_fmt"] = exibicao
+    return item
+
+
+def listar_registros_controle(tabela):
+    if tabela not in {m["tabela"] for m in CONTROLE_MODULOS.values()}:
+        return []
+    rows = q(
+        f"select * from {tabela} order by created_at desc nulls last limit 500",
+        fetch=True,
+    )
+    return [normalizar_registro_controle(r) for r in rows]
+
+
+def resumo_modulo_controle(tabela):
+    if tabela not in {m["tabela"] for m in CONTROLE_MODULOS.values()}:
+        return {"total": 0, "ativos": 0, "mes": 0}
+    row = one(
+        f"""
+        select
+          count(*)::int as total,
+          count(*) filter (where coalesce(status, 'ativo') = 'ativo')::int as ativos,
+          count(*) filter (
+            where created_at is not null
+              and date_trunc('month', created_at::timestamp) = date_trunc('month', now())
+          )::int as mes
+        from {tabela}
+        """
+    ) or {}
+    return {
+        "total": int(row.get("total") or 0),
+        "ativos": int(row.get("ativos") or 0),
+        "mes": int(row.get("mes") or 0),
+    }
+
+
+def pagina_modulo_controle(slug: str, request: Request):
+    cfg = CONTROLE_MODULOS.get(slug)
+    if not cfg:
+        return RedirectResponse("/controle", status_code=303)
+    kpis = resumo_modulo_controle(cfg["tabela"])
+    registros = listar_registros_controle(cfg["tabela"])
+    colunas = [{"chave": c[0], "rotulo": c[1]} for c in cfg["colunas"]]
+    return templates.TemplateResponse(
+        "controle/modulo.html",
+        {
+            "request": request,
+            "nav_ativo": "controle",
+            "nav_som": False,
+            "modulo": cfg,
+            "kpis": kpis,
+            "registros": registros,
+            "colunas": colunas,
+        },
+    )
+
+
+# ============================================================
+# CADASTROS — viaturas e profissionais (premium)
+# ============================================================
+
+def _txt_cad(v, max_len=500):
+    return _txt_controle(v, max_len)
+
+
+def _status_cad(v):
+    s = (_txt_cad(v, 20) or "ativo").lower()
+    return "inativo" if s in ("inativo", "0", "false") else "ativo"
+
+
+def _bool_cad(v):
+    return _bool_controle(v)
+
+
+def normalizar_viatura_cadastro(row, com_arquivos=False):
+    if not row:
+        return None
+    item = dict(row)
+    item["id"] = str(item.get("id"))
+    item["status"] = _status_cad(item.get("status"))
+    item["terceiro"] = bool(item.get("terceiro"))
+    item["exibicao"] = (item.get("exibicao") or item.get("placa") or item.get("modelo") or "-").strip()
+    item["created_at"] = dt_str(item.get("created_at"))
+    item["updated_at"] = dt_str(item.get("updated_at"))
+    if com_arquivos:
+        item["arquivos"] = listar_arquivos_viatura_cadastro(item["id"])
+    item["qtd_arquivos"] = int(item.get("qtd_arquivos") or 0)
+    return item
+
+
+def _fmt_data_cad(v):
+    if not v:
+        return ""
+    if hasattr(v, "strftime"):
+        return v.strftime("%d/%m/%Y")
+    return str(v)[:10]
+
+
+def _nome_exibicao_profissional(item):
+    return (
+        (item.get("nome_trabalho") or "").strip()
+        or (item.get("nome_completo") or "").strip()
+        or (item.get("nome") or "").strip()
+        or "-"
+    )
+
+
+def normalizar_profissional_cadastro(row, com_arquivos=False):
+    if not row:
+        return None
+    item = dict(row)
+    item["id"] = str(item.get("id"))
+    if item.get("motorista_id"):
+        item["motorista_id"] = str(item["motorista_id"])
+    item["nome_completo"] = (item.get("nome_completo") or item.get("nome") or "").strip()
+    item["nome_trabalho"] = (item.get("nome_trabalho") or item.get("nome_completo") or item.get("nome") or "").strip()
+    item["nome"] = _nome_exibicao_profissional(item)
+    item["telefone"] = (item.get("telefone_movel") or item.get("telefone_fixo") or item.get("telefone") or "").strip()
+    item["cnh_numero"] = (item.get("cnh_numero") or item.get("cnh") or "").strip()
+    item["cnh_vencimento"] = _fmt_data_cad(item.get("cnh_vencimento") or item.get("validade_cnh"))
+    item["cnh_categoria"] = (item.get("cnh_categoria") or item.get("categoria_cnh") or "").strip()
+    item["data_nascimento_fmt"] = _fmt_data_cad(item.get("data_nascimento"))
+    item["status"] = _status_cad(item.get("status"))
+    item["terceiro"] = bool(item.get("terceiro"))
+    item["pode_receber_servicos"] = bool(item.get("pode_receber_servicos"))
+    item["pode_aparecer_controle"] = bool(item.get("pode_aparecer_controle"))
+    item["created_at"] = dt_str(item.get("created_at"))
+    item["updated_at"] = dt_str(item.get("updated_at"))
+    item["detalhes_registro"] = {
+        "nome_completo": item["nome_completo"] or "-",
+        "cpf": (item.get("cpf") or "-").strip(),
+        "estado_civil": (item.get("estado_civil") or "-").strip(),
+        "data_nascimento": item["data_nascimento_fmt"] or "-",
+    }
+    if com_arquivos:
+        item["arquivos"] = listar_arquivos_profissional_cadastro(item["id"])
+    item["qtd_arquivos"] = int(item.get("qtd_arquivos") or 0)
+    return item
+
+
+def resumo_viaturas_cadastro():
+    row = one(
+        """
+        select
+          count(*)::int as total,
+          count(*) filter (where coalesce(status,'ativo')='ativo')::int as ativas,
+          count(*) filter (where coalesce(status,'ativo')='inativo')::int as inativas,
+          count(*) filter (where exists (
+            select 1 from cadastro_viatura_arquivos a where a.viatura_id = cadastro_viaturas.id
+          ))::int as com_documentos
+        from cadastro_viaturas
+        """
+    ) or {}
+    return {
+        "total": int(row.get("total") or 0),
+        "ativas": int(row.get("ativas") or 0),
+        "inativas": int(row.get("inativas") or 0),
+        "com_documentos": int(row.get("com_documentos") or 0),
+    }
+
+
+def resumo_profissionais_cadastro():
+    row = one(
+        """
+        select
+          count(*)::int as total,
+          count(*) filter (where coalesce(status,'ativo')='ativo')::int as ativos,
+          count(*) filter (where coalesce(status,'ativo')='inativo')::int as inativos,
+          count(*) filter (where coalesce(funcao,'') ilike '%%motorista%%')::int as motoristas
+        from cadastro_profissionais
+        """
+    ) or {}
+    return {
+        "total": int(row.get("total") or 0),
+        "ativos": int(row.get("ativos") or 0),
+        "inativos": int(row.get("inativos") or 0),
+        "motoristas": int(row.get("motoristas") or 0),
+    }
+
+
+def _nome_exibicao_contato(item):
+    if not item:
+        return "-"
+    if (item.get("tipo_pessoa") or "").lower() == "fisica":
+        return (item.get("nome") or "").strip() or "-"
+    return (
+        (item.get("nome_fantasia") or "").strip()
+        or (item.get("razao_social") or "").strip()
+        or "-"
+    )
+
+
+def _documento_exibicao_contato(item):
+    if not item:
+        return ""
+    if (item.get("tipo_pessoa") or "").lower() == "fisica":
+        return (item.get("cpf") or "").strip()
+    return (item.get("cnpj") or "").strip()
+
+
+def _where_contatos_cadastro(cliente=None, fornecedor=None):
+    parts = []
+    params = []
+    if cliente:
+        parts.append("coalesce(cliente, false) = true")
+    if fornecedor:
+        parts.append("coalesce(fornecedor, false) = true")
+    sql = (" where " + " and ".join(parts)) if parts else ""
+    return sql, params
+
+
+def normalizar_contato_cadastro(row, com_arquivos=False):
+    if not row:
+        return None
+    item = dict(row)
+    item["id"] = str(item.get("id"))
+    item["tipo_pessoa"] = (item.get("tipo_pessoa") or "juridica").lower()
+    item["status"] = _status_cad(item.get("status"))
+    item["cliente"] = bool(item.get("cliente"))
+    item["fornecedor"] = bool(item.get("fornecedor"))
+    item["nome_exibicao"] = _nome_exibicao_contato(item)
+    item["documento"] = _documento_exibicao_contato(item)
+    item["limite_credito"] = float(item.get("limite_credito") or 0)
+    item["data_nascimento_fmt"] = _fmt_data_cad(item.get("data_nascimento"))
+    item["created_at_fmt"] = dt_str(item.get("created_at"))
+    item["updated_at_fmt"] = dt_str(item.get("updated_at"))
+    if com_arquivos:
+        item["arquivos"] = listar_arquivos_contato_cadastro(item["id"])
+    return item
+
+
+def resumo_contatos_cadastro(cliente=False, fornecedor=False):
+    where, _ = _where_contatos_cadastro(
+        cliente=True if cliente else None,
+        fornecedor=True if fornecedor else None,
+    )
+    row = one(
+        f"""
+        select
+          count(*)::int as total,
+          count(*) filter (where coalesce(status,'ativo')='ativo')::int as ativos,
+          count(*) filter (
+            where created_at >= date_trunc('month', current_date)
+          )::int as novos_mes
+        from cadastro_contatos
+        {where}
+        """
+    ) or {}
+    return {
+        "total": int(row.get("total") or 0),
+        "ativos": int(row.get("ativos") or 0),
+        "novos_mes": int(row.get("novos_mes") or 0),
+    }
+
+
+def listar_contatos_cadastro(cliente=None, fornecedor=None, status=None):
+    where, params = _where_contatos_cadastro(cliente=cliente, fornecedor=fornecedor)
+    if status:
+        where += (" and " if where else " where ") + "coalesce(status,'ativo')=%s"
+        params.append(status)
+    rows = q(
+        f"select * from cadastro_contatos{where} order by coalesce(nome_fantasia, razao_social, nome) asc nulls last",
+        tuple(params) if params else None,
+        fetch=True,
+    )
+    return [normalizar_contato_cadastro(r) for r in rows]
+
+
+def contato_cadastro_por_id(cid):
+    row = one("select * from cadastro_contatos where id=%s", (str(cid),))
+    return normalizar_contato_cadastro(row, com_arquivos=True) if row else None
+
+
+def _params_contato_cadastro(p):
+    p = p or {}
+    tipo_pessoa = (p.get("tipo_pessoa") or "juridica").lower()
+    if tipo_pessoa not in ("fisica", "juridica"):
+        tipo_pessoa = "juridica"
+    cliente = _bool_cad(p.get("cliente"))
+    fornecedor = _bool_cad(p.get("fornecedor"))
+    if not cliente and not fornecedor:
+        raise ValueError("Marque Cliente e/ou Fornecedor")
+    if tipo_pessoa == "fisica":
+        nome = _txt_cad(p.get("nome"))
+        if not nome:
+            raise ValueError("Nome é obrigatório para pessoa física")
+    else:
+        razao = _txt_cad(p.get("razao_social"))
+        if not razao:
+            raise ValueError("Razão social é obrigatória para pessoa jurídica")
+    return (
+        tipo_pessoa,
+        _status_cad(p.get("status")),
+        _txt_cad(p.get("razao_social")),
+        _txt_cad(p.get("nome_fantasia")),
+        _txt_cad(p.get("cnpj")),
+        _txt_cad(p.get("inscricao_estadual")),
+        _txt_cad(p.get("contribuinte_icms")),
+        _txt_cad(p.get("nome")),
+        _txt_cad(p.get("cpf")),
+        _txt_cad(p.get("rg")),
+        _parse_data_controle(p.get("data_nascimento")),
+        _txt_cad(p.get("cep")),
+        _txt_cad(p.get("logradouro")),
+        _txt_cad(p.get("numero")),
+        _txt_cad(p.get("complemento")),
+        _txt_cad(p.get("bairro")),
+        _txt_cad(p.get("cidade")),
+        _txt_cad(p.get("uf")),
+        _txt_cad(p.get("email")),
+        _txt_cad(p.get("email_financeiro")),
+        _txt_cad(p.get("telefone")),
+        _txt_cad(p.get("celular")),
+        cliente,
+        fornecedor,
+        _num_controle(p.get("limite_credito")),
+        _txt_cad(p.get("prazo_recebimento")),
+        _txt_cad(p.get("observacoes_comercial_cliente")),
+        _txt_cad(p.get("prazo_pagamento")),
+        _txt_cad(p.get("categoria_fornecedor")),
+        _txt_cad(p.get("observacoes_comercial_fornecedor")),
+        _txt_cad(p.get("observacoes")),
+    )
+
+
+def salvar_contato_cadastro(payload):
+    p = payload or {}
+    cid = (p.get("id") or "").strip()
+    params = _params_contato_cadastro(p)
+    cols = """
+      tipo_pessoa=%s, status=%s, razao_social=%s, nome_fantasia=%s, cnpj=%s,
+      inscricao_estadual=%s, contribuinte_icms=%s, nome=%s, cpf=%s, rg=%s,
+      data_nascimento=%s, cep=%s, logradouro=%s, numero=%s, complemento=%s,
+      bairro=%s, cidade=%s, uf=%s, email=%s, email_financeiro=%s,
+      telefone=%s, celular=%s, cliente=%s, fornecedor=%s,
+      limite_credito=%s, prazo_recebimento=%s, observacoes_comercial_cliente=%s,
+      prazo_pagamento=%s, categoria_fornecedor=%s, observacoes_comercial_fornecedor=%s,
+      observacoes=%s, updated_at=now()
+    """
+    if cid:
+        q(f"update cadastro_contatos set {cols} where id=%s", params + (cid,))
+        return contato_cadastro_por_id(cid)
+    row = one(
+        f"""
+        insert into cadastro_contatos (
+          tipo_pessoa, status, razao_social, nome_fantasia, cnpj,
+          inscricao_estadual, contribuinte_icms, nome, cpf, rg,
+          data_nascimento, cep, logradouro, numero, complemento,
+          bairro, cidade, uf, email, email_financeiro,
+          telefone, celular, cliente, fornecedor,
+          limite_credito, prazo_recebimento, observacoes_comercial_cliente,
+          prazo_pagamento, categoria_fornecedor, observacoes_comercial_fornecedor,
+          observacoes, updated_at
+        ) values ({",".join(["%s"] * len(params))}, now())
+        returning id
+        """,
+        params,
+    )
+    return contato_cadastro_por_id(row["id"])
+
+
+def excluir_contato_cadastro(cid):
+    q("delete from cadastro_contato_arquivos where contato_id=%s", (str(cid),))
+    q("delete from cadastro_contatos where id=%s", (str(cid),))
+
+
+def listar_arquivos_contato_cadastro(cid):
+    rows = q(
+        "select * from cadastro_contato_arquivos where contato_id=%s order by created_at desc",
+        (str(cid),),
+        fetch=True,
+    )
+    out = []
+    for r in rows:
+        item = dict(r)
+        item["id"] = str(item["id"])
+        item["contato_id"] = str(item["contato_id"])
+        item["nome_arquivo"] = item.get("nome_arquivo") or item.get("nome") or item.get("filename") or "-"
+        item["tipo"] = item.get("tipo") or item.get("tipo_documento") or "-"
+        item["caminho_arquivo"] = item.get("caminho_arquivo") or item.get("url") or ""
+        item["created_at_fmt"] = dt_str(item.get("created_at"))
+        out.append(item)
+    return out
+
+
+def excluir_arquivo_contato_cadastro(aid):
+    row = one("select caminho_arquivo, url from cadastro_contato_arquivos where id=%s", (str(aid),))
+    if row:
+        path_url = row.get("caminho_arquivo") or row.get("url") or ""
+        if path_url.startswith("/static/"):
+            fpath = path_url.lstrip("/").replace("/", os.sep)
+            if os.path.isfile(fpath):
+                try:
+                    os.remove(fpath)
+                except OSError:
+                    pass
+    q("delete from cadastro_contato_arquivos where id=%s", (str(aid),))
+
+
+async def salvar_arquivo_contato_cadastro(cid, form, arquivo):
+    if not arquivo or not getattr(arquivo, "filename", None):
+        raise ValueError("Arquivo obrigatório")
+    pasta = os.path.join(CADASTROS_UPLOAD_DIR, "contatos", str(cid))
+    os.makedirs(pasta, exist_ok=True)
+    ext = os.path.splitext(arquivo.filename)[1].lower()
+    fname = f"{uuid.uuid4().hex}{ext}"
+    path = os.path.join(pasta, fname)
+    content = await arquivo.read()
+    with open(path, "wb") as f:
+        f.write(content)
+    caminho = f"/static/uploads/cadastros/contatos/{cid}/{fname}"
+    nome_arq = _txt_cad(form.get("nome")) or arquivo.filename
+    tipo_doc = _txt_cad(form.get("tipo") or form.get("tipo_documento")) or "Outros"
+    row = one(
+        """
+        insert into cadastro_contato_arquivos (
+          contato_id, nome_arquivo, extensao, tipo, caminho_arquivo,
+          nome, tipo_documento, data_documento, filename, url
+        ) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) returning *
+        """,
+        (
+            str(cid),
+            nome_arq,
+            ext.lstrip("."),
+            tipo_doc,
+            caminho,
+            nome_arq,
+            tipo_doc,
+            _parse_data_controle(form.get("data_documento")),
+            fname,
+            caminho,
+        ),
+    )
+    return dict(row)
+
+
+def opcoes_contatos_cadastro(papel=None):
+    cliente = (papel or "").lower() == "cliente"
+    fornecedor = (papel or "").lower() == "fornecedor"
+    itens = listar_contatos_cadastro(
+        cliente=True if cliente else None,
+        fornecedor=True if fornecedor else None,
+        status="ativo",
+    )
+    return [
+        {
+            "id": i["id"],
+            "nome": i["nome_exibicao"],
+            "documento": i.get("documento") or "",
+            "cidade": i.get("cidade") or "",
+        }
+        for i in itens
+    ]
+
+
+def listar_viaturas_cadastro():
+    rows = q(
+        """
+        select v.*,
+               (select count(*)::int from cadastro_viatura_arquivos a where a.viatura_id = v.id) as qtd_arquivos
+          from cadastro_viaturas v
+         order by coalesce(v.exibicao, v.placa, v.modelo) asc nulls last
+        """,
+        fetch=True,
+    )
+    return [normalizar_viatura_cadastro(r) for r in rows]
+
+
+def viatura_cadastro_por_id(vid):
+    row = one(
+        """
+        select v.*,
+               (select count(*)::int from cadastro_viatura_arquivos a where a.viatura_id = v.id) as qtd_arquivos
+          from cadastro_viaturas v
+         where v.id = %s
+        """,
+        (str(vid),),
+    )
+    return normalizar_viatura_cadastro(row, com_arquivos=True) if row else None
+
+
+def salvar_viatura_cadastro(payload):
+    p = payload or {}
+    vid = (p.get("id") or "").strip()
+    placa = (_txt_cad(p.get("placa"), 12) or "").upper()
+    if not placa:
+        raise ValueError("Placa é obrigatória")
+    exibicao = _txt_cad(p.get("exibicao")) or placa
+    params = (
+        placa,
+        _txt_cad(p.get("marca")),
+        _txt_cad(p.get("modelo")),
+        _txt_cad(p.get("renavam")),
+        _txt_cad(p.get("chassi")),
+        _txt_cad(p.get("ano_fabricacao"), 8),
+        _txt_cad(p.get("ano_modelo"), 8),
+        _txt_cad(p.get("combustivel")),
+        _num_controle(p.get("capacidade_litros")) or None,
+        _txt_cad(p.get("cor")),
+        _txt_cad(p.get("estado_placa")),
+        _txt_cad(p.get("tipo_viatura")),
+        _txt_cad(p.get("observacoes")),
+        _status_cad(p.get("status")),
+        _txt_cad(p.get("cpf_cnpj_crlv")),
+        exibicao,
+        _txt_cad(p.get("telefone")),
+        _txt_cad(p.get("personalizacao")),
+        _num_controle(p.get("consumo_km_l")) or None,
+        _int_controle(p.get("hodometro")) or None,
+        _bool_cad(p.get("terceiro")),
+    )
+    if vid:
+        q(
+            """
+            update cadastro_viaturas set
+              placa=%s, marca=%s, modelo=%s, renavam=%s, chassi=%s,
+              ano_fabricacao=%s, ano_modelo=%s, combustivel=%s, capacidade_litros=%s,
+              cor=%s, estado_placa=%s, tipo_viatura=%s, observacoes=%s, status=%s,
+              cpf_cnpj_crlv=%s, exibicao=%s, telefone=%s, personalizacao=%s,
+              consumo_km_l=%s, hodometro=%s, terceiro=%s, updated_at=now()
+            where id=%s
+            """,
+            params + (vid,),
+        )
+        return viatura_cadastro_por_id(vid)
+    row = one(
+        """
+        insert into cadastro_viaturas (
+          placa, marca, modelo, renavam, chassi, ano_fabricacao, ano_modelo,
+          combustivel, capacidade_litros, cor, estado_placa, tipo_viatura, observacoes,
+          status, cpf_cnpj_crlv, exibicao, telefone, personalizacao,
+          consumo_km_l, hodometro, terceiro, updated_at
+        ) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,now())
+        returning id
+        """,
+        params,
+    )
+    return viatura_cadastro_por_id(row["id"])
+
+
+def excluir_viatura_cadastro(vid):
+    q("delete from cadastro_viatura_arquivos where viatura_id=%s", (str(vid),))
+    q("delete from cadastro_viaturas where id=%s", (str(vid),))
+
+
+def listar_arquivos_viatura_cadastro(vid):
+    rows = q(
+        "select * from cadastro_viatura_arquivos where viatura_id=%s order by created_at desc",
+        (str(vid),),
+        fetch=True,
+    )
+    out = []
+    for r in rows:
+        item = dict(r)
+        item["id"] = str(item["id"])
+        item["viatura_id"] = str(item["viatura_id"])
+        if item.get("data_documento") and hasattr(item["data_documento"], "strftime"):
+            item["data_documento"] = item["data_documento"].strftime("%Y-%m-%d")
+        out.append(item)
+    return out
+
+
+def listar_profissionais_cadastro():
+    rows = q("select * from cadastro_profissionais order by nome asc nulls last", fetch=True)
+    return [normalizar_profissional_cadastro(r) for r in rows]
+
+
+def profissional_cadastro_por_id(pid):
+    row = one("select * from cadastro_profissionais where id=%s", (str(pid),))
+    return normalizar_profissional_cadastro(row, com_arquivos=True) if row else None
+
+
+def _params_profissional_cadastro(p):
+    p = p or {}
+    nome_completo = _txt_cad(p.get("nome_completo") or p.get("nome"))
+    if not nome_completo:
+        raise ValueError("Nome completo é obrigatório")
+    nome_trabalho = _txt_cad(p.get("nome_trabalho")) or nome_completo
+    nome_legacy = nome_trabalho
+    cnh_numero = _txt_cad(p.get("cnh_numero") or p.get("cnh"))
+    cnh_venc = _parse_data_controle(p.get("cnh_vencimento") or p.get("validade_cnh"))
+    cnh_cat = _txt_cad(p.get("cnh_categoria") or p.get("categoria_cnh"))
+    tel_movel = _txt_cad(p.get("telefone_movel") or p.get("telefone"))
+    remuneracao = _txt_cad(p.get("remuneracao"))
+    if remuneracao is None and p.get("comissao_padrao") not in (None, ""):
+        remuneracao = str(p.get("comissao_padrao"))
+    return (
+        _txt_cad(p.get("filial_cnpj")),
+        nome_completo,
+        nome_trabalho,
+        _parse_data_controle(p.get("data_nascimento")),
+        _txt_cad(p.get("cpf")),
+        _txt_cad(p.get("rg")),
+        tel_movel,
+        _txt_cad(p.get("telefone_fixo")),
+        _txt_cad(p.get("estado_civil")),
+        _txt_cad(p.get("email")),
+        _txt_cad(p.get("cep")),
+        _txt_cad(p.get("logradouro")),
+        _txt_cad(p.get("bairro")),
+        _txt_cad(p.get("cidade")),
+        _txt_cad(p.get("uf")),
+        _txt_cad(p.get("observacoes")),
+        _bool_cad(p.get("terceiro")),
+        _txt_cad(p.get("cnpj")),
+        _txt_cad(p.get("funcao")),
+        remuneracao,
+        _txt_cad(p.get("forma_pagamento")),
+        _parse_data_controle(p.get("data_admissao")),
+        _parse_data_controle(p.get("data_demissao")),
+        _txt_cad(p.get("hora_inicio")),
+        _txt_cad(p.get("hora_termino")),
+        _txt_cad(p.get("carga_horaria")),
+        _txt_cad(p.get("intervalo")),
+        _txt_cad(p.get("escala")),
+        _txt_cad(p.get("registro_ctps")),
+        cnh_numero,
+        cnh_venc,
+        cnh_cat,
+        _status_cad(p.get("status")),
+        nome_legacy,
+        cnh_numero,
+        cnh_cat,
+        cnh_venc,
+        tel_movel,
+        _txt_cad(p.get("endereco")),
+        _txt_cad(p.get("tipo_profissional")),
+        _num_controle(p.get("comissao_padrao")),
+        _bool_cad(p.get("pode_receber_servicos")),
+        _bool_cad(p.get("pode_aparecer_controle")),
+        (p.get("motorista_id") or "").strip() or None,
+    )
+
+
+def salvar_profissional_cadastro(payload):
+    p = payload or {}
+    pid = (p.get("id") or "").strip()
+    params = _params_profissional_cadastro(p)
+    cols_update = """
+      filial_cnpj=%s, nome_completo=%s, nome_trabalho=%s, data_nascimento=%s,
+      cpf=%s, rg=%s, telefone_movel=%s, telefone_fixo=%s, estado_civil=%s, email=%s,
+      cep=%s, logradouro=%s, bairro=%s, cidade=%s, uf=%s, observacoes=%s,
+      terceiro=%s, cnpj=%s, funcao=%s, remuneracao=%s, forma_pagamento=%s,
+      data_admissao=%s, data_demissao=%s, hora_inicio=%s, hora_termino=%s,
+      carga_horaria=%s, intervalo=%s, escala=%s, registro_ctps=%s,
+      cnh_numero=%s, cnh_vencimento=%s, cnh_categoria=%s, status=%s,
+      nome=%s, cnh=%s, categoria_cnh=%s, validade_cnh=%s, telefone=%s, endereco=%s,
+      tipo_profissional=%s, comissao_padrao=%s, pode_receber_servicos=%s,
+      pode_aparecer_controle=%s, motorista_id=%s, updated_at=now()
+    """
+    if pid:
+        q(f"update cadastro_profissionais set {cols_update} where id=%s", params + (pid,))
+        return profissional_cadastro_por_id(pid)
+    row = one(
+        f"""
+        insert into cadastro_profissionais (
+          filial_cnpj, nome_completo, nome_trabalho, data_nascimento,
+          cpf, rg, telefone_movel, telefone_fixo, estado_civil, email,
+          cep, logradouro, bairro, cidade, uf, observacoes,
+          terceiro, cnpj, funcao, remuneracao, forma_pagamento,
+          data_admissao, data_demissao, hora_inicio, hora_termino,
+          carga_horaria, intervalo, escala, registro_ctps,
+          cnh_numero, cnh_vencimento, cnh_categoria, status,
+          nome, cnh, categoria_cnh, validade_cnh, telefone, endereco,
+          tipo_profissional, comissao_padrao, pode_receber_servicos,
+          pode_aparecer_controle, motorista_id, updated_at
+        ) values ({",".join(["%s"] * len(params))}, now())
+        returning id
+        """,
+        params,
+    )
+    return profissional_cadastro_por_id(row["id"])
+
+
+def excluir_profissional_cadastro(pid):
+    q("delete from cadastro_profissional_arquivos where profissional_id=%s", (str(pid),))
+    q("delete from cadastro_profissionais where id=%s", (str(pid),))
+
+
+def listar_arquivos_profissional_cadastro(pid):
+    rows = q(
+        "select * from cadastro_profissional_arquivos where profissional_id=%s order by created_at desc",
+        (str(pid),),
+        fetch=True,
+    )
+    out = []
+    for r in rows:
+        item = dict(r)
+        item["id"] = str(item["id"])
+        item["profissional_id"] = str(item["profissional_id"])
+        item["nome_arquivo"] = item.get("nome_arquivo") or item.get("nome") or item.get("filename") or "-"
+        item["tipo"] = item.get("tipo") or item.get("tipo_documento") or "-"
+        item["caminho_arquivo"] = item.get("caminho_arquivo") or item.get("url") or ""
+        item["extensao"] = (item.get("extensao") or "").strip().lower()
+        if not item["extensao"] and item.get("filename"):
+            item["extensao"] = os.path.splitext(item["filename"])[1].lstrip(".").lower()
+        item["created_at_fmt"] = dt_str(item.get("created_at"))
+        out.append(item)
+    return out
+
+
+def excluir_arquivo_profissional_cadastro(aid):
+    row = one("select caminho_arquivo, url, filename from cadastro_profissional_arquivos where id=%s", (str(aid),))
+    if row:
+        path_url = row.get("caminho_arquivo") or row.get("url") or ""
+        if path_url.startswith("/static/"):
+            fpath = path_url.lstrip("/").replace("/", os.sep)
+            if os.path.isfile(fpath):
+                try:
+                    os.remove(fpath)
+                except OSError:
+                    pass
+    q("delete from cadastro_profissional_arquivos where id=%s", (str(aid),))
+
+
+async def salvar_arquivo_viatura_cadastro(vid, form, arquivo: UploadFile):
+    if not arquivo or not arquivo.filename:
+        raise ValueError("Arquivo obrigatório")
+    pasta = os.path.join(CADASTROS_UPLOAD_DIR, "viaturas", str(vid))
+    os.makedirs(pasta, exist_ok=True)
+    ext = os.path.splitext(arquivo.filename)[1].lower()
+    fname = f"{uuid.uuid4().hex}{ext}"
+    path = os.path.join(pasta, fname)
+    content = await arquivo.read()
+    with open(path, "wb") as f:
+        f.write(content)
+    url = f"/static/uploads/cadastros/viaturas/{vid}/{fname}"
+    row = one(
+        """
+        insert into cadastro_viatura_arquivos (viatura_id, nome, tipo_documento, data_documento, filename, url)
+        values (%s,%s,%s,%s,%s,%s) returning *
+        """,
+        (
+            str(vid),
+            _txt_cad(form.get("nome")) or arquivo.filename,
+            _txt_cad(form.get("tipo_documento")),
+            _parse_data_controle(form.get("data_documento")),
+            fname,
+            url,
+        ),
+    )
+    return dict(row)
+
+
+async def salvar_arquivo_profissional_cadastro(pid, form, arquivo):
+    if not arquivo or not getattr(arquivo, "filename", None):
+        raise ValueError("Arquivo obrigatório")
+    pasta = os.path.join(CADASTROS_UPLOAD_DIR, "profissionais", str(pid))
+    os.makedirs(pasta, exist_ok=True)
+    ext = os.path.splitext(arquivo.filename)[1].lower()
+    fname = f"{uuid.uuid4().hex}{ext}"
+    path = os.path.join(pasta, fname)
+    content = await arquivo.read()
+    with open(path, "wb") as f:
+        f.write(content)
+    caminho = f"/static/uploads/cadastros/profissionais/{pid}/{fname}"
+    nome_arq = _txt_cad(form.get("nome")) or arquivo.filename
+    tipo_doc = _txt_cad(form.get("tipo") or form.get("tipo_documento")) or "Outros"
+    row = one(
+        """
+        insert into cadastro_profissional_arquivos (
+          profissional_id, nome_arquivo, extensao, tipo, caminho_arquivo,
+          nome, tipo_documento, data_documento, filename, url
+        ) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) returning *
+        """,
+        (
+            str(pid),
+            nome_arq,
+            ext.lstrip("."),
+            tipo_doc,
+            caminho,
+            nome_arq,
+            tipo_doc,
+            _parse_data_controle(form.get("data_documento")),
+            fname,
+            caminho,
+        ),
+    )
+    return dict(row)
+
+
+@app.get("/api/cadastros/viaturas")
+def api_cadastros_lista_viaturas():
+    return {"ok": True, "itens": listar_viaturas_cadastro(), "kpis": resumo_viaturas_cadastro()}
+
+
+@app.get("/api/cadastros/viaturas/{vid}")
+def api_cadastros_get_viatura(vid: str):
+    item = viatura_cadastro_por_id(vid)
+    if not item:
+        return JSONResponse({"ok": False, "erro": "Viatura não encontrada"}, status_code=404)
+    return {"ok": True, "item": item}
+
+
+@app.post("/api/cadastros/viaturas")
+async def api_cadastros_post_viatura(request: Request):
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    try:
+        item = salvar_viatura_cadastro(payload)
+        return {"ok": True, "item": item, "kpis": resumo_viaturas_cadastro()}
+    except Exception as exc:
+        return JSONResponse({"ok": False, "erro": str(exc)}, status_code=400)
+
+
+@app.delete("/api/cadastros/viaturas/{vid}")
+def api_cadastros_delete_viatura(vid: str):
+    try:
+        excluir_viatura_cadastro(vid)
+        return {"ok": True, "kpis": resumo_viaturas_cadastro()}
+    except Exception as exc:
+        return JSONResponse({"ok": False, "erro": str(exc)}, status_code=400)
+
+
+@app.post("/api/cadastros/viaturas/{vid}/arquivos")
+async def api_cadastros_upload_viatura(vid: str, request: Request):
+    form = await request.form()
+    arquivo = form.get("arquivo")
+    try:
+        row = await salvar_arquivo_viatura_cadastro(vid, form, arquivo)
+        item = viatura_cadastro_por_id(vid)
+        return {"ok": True, "arquivo": row, "item": item}
+    except Exception as exc:
+        return JSONResponse({"ok": False, "erro": str(exc)}, status_code=400)
+
+
+@app.get("/api/cadastros/profissionais")
+def api_cadastros_lista_profissionais():
+    return {"ok": True, "itens": listar_profissionais_cadastro(), "kpis": resumo_profissionais_cadastro()}
+
+
+@app.get("/api/cadastros/profissionais/{pid}")
+def api_cadastros_get_profissional(pid: str):
+    item = profissional_cadastro_por_id(pid)
+    if not item:
+        return JSONResponse({"ok": False, "erro": "Profissional não encontrado"}, status_code=404)
+    return {"ok": True, "item": item}
+
+
+@app.post("/api/cadastros/profissionais")
+async def api_cadastros_post_profissional(request: Request):
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    try:
+        item = salvar_profissional_cadastro(payload)
+        return {"ok": True, "item": item, "kpis": resumo_profissionais_cadastro()}
+    except Exception as exc:
+        return JSONResponse({"ok": False, "erro": str(exc)}, status_code=400)
+
+
+@app.put("/api/cadastros/profissionais/{pid}")
+async def api_cadastros_put_profissional(pid: str, request: Request):
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    payload["id"] = pid
+    try:
+        item = salvar_profissional_cadastro(payload)
+        return {"ok": True, "item": item, "kpis": resumo_profissionais_cadastro()}
+    except Exception as exc:
+        return JSONResponse({"ok": False, "erro": str(exc)}, status_code=400)
+
+
+@app.delete("/api/cadastros/profissionais/{pid}")
+def api_cadastros_delete_profissional(pid: str):
+    try:
+        excluir_profissional_cadastro(pid)
+        return {"ok": True, "kpis": resumo_profissionais_cadastro()}
+    except Exception as exc:
+        return JSONResponse({"ok": False, "erro": str(exc)}, status_code=400)
+
+
+@app.get("/api/cadastros/profissionais/{pid}/arquivos")
+def api_cadastros_lista_arquivos_profissional(pid: str):
+    return {"ok": True, "itens": listar_arquivos_profissional_cadastro(pid)}
+
+
+@app.post("/api/cadastros/profissionais/{pid}/arquivos")
+async def api_cadastros_upload_profissional(pid: str, request: Request):
+    form = await request.form()
+    arquivo = form.get("arquivo")
+    try:
+        row = await salvar_arquivo_profissional_cadastro(pid, form, arquivo)
+        return {"ok": True, "arquivo": row, "itens": listar_arquivos_profissional_cadastro(pid)}
+    except Exception as exc:
+        return JSONResponse({"ok": False, "erro": str(exc)}, status_code=400)
+
+
+@app.delete("/api/cadastros/profissionais/{pid}/arquivos/{aid}")
+def api_cadastros_delete_arquivo_profissional(pid: str, aid: str):
+    try:
+        excluir_arquivo_profissional_cadastro(aid)
+        return {"ok": True, "itens": listar_arquivos_profissional_cadastro(pid)}
+    except Exception as exc:
+        return JSONResponse({"ok": False, "erro": str(exc)}, status_code=400)
+
+
+@app.get("/api/cadastros/contatos")
+def api_cadastros_lista_contatos(
+    cliente: str = "",
+    fornecedor: str = "",
+    status: str = "",
+):
+    filtro_c = cliente.lower() in ("1", "true", "sim", "s")
+    filtro_f = fornecedor.lower() in ("1", "true", "sim", "s")
+    itens = listar_contatos_cadastro(
+        cliente=True if filtro_c else None,
+        fornecedor=True if filtro_f else None,
+        status=status or None,
+    )
+    kpis = resumo_contatos_cadastro(
+        cliente=filtro_c or None,
+        fornecedor=filtro_f or None,
+    )
+    return {"ok": True, "itens": itens, "kpis": kpis}
+
+
+@app.get("/api/cadastros/contatos/opcoes")
+def api_cadastros_opcoes_contatos(papel: str = ""):
+    return {"ok": True, "itens": opcoes_contatos_cadastro(papel)}
+
+
+@app.get("/api/cadastros/contatos/{cid}")
+def api_cadastros_get_contato(cid: str):
+    item = contato_cadastro_por_id(cid)
+    if not item:
+        return JSONResponse({"ok": False, "erro": "Contato não encontrado"}, status_code=404)
+    return {"ok": True, "item": item}
+
+
+@app.post("/api/cadastros/contatos")
+async def api_cadastros_post_contato(request: Request):
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    try:
+        filtro_c = bool(payload.get("filtro_cliente"))
+        filtro_f = bool(payload.get("filtro_fornecedor"))
+        item = salvar_contato_cadastro(payload)
+        kpis = resumo_contatos_cadastro(cliente=filtro_c or None, fornecedor=filtro_f or None)
+        return {"ok": True, "item": item, "kpis": kpis}
+    except Exception as exc:
+        return JSONResponse({"ok": False, "erro": str(exc)}, status_code=400)
+
+
+@app.put("/api/cadastros/contatos/{cid}")
+async def api_cadastros_put_contato(cid: str, request: Request):
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    payload["id"] = cid
+    try:
+        filtro_c = bool(payload.get("filtro_cliente"))
+        filtro_f = bool(payload.get("filtro_fornecedor"))
+        item = salvar_contato_cadastro(payload)
+        kpis = resumo_contatos_cadastro(cliente=filtro_c or None, fornecedor=filtro_f or None)
+        return {"ok": True, "item": item, "kpis": kpis}
+    except Exception as exc:
+        return JSONResponse({"ok": False, "erro": str(exc)}, status_code=400)
+
+
+@app.delete("/api/cadastros/contatos/{cid}")
+def api_cadastros_delete_contato(cid: str, cliente: str = "", fornecedor: str = ""):
+    try:
+        excluir_contato_cadastro(cid)
+        filtro_c = cliente.lower() in ("1", "true", "sim", "s")
+        filtro_f = fornecedor.lower() in ("1", "true", "sim", "s")
+        kpis = resumo_contatos_cadastro(cliente=filtro_c or None, fornecedor=filtro_f or None)
+        return {"ok": True, "kpis": kpis}
+    except Exception as exc:
+        return JSONResponse({"ok": False, "erro": str(exc)}, status_code=400)
+
+
+@app.get("/api/cadastros/contatos/{cid}/arquivos")
+def api_cadastros_lista_arquivos_contato(cid: str):
+    return {"ok": True, "itens": listar_arquivos_contato_cadastro(cid)}
+
+
+@app.post("/api/cadastros/contatos/{cid}/arquivos")
+async def api_cadastros_upload_contato(cid: str, request: Request):
+    form = await request.form()
+    arquivo = form.get("arquivo")
+    try:
+        row = await salvar_arquivo_contato_cadastro(cid, form, arquivo)
+        return {"ok": True, "arquivo": row, "itens": listar_arquivos_contato_cadastro(cid)}
+    except Exception as exc:
+        return JSONResponse({"ok": False, "erro": str(exc)}, status_code=400)
+
+
+@app.delete("/api/cadastros/contatos/{cid}/arquivos/{aid}")
+def api_cadastros_delete_arquivo_contato(cid: str, aid: str):
+    try:
+        excluir_arquivo_contato_cadastro(aid)
+        return {"ok": True, "itens": listar_arquivos_contato_cadastro(cid)}
+    except Exception as exc:
+        return JSONResponse({"ok": False, "erro": str(exc)}, status_code=400)
+
+
+def opcoes_profissionais_controle():
+    rows = q(
+        """
+        select id,
+               coalesce(nullif(trim(nome_trabalho),''), nullif(trim(nome_completo),''), nome) as nome
+          from cadastro_profissionais
+         where coalesce(status, 'ativo') = 'ativo'
+           and coalesce(pode_aparecer_controle, true) = true
+           and coalesce(trim(coalesce(nome_completo, nome)), '') <> ''
+         order by nome asc
+        """,
+        fetch=True,
+    )
+    return [
+        {"id": str(r["id"]), "nome": (r.get("nome") or "").strip(), "status": "ativo"}
+        for r in rows
+    ]
+
+
+def opcoes_motoristas_legado():
+    rows = q(
+        """
+        select id, nome
+          from motoristas
+         where coalesce(ativo, true) = true
+           and coalesce(trim(nome), '') <> ''
+         order by nome asc
+        """,
+        fetch=True,
+    )
+    return [
+        {"id": str(r["id"]), "nome": (r.get("nome") or "").strip(), "status": "ativo"}
+        for r in rows
+    ]
+
+
+def opcoes_motoristas_controle():
+    """Profissionais ativos aptos a receber serviços ou função de motorista."""
+    rows = q(
+        """
+        select id,
+               coalesce(nullif(trim(nome_trabalho),''), nullif(trim(nome_completo),''), nome) as nome
+          from cadastro_profissionais
+         where coalesce(status, 'ativo') = 'ativo'
+           and (
+             coalesce(pode_receber_servicos, true) = true
+             or coalesce(funcao, '') ilike '%%motorista%%'
+             or coalesce(tipo_profissional, '') ilike '%%motorista%%'
+           )
+           and coalesce(trim(coalesce(nome_completo, nome)), '') <> ''
+         order by nome asc
+        """,
+        fetch=True,
+    )
+    out = [
+        {"id": str(r["id"]), "nome": (r.get("nome") or "").strip(), "status": "ativo"}
+        for r in rows
+    ]
+    if out:
+        return out
+    return opcoes_motoristas_legado()
+
+
+def opcoes_viaturas_controle():
+    rows = q(
+        """
+        select id, placa, marca, modelo, exibicao, tipo_viatura
+          from cadastro_viaturas
+         where coalesce(status, 'ativo') = 'ativo'
+         order by placa asc nulls last
+        """,
+        fetch=True,
+    )
+    out = []
+    for r in rows:
+        placa = (r.get("placa") or "").strip().upper()
+        nome = (r.get("exibicao") or r.get("modelo") or r.get("tipo_viatura") or placa).strip()
+        label = f"{placa} — {nome}" if placa and nome and nome != placa else (placa or nome or "Sem identificação")
+        out.append({"id": str(r["id"]), "placa": placa, "nome": nome, "status": "ativo", "label": label})
+    if out:
+        return out
+    rows = q(
+        """
+        select id, placa, modelo, tipo
+          from veiculos
+         where coalesce(ativo, true) = true
+         order by placa asc nulls last
+        """,
+        fetch=True,
+    )
+    for r in rows:
+        placa = (r.get("placa") or "").strip().upper()
+        modelo = (r.get("modelo") or "").strip()
+        tipo = (r.get("tipo") or "").strip()
+        nome = modelo or tipo or placa
+        label = f"{placa} — {nome}" if placa and nome and nome != placa else (placa or nome)
+        out.append({"id": str(r["id"]), "placa": placa, "nome": nome, "status": "ativo", "label": label})
+    return out
+
+
+@app.get("/api/opcoes/motoristas")
+def api_opcoes_motoristas():
+    return opcoes_motoristas_controle()
+
+
+@app.get("/api/opcoes/profissionais")
+def api_opcoes_profissionais():
+    return opcoes_profissionais_controle()
+
+
+@app.get("/api/opcoes/viaturas")
+def api_opcoes_viaturas():
+    return opcoes_viaturas_controle()
+
+
+@app.get("/controle/danos", response_class=HTMLResponse)
+def controle_pagina_danos(request: Request):
+    return pagina_modulo_controle("danos", request)
+
+
+@app.get("/controle/abastecimentos", response_class=HTMLResponse)
+def controle_pagina_abastecimentos(request: Request):
+    return pagina_modulo_controle("abastecimentos", request)
+
+
+@app.get("/controle/checklist-viatura", response_class=HTMLResponse)
+def controle_pagina_checklist_viatura(request: Request):
+    return pagina_modulo_controle("checklist-viatura", request)
+
+
+@app.get("/controle/manutencoes", response_class=HTMLResponse)
+def controle_pagina_manutencoes(request: Request):
+    return pagina_modulo_controle("manutencoes", request)
+
+
+@app.get("/controle/multas", response_class=HTMLResponse)
+def controle_pagina_multas(request: Request):
+    return pagina_modulo_controle("multas", request)
+
+
+@app.get("/controle/seguros", response_class=HTMLResponse)
+def controle_pagina_seguros(request: Request):
+    return pagina_modulo_controle("seguros", request)
+
+
+@app.get("/api/controle/danos")
+def api_controle_lista_danos():
+    return {"ok": True, "itens": listar_registros_controle("controle_danos")}
+
+
+@app.get("/api/controle/abastecimentos")
+def api_controle_lista_abastecimentos():
+    return {"ok": True, "itens": listar_registros_controle("controle_abastecimentos")}
+
+
+@app.get("/api/controle/checklist-viatura")
+def api_controle_lista_checklist_viatura():
+    return {"ok": True, "itens": listar_registros_controle("controle_checklists_viatura")}
+
+
+@app.get("/api/controle/manutencoes")
+def api_controle_lista_manutencoes():
+    return {"ok": True, "itens": listar_registros_controle("controle_manutencoes")}
+
+
+@app.get("/api/controle/multas")
+def api_controle_lista_multas():
+    return {"ok": True, "itens": listar_registros_controle("controle_multas")}
+
+
+@app.get("/api/controle/seguros")
+def api_controle_lista_seguros():
+    return {"ok": True, "itens": listar_registros_controle("controle_seguros")}
+
+
+@app.post("/api/controle/danos")
+async def api_controle_post_danos(request: Request):
+    return await api_controle_salvar("danos", request)
+
+
+@app.post("/api/controle/abastecimentos")
+async def api_controle_post_abastecimentos(request: Request):
+    return await api_controle_salvar("abastecimentos", request)
+
+
+@app.post("/api/controle/checklist-viatura")
+async def api_controle_post_checklist_viatura(request: Request):
+    return await api_controle_salvar("checklist-viatura", request)
+
+
+@app.post("/api/controle/manutencoes")
+async def api_controle_post_manutencoes(request: Request):
+    return await api_controle_salvar("manutencoes", request)
+
+
+@app.post("/api/controle/multas")
+async def api_controle_post_multas(request: Request):
+    return await api_controle_salvar("multas", request)
+
+
+@app.post("/api/controle/seguros")
+async def api_controle_post_seguros(request: Request):
+    return await api_controle_salvar("seguros", request)
 
 
 @app.get('/', response_class=HTMLResponse)
@@ -3446,3 +5660,8 @@ def exportar(data_ini: str="", data_fim: str="", seguradora: str="", tipo: str="
         pd.DataFrame(lista_motoristas()).to_excel(writer,index=False,sheet_name='Motoristas')
     output.seek(0)
     return StreamingResponse(output,media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',headers={'Content-Disposition':'attachment; filename=sistema_reboque_relatorio.xlsx'})
+
+import financeiro_routes
+import financeiro_notas_entrada
+financeiro_routes.register(app, templates)
+financeiro_notas_entrada.register(app, templates)

@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Notas Fiscais de Entrada — Essência</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/dashboard.css">
+  <link rel="stylesheet" href="/static/controle.css">
+  <link rel="stylesheet" href="/static/cadastros.css">
+  <link rel="stylesheet" href="/static/financeiro.css">
+</head>
+<body class="fin-body">
+{% include "partials/nav_principal.html" %}
+<div id="finToast"></div>
+<div class="fin-shell">
+  <aside class="fin-sidebar-left">
+    <a href="/financeiro" class="fin-link-hub">← Hub Financeiro</a>
+
+    <div class="fin-card">
+      <div class="fin-card-head"><span class="fin-card-icon">◎</span><span>Situação</span></div>
+      <div class="fin-pills" id="filtroSituacao">
+        <button type="button" class="fin-pill active" data-sit="">Todos</button>
+        <button type="button" class="fin-pill" data-sit="registrada">Registrada</button>
+        <button type="button" class="fin-pill" data-sit="pendente">Pendente</button>
+        <button type="button" class="fin-pill" data-sit="cancelada">Cancelada</button>
+      </div>
+    </div>
+
+    <div class="fin-card">
+      <div class="fin-card-head"><span class="fin-card-icon">◎</span><span>Vinculação</span></div>
+      <div class="fin-pills" id="filtroVinculacao">
+        <button type="button" class="fin-pill active" data-vinc="">Todos</button>
+        <button type="button" class="fin-pill" data-vinc="nao_vinculado">Não vinculado</button>
+        <button type="button" class="fin-pill" data-vinc="lancado_contas_pagar">Lançado CP</button>
+      </div>
+    </div>
+
+    <div class="fin-card">
+      <div class="fin-card-head"><span class="fin-card-icon">⚙</span><span>Filtros</span></div>
+      <div class="fin-filters-grid">
+        <div class="fin-field"><label>Produto</label><input type="text" id="ff_produto" placeholder="Descrição do item"></div>
+        <div class="fin-field"><label>Lote</label><input type="text" id="ff_lote"></div>
+        <div class="fin-field"><label>UF</label><input type="text" id="ff_uf" maxlength="2" placeholder="SP"></div>
+        <div class="fin-field"><label>Busca customizada</label><input type="search" id="ff_busca" placeholder="Número, fornecedor, chave..."></div>
+        <div class="fin-field"><label>Entrada de</label><input type="date" id="ff_data_ini"></div>
+        <div class="fin-field"><label>Entrada até</label><input type="date" id="ff_data_fim"></div>
+      </div>
+      <div class="fin-filter-actions">
+        <button type="button" class="fin-btn fin-btn-primary" id="btnFiltrar">🔍 Aplicar filtros</button>
+        <button type="button" class="fin-btn fin-btn-outline" id="btnLimpar">Limpar</button>
+      </div>
+    </div>
+  </aside>
+
+  <main class="fin-main">
+    <div class="fin-page-head">
+      <h1>Notas Fiscais de Entrada</h1>
+      <p class="fin-page-sub">Importe XML de NF-e de fornecedor e lance em Contas a Pagar</p>
+    </div>
+    <div class="fin-table-area">
+      <div class="fin-table-wrap">
+        <table class="fin-table">
+          <thead>
+            <tr>
+              <th style="width:36px"><input type="checkbox" id="chkTodos"></th>
+              <th>Número</th>
+              <th>Data entrada</th>
+              <th>Fornecedor</th>
+              <th>Situação</th>
+              <th>Valor total</th>
+              <th>Vinculação</th>
+              <th style="width:56px">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyNotas"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <aside class="fin-sidebar-right">
+    <p class="fin-side-section-title">Principal</p>
+    <button type="button" class="fin-action-btn fin-action-btn-primary" id="btnImportarXml">
+      <span class="fin-action-btn-icon">⬆</span>
+      <span>Importar XML NF-e</span>
+    </button>
+
+    <p class="fin-side-section-title">Ferramentas</p>
+    <button type="button" class="fin-action-btn fin-action-btn-accent" id="btnLancarSel" disabled>
+      <span class="fin-action-btn-icon">✓</span>
+      <span>Lançar em contas a pagar</span>
+    </button>
+    <button type="button" class="fin-action-btn" id="btnVerDetalhe" disabled>
+      <span class="fin-action-btn-icon">👁</span>
+      <span>Ver detalhes</span>
+    </button>
+
+    <p class="fin-side-section-title">Resumo</p>
+    <div class="fin-stats">
+      <div class="fin-stat-card"><label>Quantidade</label><b id="painelQtd">0</b></div>
+      <div class="fin-stat-card full"><label>Valor total</label><b id="painelTotal">R$ 0,00</b></div>
+    </div>
+  </aside>
+</div>
+
+<!-- Modal importação -->
+<div id="modalImport" class="cad-modal" aria-hidden="true">
+  <div class="cad-modal-shell fin-modal-import">
+    <main class="cad-modal-main">
+      <h2 class="cad-modal-title">Importação de XML NF-e</h2>
+      <p id="importErro" class="cad-erro" style="display:none"></p>
+      <div class="cad-form-grid">
+        <div><label>Loja / unidade</label><input type="text" id="imp_loja" placeholder="Ex.: Matriz, Filial SP"></div>
+        <div class="full fin-check-row">
+          <label class="fin-check-import"><input type="checkbox" id="imp_lancar_cp"> Lançar contas a pagar automaticamente</label>
+        </div>
+      </div>
+      <div class="fin-dropzone" id="dropzone">
+        <input type="file" id="imp_arquivo" accept=".xml,text/xml,application/xml" hidden>
+        <div class="fin-dropzone-inner">
+          <span class="fin-dropzone-icon">📄</span>
+          <p><b>Arraste e solte o XML aqui</b></p>
+          <p class="muted">ou clique para selecionar o arquivo NF-e</p>
+          <p id="imp_nome_arquivo" class="fin-dropzone-file"></p>
+        </div>
+      </div>
+      <div class="cad-modal-footer" style="margin-top:16px">
+        <button type="button" class="fin-btn fin-btn-outline" id="btnFecharImport">Cancelar</button>
+        <button type="button" class="fin-btn fin-btn-primary" id="btnEnviarImport">Importar nota</button>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Modal detalhes -->
+<div id="modalDetalhe" class="cad-modal" aria-hidden="true">
+  <div class="cad-modal-shell cad-modal-prof fin-modal-detalhe">
+    <nav class="cad-modal-nav">
+      <h3>NF-e Entrada</h3>
+      <button type="button" class="cad-nav-btn active" data-nf-tab="nota">📋 Nota</button>
+      <button type="button" class="cad-nav-btn" data-nf-tab="itens">📦 Itens</button>
+      <button type="button" class="cad-nav-btn" data-nf-tab="parcelas">📅 Parcelas</button>
+      <button type="button" class="cad-nav-btn" data-nf-tab="cp">💳 Contas a pagar</button>
+      <button type="button" class="cad-nav-btn" data-nf-tab="xml">📝 XML</button>
+    </nav>
+    <main class="cad-modal-main">
+      <h2 class="cad-modal-title" id="detTitulo">Detalhes da nota</h2>
+      <div class="fin-tab-panel active" data-nf-panel="nota">
+        <div class="fin-detalhe-grid" id="detNota"></div>
+      </div>
+      <div class="fin-tab-panel" data-nf-panel="itens">
+        <table class="fin-table fin-hist-table"><thead><tr><th>#</th><th>Descrição</th><th>Qtd</th><th>Valor</th></tr></thead><tbody id="detItens"></tbody></table>
+      </div>
+      <div class="fin-tab-panel" data-nf-panel="parcelas">
+        <table class="fin-table fin-hist-table"><thead><tr><th>Parcela</th><th>Vencimento</th><th>Valor</th></tr></thead><tbody id="detParcelas"></tbody></table>
+      </div>
+      <div class="fin-tab-panel" data-nf-panel="cp">
+        <div id="detCp"></div>
+      </div>
+      <div class="fin-tab-panel" data-nf-panel="xml">
+        <pre id="detXml" class="fin-xml-pre"></pre>
+      </div>
+      <div class="cad-modal-footer">
+        <button type="button" class="fin-btn fin-btn-outline" id="btnFecharDet">Fechar</button>
+        <button type="button" class="fin-btn fin-btn-primary" id="btnLancarDet">Lançar em contas a pagar</button>
+        <a class="fin-btn fin-btn-outline" id="btnBaixarXmlDet" href="#" target="_blank" style="display:none">Baixar XML</a>
+        <button type="button" class="fin-btn fin-btn-outline fin-btn-danger" id="btnExcluirDet">Excluir</button>
+      </div>
+    </main>
+  </div>
+</div>
+
+<div id="menuContexto" class="fin-menu-ctx" style="display:none"></div>
+
+<script src="/static/financeiro_shared.js"></script>
+<script src="/static/financeiro_notas_entrada.js"></script>
+</body>
+</html>

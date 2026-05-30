@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{{ modulo.titulo }} — Controle</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/dashboard.css">
+  <link rel="stylesheet" href="/static/controle.css">
+</head>
+<body class="ctrl-body dash-body">
+{% include "partials/nav_principal.html" %}
+
+<div class="ctrl-wrap">
+  <header class="ctrl-header">
+    <div>
+      <p class="ctrl-breadcrumb"><a href="/controle">Controle</a> / {{ modulo.titulo }}</p>
+      <span class="ctrl-badge">{{ modulo.icone }} {{ modulo.titulo }}</span>
+      <h1>{{ modulo.titulo }}</h1>
+      <p>{{ modulo.descricao }}</p>
+    </div>
+    <div class="ctrl-mod-actions">
+      <a href="/controle" class="ctrl-btn ctrl-btn-outline">← Hub Controle</a>
+      <button type="button" class="ctrl-btn ctrl-btn-primary" onclick="abrirModalCadastroControle()">+ Cadastrar</button>
+      <button type="button" class="ctrl-btn ctrl-btn-dark" onclick="document.getElementById('buscaModulo').focus()">Procurar</button>
+    </div>
+  </header>
+
+  <div class="ctrl-kpis" id="ctrlKpis">
+    <div class="ctrl-kpi accent">
+      <small>Total de registros</small>
+      <b id="kpiTotal">{{ kpis.total }}</b>
+    </div>
+    <div class="ctrl-kpi">
+      <small>Ativos</small>
+      <b id="kpiAtivos">{{ kpis.ativos }}</b>
+    </div>
+    <div class="ctrl-kpi">
+      <small>Cadastros no mês</small>
+      <b id="kpiMes">{{ kpis.mes }}</b>
+    </div>
+    <div class="ctrl-kpi">
+      <small>Módulo</small>
+      <b style="font-size:14px">{{ modulo.slug }}</b>
+    </div>
+  </div>
+
+  <section class="ctrl-panel">
+    <h2>Filtros</h2>
+    <div class="ctrl-filters">
+      <div class="ctrl-field">
+        <label>Busca rápida</label>
+        <input type="search" id="buscaModulo" placeholder="Digite para filtrar na tabela..." oninput="filtrarTabelaControle()">
+      </div>
+      <div class="ctrl-field">
+        <label>Status</label>
+        <select id="filtroStatus" onchange="filtrarTabelaControle()">
+          <option value="">Todos</option>
+          <option value="ativo">Ativo</option>
+          <option value="inativo">Inativo</option>
+        </select>
+      </div>
+      <div class="ctrl-field">
+        <label>Período</label>
+        <select id="filtroPeriodo" onchange="filtrarTabelaControle()">
+          <option value="">Todos os períodos</option>
+          <option value="hoje">Hoje</option>
+          <option value="semana">Últimos 7 dias</option>
+          <option value="mes">Mês atual</option>
+          <option value="mes_anterior">Mês anterior</option>
+        </select>
+      </div>
+      <div class="ctrl-field ctrl-ac-wrap" data-ctrl-ac="viatura" data-mode="filter" data-field="filtro_viatura" data-filter-hidden="filtroViatura">
+        <label>Viatura</label>
+        <input type="text" class="ctrl-ac-input" id="filtroViaturaVis" autocomplete="off" placeholder="Buscar viatura...">
+        <input type="hidden" id="filtroViatura" name="filtro_viatura">
+        <ul class="ctrl-ac-list" role="listbox"></ul>
+      </div>
+      {% if modulo.slug in ['danos', 'abastecimentos'] %}
+      <div class="ctrl-field ctrl-ac-wrap" data-ctrl-ac="motorista" data-mode="filter" data-field="filtro_profissional" data-filter-hidden="filtroProfissional" data-filter-attr="data-profissional">
+        <label>Profissional</label>
+        <input type="text" class="ctrl-ac-input" id="filtroProfissionalVis" autocomplete="off" placeholder="Buscar profissional...">
+        <input type="hidden" id="filtroProfissional">
+        <ul class="ctrl-ac-list" role="listbox"></ul>
+      </div>
+      {% elif modulo.slug == 'checklist-viatura' %}
+      <div class="ctrl-field ctrl-ac-wrap" data-ctrl-ac="motorista" data-mode="filter" data-field="filtro_motorista" data-filter-hidden="filtroMotorista" data-filter-attr="data-motorista">
+        <label>Motorista</label>
+        <input type="text" class="ctrl-ac-input" id="filtroMotoristaVis" autocomplete="off" placeholder="Buscar motorista...">
+        <input type="hidden" id="filtroMotorista">
+        <ul class="ctrl-ac-list" role="listbox"></ul>
+      </div>
+      {% elif modulo.slug == 'multas' %}
+      <div class="ctrl-field ctrl-ac-wrap" data-ctrl-ac="motorista" data-mode="filter" data-field="filtro_condutor" data-filter-hidden="filtroCondutor" data-filter-attr="data-condutor">
+        <label>Condutor</label>
+        <input type="text" class="ctrl-ac-input" id="filtroCondutorVis" autocomplete="off" placeholder="Buscar condutor...">
+        <input type="hidden" id="filtroCondutor">
+        <ul class="ctrl-ac-list" role="listbox"></ul>
+      </div>
+      {% endif %}
+      <div class="ctrl-field">
+        <label>&nbsp;</label>
+        <button type="button" class="ctrl-btn ctrl-btn-outline" style="width:100%" onclick="limparFiltrosControle()">Limpar</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="ctrl-panel" id="secaoRegistros">
+    <h2>Registros</h2>
+    <div id="ctrlMsgErro" class="ctrl-msg-erro" style="display:none"></div>
+    {% if registros %}
+    <div class="ctrl-table-wrap">
+      <table class="ctrl-table" id="tabelaControle">
+        <thead>
+          <tr>
+            {% for col in colunas %}
+            <th>{{ col.rotulo }}</th>
+            {% endfor %}
+            <th>Atualizado</th>
+          </tr>
+        </thead>
+        <tbody id="tbodyControle">
+          {% for r in registros %}
+          <tr data-status="{{ (r.status or 'ativo')|lower }}" data-viatura="{{ (r.viatura or '')|lower }}" data-profissional="{{ (r.profissional or '')|lower }}" data-motorista="{{ (r.motorista or '')|lower }}" data-condutor="{{ (r.condutor or '')|lower }}" data-data="{{ r._data_iso or '' }}">
+            {% for col in colunas %}
+            <td>{{ r._fmt[col.chave] if r._fmt and col.chave in r._fmt else (r[col.chave] or '-') }}</td>
+            {% endfor %}
+            <td>{{ r.updated_at or r.created_at or '-' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="ctrl-empty" id="ctrlEmpty">
+      <div class="ctrl-empty-icon">{{ modulo.icone }}</div>
+      <h3>Nenhum registro ainda</h3>
+      <p>Os cadastros de <strong>{{ modulo.titulo }}</strong> aparecerão aqui assim que forem incluídos.</p>
+      <p style="margin-top:16px"><button type="button" class="ctrl-btn ctrl-btn-primary" onclick="abrirModalCadastroControle()">+ Cadastrar primeiro registro</button></p>
+    </div>
+    {% endif %}
+  </section>
+</div>
+
+<div id="modalCadastroControle" class="ctrl-modal" aria-hidden="true">
+  <div class="ctrl-modal-box grande">
+    <div class="ctrl-modal-head">
+      <h2>Cadastrar — {{ modulo.titulo }}</h2>
+      <button type="button" class="ctrl-btn ctrl-btn-outline" onclick="fecharModalCadastroControle()">Fechar</button>
+    </div>
+    <form id="formCadastroControle" onsubmit="return salvarCadastroControle(event)">
+      {% include "controle/forms/" ~ modulo.slug ~ ".html" %}
+      <div class="ctrl-modal-foot">
+        <span id="ctrlFormErro" class="ctrl-msg-erro" style="display:none"></span>
+        <button type="button" class="ctrl-btn ctrl-btn-outline" onclick="fecharModalCadastroControle()">Cancelar</button>
+        <button type="submit" class="ctrl-btn ctrl-btn-primary" id="btnSalvarControle">Salvar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+window.CONTROLE_CFG = {
+  slug: {{ modulo.slug | tojson }},
+  apiPost: {{ modulo.api | tojson }},
+  colunas: {{ colunas | tojson }}
+};
+</script>
+<script src="/static/controle_autocomplete.js"></script>
+<script src="/static/controle.js"></script>
+</body>
+</html>

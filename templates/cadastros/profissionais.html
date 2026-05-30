@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Profissionais — Cadastros</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/dashboard.css">
+  <link rel="stylesheet" href="/static/controle.css">
+  <link rel="stylesheet" href="/static/cadastros.css">
+</head>
+<body class="ctrl-body dash-body cad-body">
+{% include "partials/nav_principal.html" %}
+<div class="ctrl-wrap">
+  <header class="ctrl-header">
+    <div>
+      <p class="ctrl-breadcrumb"><a href="/cadastros">Cadastros</a> / Profissionais</p>
+      <span class="ctrl-badge cad-badge">👤 Equipe</span>
+      <h1>Profissionais</h1>
+      <p>Cadastro premium de motoristas e profissionais — padrão AutEM.</p>
+    </div>
+    <div class="ctrl-mod-actions">
+      <a href="/cadastros" class="ctrl-btn ctrl-btn-outline">← Hub Cadastros</a>
+      <button type="button" class="ctrl-btn ctrl-btn-primary" id="btnNovoProfissional">+ Cadastrar</button>
+    </div>
+  </header>
+
+  <div class="ctrl-kpis" id="cadKpisProf">
+    <div class="ctrl-kpi accent"><small>Total</small><b id="kpiPTotal">{{ kpis.total }}</b></div>
+    <div class="ctrl-kpi"><small>Ativos</small><b id="kpiPAtivos">{{ kpis.ativos }}</b></div>
+    <div class="ctrl-kpi"><small>Inativos</small><b id="kpiPInativos">{{ kpis.inativos }}</b></div>
+    <div class="ctrl-kpi"><small>Motoristas</small><b id="kpiPMotoristas">{{ kpis.motoristas }}</b></div>
+  </div>
+
+  <section class="ctrl-panel">
+    <h2>Filtros</h2>
+    <div class="ctrl-filters">
+      <div class="ctrl-field"><label>Busca rápida</label><input type="search" id="filtroBuscaP" placeholder="Nome, CPF, telefone..."></div>
+      <div class="ctrl-field"><label>Status</label>
+        <select id="filtroStatusP"><option value="">Todos</option><option value="ativo">Ativo</option><option value="inativo">Inativo</option></select>
+      </div>
+      <div class="ctrl-field"><label>Função</label><input type="text" id="filtroFuncaoP" placeholder="Ex.: Motorista"></div>
+      <div class="ctrl-field"><label>&nbsp;</label><button type="button" class="ctrl-btn ctrl-btn-outline" style="width:100%" id="btnLimparFiltrosP">Limpar</button></div>
+    </div>
+  </section>
+
+  <section class="ctrl-panel">
+    <h2>Registros</h2>
+    <div class="ctrl-table-wrap">
+      <table class="ctrl-table" id="tabelaProfissionais">
+        <thead>
+          <tr><th>Nome</th><th>CPF</th><th>Telefone</th><th>Função</th><th>Status</th><th>Ações</th></tr>
+        </thead>
+        <tbody id="tbodyProfissionais"></tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<div id="modalProfissional" class="cad-modal" aria-hidden="true">
+  <div class="cad-modal-shell cad-modal-prof">
+    <nav class="cad-modal-nav">
+      <h3>Profissional</h3>
+      <button type="button" class="cad-nav-btn active" data-cad-tab="editar">✏️ Editar</button>
+      <button type="button" class="cad-nav-btn" data-cad-tab="config">⚙️ Configurações</button>
+      <button type="button" class="cad-nav-btn" data-cad-tab="habilitacao">🪪 Habilitação</button>
+      <button type="button" class="cad-nav-btn" data-cad-tab="arquivos">📎 Arquivos</button>
+    </nav>
+    <main class="cad-modal-main">
+      <h2 class="cad-modal-title" id="modalProfTitulo">Novo profissional</h2>
+      <input type="hidden" id="profissionalId">
+
+      <div class="cad-panel active" data-cad-panel="editar">
+        <h3 class="cad-section-title">Informações gerais</h3>
+        <div class="cad-form-grid">
+          <div><label>Filial / CNPJ</label><input id="p_filial_cnpj"></div>
+          <div class="full"><label>Nome completo</label><input id="p_nome_completo" required></div>
+          <div><label>Nome de trabalho</label><input id="p_nome_trabalho"></div>
+          <div><label>Data de nascimento</label><input type="date" id="p_data_nascimento"></div>
+          <div><label>CPF</label><input id="p_cpf"></div>
+          <div><label>RG</label><input id="p_rg"></div>
+          <div><label>Telefone fixo</label><input id="p_telefone_fixo"></div>
+          <div><label>Telefone móvel</label><input id="p_telefone_movel"></div>
+          <div><label>Estado civil</label>
+            <select id="p_estado_civil">
+              <option value="">—</option>
+              <option>Solteiro(a)</option>
+              <option>Casado(a)</option>
+              <option>Divorciado(a)</option>
+              <option>Viúvo(a)</option>
+              <option>União estável</option>
+            </select>
+          </div>
+          <div><label>E-mail</label><input type="email" id="p_email"></div>
+        </div>
+        <h3 class="cad-section-title">Endereço</h3>
+        <div class="cad-form-grid">
+          <div><label>CEP</label><input id="p_cep"></div>
+          <div class="full"><label>Logradouro</label><input id="p_logradouro"></div>
+          <div><label>Bairro</label><input id="p_bairro"></div>
+          <div><label>Cidade</label><input id="p_cidade"></div>
+          <div><label>UF</label><input id="p_uf" maxlength="2"></div>
+          <div class="full"><label>Observações</label><textarea id="p_observacoes" rows="2"></textarea></div>
+        </div>
+      </div>
+
+      <div class="cad-panel" data-cad-panel="config">
+        <div class="cad-detalhes-box" id="detalhesConfig"></div>
+        <h3 class="cad-section-title">Configurações</h3>
+        <div class="cad-form-grid">
+          <div><label>Terceiro</label><select id="p_terceiro"><option value="false">Não</option><option value="true">Sim</option></select></div>
+          <div><label>CNPJ</label><input id="p_cnpj"></div>
+          <div><label>Função</label><input id="p_funcao" placeholder="Motorista"></div>
+          <div><label>Remuneração</label><input id="p_remuneracao"></div>
+          <div><label>Forma de pagamento</label><input id="p_forma_pagamento"></div>
+          <div><label>Aparecer no Controle</label><select id="p_pode_controle"><option value="true">Sim</option><option value="false">Não</option></select></div>
+          <div><label>Pode receber serviços</label><select id="p_pode_receber"><option value="true">Sim</option><option value="false">Não</option></select></div>
+        </div>
+        <h3 class="cad-section-title">Jornada de trabalho</h3>
+        <div class="cad-form-grid">
+          <div><label>Data admissão</label><input type="date" id="p_data_admissao"></div>
+          <div><label>Data demissão</label><input type="date" id="p_data_demissao"></div>
+          <div><label>Hora de início</label><input type="time" id="p_hora_inicio"></div>
+          <div><label>Hora de término</label><input type="time" id="p_hora_termino"></div>
+          <div><label>Carga horária</label><input id="p_carga_horaria"></div>
+          <div><label>Intervalo</label><input id="p_intervalo"></div>
+          <div><label>Escala</label><input id="p_escala"></div>
+          <div><label>Registro CTPS</label><input id="p_registro_ctps"></div>
+        </div>
+      </div>
+
+      <div class="cad-panel" data-cad-panel="habilitacao">
+        <div class="cad-detalhes-box" id="detalhesHabilitacao"></div>
+        <h3 class="cad-section-title">Carteira de habilitação</h3>
+        <div class="cad-form-grid">
+          <div class="full"><label>Número do registro da CNH</label><input id="p_cnh_numero"></div>
+          <div><label>Vencimento</label><input type="date" id="p_cnh_vencimento"></div>
+          <div><label>Categoria</label>
+            <select id="p_cnh_categoria">
+              <option value="">—</option>
+              <option>A</option><option>B</option><option>C</option><option>D</option><option>E</option>
+              <option>AB</option><option>AC</option><option>AD</option><option>AE</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="cad-panel" data-cad-panel="arquivos">
+        <div class="cad-detalhes-box" id="detalhesArquivos"></div>
+        <div class="cad-arquivos-head">
+          <h3 class="cad-section-title" style="margin:0">Arquivos</h3>
+          <button type="button" class="ctrl-btn ctrl-btn-primary" id="btnToggleUploadArq">+ Adicionar arquivo</button>
+        </div>
+        <form id="formArquivoProf" class="cad-upload-panel" style="display:none">
+          <div class="cad-form-grid">
+            <div><label>Nome do arquivo</label><input name="nome" id="arq_p_nome"></div>
+            <div><label>Tipo</label>
+              <select name="tipo" id="arq_p_tipo">
+                <option value="CNH">CNH</option>
+                <option value="Documento pessoal">Documento pessoal</option>
+                <option value="Comprovante de residência">Comprovante de residência</option>
+                <option value="Contrato">Contrato</option>
+                <option value="Outros">Outros</option>
+              </select>
+            </div>
+            <div><label>Data</label><input type="date" name="data_documento" id="arq_p_data"></div>
+            <div class="full"><label>Arquivo</label><input type="file" name="arquivo" id="arq_p_file" required></div>
+            <div class="full"><button type="submit" class="ctrl-btn ctrl-btn-primary">Enviar anexo</button></div>
+          </div>
+        </form>
+        <div class="cad-arquivos-list" id="listaArquivosProf"></div>
+      </div>
+      <p id="cadErroProf" class="cad-msg-erro" style="display:none"></p>
+    </main>
+    <footer class="cad-modal-foot">
+      <label class="cad-status-toggle"><input type="checkbox" id="p_status_toggle" checked> Registro ativo</label>
+      <div class="cad-foot-actions">
+        <button type="button" class="ctrl-btn ctrl-btn-outline cad-btn-danger" id="btnExcluirProf" style="display:none">Excluir</button>
+        <button type="button" class="ctrl-btn ctrl-btn-outline" id="btnFecharProf">Cancelar</button>
+        <button type="button" class="ctrl-btn ctrl-btn-primary" id="btnSalvarProf">Salvar</button>
+      </div>
+    </footer>
+  </div>
+</div>
+
+<script src="/static/cadastros_profissionais.js"></script>
+</body>
+</html>

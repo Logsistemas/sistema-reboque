@@ -1,0 +1,49 @@
+{% extends "financeiro/base_lancamentos.html" %}
+{% block titulo_pagina %}Contas a receber{% endblock %}
+{% block fin_page %}receber{% endblock %}
+{% block fin_api %}/api/financeiro/contas-receber{% endblock %}
+{% block fin_tipo %}receber{% endblock %}
+{% block titulo_centro %}Contas a receber{% endblock %}
+{% block sit_pago %}recebido{% endblock %}
+{% block lbl_pago %}Recebido{% endblock %}
+{% block lbl_tipo_pgto %}Tipo de recebimento{% endblock %}
+{% block lbl_forma %}Forma de recebimento{% endblock %}
+{% block placeholder_busca %}Cliente, CPF/CNPJ, e-mail ou histórico{% endblock %}
+{% block col_parte %}Cliente{% endblock %}
+{% block col_forma %}Forma de recebimento{% endblock %}
+{% block botoes_extra_receber %}
+    <button type="button" class="fin-action-btn fin-tool-stub">
+      <span class="fin-action-btn-icon">🏛</span>
+      <span>Gerar remessa</span>
+    </button>
+    <button type="button" class="fin-action-btn fin-tool-stub">
+      <span class="fin-action-btn-icon">📑</span>
+      <span>Boletos em PDF</span>
+    </button>
+    <button type="button" class="fin-action-btn fin-tool-stub">
+      <span class="fin-action-btn-icon">✉</span>
+      <span>Enviar boletos</span>
+    </button>
+    <button type="button" class="fin-action-btn fin-tool-stub">
+      <span class="fin-action-btn-icon">📧</span>
+      <span>E-mail de cobrança</span>
+    </button>
+{% endblock %}
+{% block ferramentas %}
+      <button type="button" class="fin-action-btn fin-tool-stub">
+        <span class="fin-action-btn-icon">💰</span>
+        <span>Gerenciar recebimentos</span>
+      </button>
+      <button type="button" class="fin-action-btn fin-tool-stub">
+        <span class="fin-action-btn-icon">↻</span>
+        <span>Contas recorrentes</span>
+      </button>
+      <button type="button" class="fin-action-btn fin-tool-stub">
+        <span class="fin-action-btn-icon">▦</span>
+        <span>Gerenciar categorias</span>
+      </button>
+      <button type="button" class="fin-action-btn fin-tool-stub">
+        <span class="fin-action-btn-icon">⬆</span>
+        <span>Importar registros</span>
+      </button>
+{% endblock %}

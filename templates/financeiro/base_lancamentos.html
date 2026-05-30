@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{% block titulo_pagina %}Financeiro{% endblock %} — Essência</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/dashboard.css">
+  <link rel="stylesheet" href="/static/controle.css">
+  <link rel="stylesheet" href="/static/cadastros.css">
+  <link rel="stylesheet" href="/static/financeiro.css">
+</head>
+<body class="fin-body" data-fin-page="{% block fin_page %}pagar{% endblock %}" data-fin-api="{% block fin_api %}/api/financeiro/contas-pagar{% endblock %}" data-fin-tipo="{% block fin_tipo %}pagar{% endblock %}">
+{% include "partials/nav_principal.html" %}
+<div id="finToast"></div>
+<div class="fin-shell">
+  <aside class="fin-sidebar-left">
+    <a href="/financeiro" class="fin-link-hub">← Hub Financeiro</a>
+
+    <div class="fin-card">
+      <div class="fin-card-head">
+        <span class="fin-card-icon">◎</span>
+        <span>Situação</span>
+      </div>
+      <div class="fin-pills" id="filtroSituacao" role="group" aria-label="Filtrar por situação">
+        <button type="button" class="fin-pill active" data-sit="">
+          <span class="fin-pill-icon">◉</span> Todos
+        </button>
+        <button type="button" class="fin-pill" data-sit="em_aberto">
+          <span class="fin-pill-icon">○</span> Em aberto
+        </button>
+        <button type="button" class="fin-pill" data-sit="{% block sit_pago %}pago{% endblock %}">
+          <span class="fin-pill-icon">✓</span> {% block lbl_pago %}Pago{% endblock %}
+        </button>
+        <button type="button" class="fin-pill" data-sit="vencido">
+          <span class="fin-pill-icon">!</span> Vencido
+        </button>
+      </div>
+    </div>
+
+    <div class="fin-card">
+      <div class="fin-card-head">
+        <span class="fin-card-icon">⚙</span>
+        <span>Filtros avançados</span>
+      </div>
+      <div class="fin-filters-grid">
+        <div class="fin-field"><label>Categoria</label><input type="text" id="ff_categoria" placeholder="Ex.: Operacional"></div>
+        <div class="fin-field"><label>{% block lbl_tipo_pgto %}Tipo de pagamento{% endblock %}</label><input type="text" id="ff_tipo" placeholder="Ex.: Boleto"></div>
+        <div class="fin-field"><label>{% block lbl_forma %}Forma de pagamento{% endblock %}</label><input type="text" id="ff_forma" placeholder="Ex.: PIX"></div>
+        <div class="fin-field-row">
+          <div class="fin-field"><label>Valor mín.</label><input type="number" step="0.01" id="ff_valor_min" placeholder="0"></div>
+          <div class="fin-field"><label>Valor máx.</label><input type="number" step="0.01" id="ff_valor_max" placeholder="0"></div>
+        </div>
+        <div class="fin-field"><label>Nº documento</label><input type="text" id="ff_numero_doc" placeholder="NF, boleto..."></div>
+      </div>
+      <div class="fin-filter-actions">
+        <button type="button" class="fin-btn fin-btn-primary" id="btnFiltrar">🔍 Aplicar filtros</button>
+        <button type="button" class="fin-btn fin-btn-outline" id="btnLimparFiltros">Limpar</button>
+      </div>
+    </div>
+  </aside>
+
+  <main class="fin-main">
+    <div class="fin-page-head">
+      <h1>{% block titulo_centro %}Contas a pagar{% endblock %}</h1>
+    </div>
+    <div class="fin-quick-bar">
+      <div class="fin-quick-item">
+        <span class="fin-quick-icon">🏦</span>
+        <select id="topContaFin" title="Conta financeira"><option value="">Todas as contas financeiras</option></select>
+      </div>
+      <div class="fin-quick-item fin-quick-search">
+        <span class="fin-quick-icon">🔎</span>
+        <input type="search" id="topBusca" placeholder="{% block placeholder_busca %}Fornecedor, CPF/CNPJ, e-mail ou histórico{% endblock %}">
+      </div>
+      <div class="fin-quick-item fin-quick-dates">
+        <span class="fin-quick-icon">📅</span>
+        <input type="date" id="topDataIni" title="Vencimento de">
+        <span>até</span>
+        <input type="date" id="topDataFim" title="Vencimento até">
+      </div>
+    </div>
+    <div class="fin-table-area">
+      <div class="fin-table-wrap">
+        <table class="fin-table">
+          <thead>
+            <tr>
+              <th style="width:36px"><input type="checkbox" id="chkTodos" title="Selecionar todos"></th>
+              <th>{% block col_parte %}Fornecedor{% endblock %}</th>
+              <th>Histórico</th>
+              <th>{% block col_forma %}Forma de pagamento{% endblock %}</th>
+              <th>Vencimento</th>
+              <th>Valor</th>
+              <th>Situação</th>
+              <th style="width:140px">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyLista"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <aside class="fin-sidebar-right">
+    <p class="fin-side-section-title">Ações principais</p>
+    <button type="button" class="fin-action-btn fin-action-btn-primary" id="btnIncluir">
+      <span class="fin-action-btn-icon">+</span>
+      <span>Incluir conta</span>
+    </button>
+    <button type="button" class="fin-action-btn fin-action-btn-accent" id="btnBaixarSel">
+      <span class="fin-action-btn-icon">✓</span>
+      <span>Baixar selecionados</span>
+    </button>
+    <button type="button" class="fin-action-btn fin-tool-stub">
+      <span class="fin-action-btn-icon">▦</span>
+      <span>Alterar categorias</span>
+    </button>
+    <button type="button" class="fin-action-btn fin-tool-stub">
+      <span class="fin-action-btn-icon">📄</span>
+      <span>Gerar recibos</span>
+    </button>
+    {% block botoes_extra_receber %}{% endblock %}
+
+    <p class="fin-side-section-title">Resumo do filtro</p>
+    <div class="fin-stats">
+      <div class="fin-stat-card">
+        <label>Quantidade</label>
+        <b id="painelQtd">0</b>
+      </div>
+      <div class="fin-stat-card full">
+        <label>Valor total</label>
+        <b id="painelTotal">R$ 0,00</b>
+      </div>
+    </div>
+
+    <p class="fin-side-section-title">Ferramentas</p>
+    <div class="fin-tool-list">
+      {% block ferramentas %}
+      <button type="button" class="fin-action-btn fin-tool-stub">
+        <span class="fin-action-btn-icon">💳</span>
+        <span>Gerenciar pagamentos</span>
+      </button>
+      <button type="button" class="fin-action-btn fin-tool-stub">
+        <span class="fin-action-btn-icon">↻</span>
+        <span>Contas recorrentes</span>
+      </button>
+      <button type="button" class="fin-action-btn fin-tool-stub">
+        <span class="fin-action-btn-icon">▤</span>
+        <span>Gerenciar categorias</span>
+      </button>
+      <button type="button" class="fin-action-btn fin-tool-stub">
+        <span class="fin-action-btn-icon">⬆</span>
+        <span>Importar registros</span>
+      </button>
+      {% endblock %}
+    </div>
+  </aside>
+</div>
+{% include "financeiro/_modal_lancamento.html" %}
+<script src="/static/financeiro_shared.js"></script>
+<script src="/static/financeiro_lancamento.js"></script>
+</body>
+</html>

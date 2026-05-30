@@ -1,0 +1,7 @@
+<div class="ctrl-field ctrl-ac-wrap" data-ctrl-ac="viatura" data-field="viatura"{% if required %} data-required="1"{% endif %}>
+  <label>{{ label | default('Viatura') }}</label>
+  <input type="text" class="ctrl-ac-input" autocomplete="off" placeholder="Buscar viatura...">
+  <input type="hidden" name="viatura"{% if required %} required{% endif %}>
+  <input type="hidden" name="viatura_id">
+  <ul class="ctrl-ac-list" role="listbox"></ul>
+</div>
