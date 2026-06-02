@@ -303,11 +303,14 @@
         (it) => `<tr>
         <td>${it.sequencia || ""}</td>
         <td>${it.descricao || "—"}</td>
+        <td>${it.ncm || "—"}</td>
+        <td>${it.cfop || "—"}</td>
         <td>${it.quantidade ?? "—"} ${it.unidade || ""}</td>
+        <td class="fin-valor">${it.valor_unitario_fmt || it.valor_unitario || "—"}</td>
         <td class="fin-valor">${it.valor_total_fmt || it.valor_total}</td>
       </tr>`
       )
-      .join("") || '<tr><td colspan="4" class="fin-empty">Sem itens</td></tr>';
+      .join("") || '<tr><td colspan="7" class="fin-empty">Sem itens</td></tr>';
 
     const tbPar = el("detParcelas");
     tbPar.innerHTML = (n.parcelas || [])
@@ -362,16 +365,49 @@
 
   function abrirModalLancar(id) {
     if (!id) return;
-    const nota = itens.find((i) => i.id === id) || detalheAtual;
-    if (!nota) return;
     lancarNotaId = id;
     setSelecionado(id);
     S.mostrarErro(el("lancarErro"), "");
-    if (el("lancarResumo")) {
-      el("lancarResumo").innerHTML = `<b>${nota.nome_fornecedor || "Fornecedor"}</b><br>NF ${nota.numero_nota || nota.numero} · ${nota.valor_total_fmt}`;
-    }
     preencherSelectContas(el("lancar_conta_fin"), "");
     abrirModal("modalLancar");
+    carregarResumoLancar(id);
+  }
+
+  async function carregarResumoLancar(id) {
+    const wrap = el("lancarParcelasWrap");
+    const tb = el("lancarParcelas");
+    const resumo = el("lancarResumo");
+    if (wrap) wrap.hidden = true;
+    if (tb) tb.innerHTML = "";
+    if (resumo) resumo.innerHTML = "Carregando…";
+    try {
+      const j = await S.apiJson(`${API}/${id}`);
+      const n = j.item || {};
+      if (resumo) {
+        resumo.innerHTML = `<b>${n.nome_fornecedor || "Fornecedor"}</b><br>NF ${n.numero_nota || n.numero} · ${n.valor_total_fmt}`;
+      }
+      const parcelas = n.parcelas || [];
+      if (parcelas.length && wrap && tb) {
+        wrap.hidden = false;
+        tb.innerHTML = parcelas
+          .map(
+            (p) => `<tr>
+              <td>${p.numero_parcela || "—"}</td>
+              <td>${p.vencimento_fmt || p.vencimento || "—"}</td>
+              <td class="fin-valor">${p.valor_fmt || p.valor}</td>
+            </tr>`
+          )
+          .join("");
+      } else if (wrap) {
+        wrap.hidden = true;
+      }
+    } catch (err) {
+      const nota = itens.find((i) => i.id === id) || detalheAtual;
+      if (resumo && nota) {
+        resumo.innerHTML = `<b>${nota.nome_fornecedor || "Fornecedor"}</b><br>NF ${nota.numero_nota || nota.numero} · ${nota.valor_total_fmt}`;
+      }
+      S.mostrarErro(el("lancarErro"), err.message || "Não foi possível carregar as parcelas.");
+    }
   }
 
   async function executarLancarCp(id, contaFinanceiraId) {

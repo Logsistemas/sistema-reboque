@@ -121,7 +121,7 @@
         <div class="fin-detalhe-grid" id="detNota"></div>
       </div>
       <div class="fin-tab-panel" data-nf-panel="itens">
-        <table class="fin-table fin-hist-table"><thead><tr><th>#</th><th>Descrição</th><th>Qtd</th><th>Valor</th></tr></thead><tbody id="detItens"></tbody></table>
+        <table class="fin-table fin-hist-table"><thead><tr><th>#</th><th>Descrição</th><th>NCM</th><th>CFOP</th><th>Qtd</th><th>V. unit.</th><th>V. total</th></tr></thead><tbody id="detItens"></tbody></table>
       </div>
       <div class="fin-tab-panel" data-nf-panel="parcelas">
         <table class="fin-table fin-hist-table"><thead><tr><th>Parcela</th><th>Vencimento</th><th>Valor</th></tr></thead><tbody id="detParcelas"></tbody></table>
@@ -149,6 +149,10 @@
       <h2 class="cad-modal-title">Lançar em Contas a Pagar</h2>
       <p id="lancarErro" class="cad-erro" style="display:none"></p>
       <p id="lancarResumo" class="fin-lancar-resumo"></p>
+      <div id="lancarParcelasWrap" class="fin-lancar-parcelas" hidden>
+        <p class="fin-side-section-title">Parcelas do XML</p>
+        <table class="fin-table fin-hist-table"><thead><tr><th>Parcela</th><th>Vencimento</th><th>Valor</th></tr></thead><tbody id="lancarParcelas"></tbody></table>
+      </div>
       <div class="cad-form-grid">
         <div class="full">
           <label>Conta financeira (opcional)</label>
