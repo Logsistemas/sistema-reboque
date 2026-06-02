@@ -62,34 +62,40 @@
     el("f_banco").value = item?.banco || "";
     el("f_agencia").value = item?.agencia || "";
     el("f_conta").value = item?.conta || "";
-    el("f_saldo_inicial").value = item?.saldo_inicial ?? 0;
-    el("f_saldo_atual").value = item?.saldo_atual_fmt || (item ? item.saldo_atual : "—");
+    el("f_saldo_inicial").value =
+      item?.saldo_inicial_fmt || (item?.saldo_inicial != null ? S.formatMoedaInput(item.saldo_inicial) : "");
+    el("f_saldo_atual").value = item?.saldo_atual_fmt || (item ? S.formatMoedaInput(item.saldo_atual) : "—");
     el("f_status").value = item?.status || "ativo";
     el("f_observacoes").value = item?.observacoes || "";
   }
 
   async function salvar() {
     const id = el("regId").value;
+    const saldoInicial = S.parseMoedaBr(el("f_saldo_inicial").value, 0);
     const payload = {
       nome: el("f_nome").value.trim(),
       tipo: el("f_tipo").value,
       banco: el("f_banco").value,
       agencia: el("f_agencia").value,
       conta: el("f_conta").value,
-      saldo_inicial: el("f_saldo_inicial").value,
+      saldo_inicial: saldoInicial,
       status: el("f_status").value,
       observacoes: el("f_observacoes").value,
     };
+    if (!payload.nome) {
+      S.mostrarErro(erro, "Informe o nome da conta.");
+      return;
+    }
     try {
       const url = id ? `${API}/${id}` : API;
-      const j = await S.apiJson(url, {
+      await S.apiJson(url, {
         method: id ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
       modal.classList.remove("open");
+      S.toast(id ? "Conta atualizada." : "Conta cadastrada com sucesso.");
       await carregar();
-      if (j.item) abrir(j.item);
     } catch (e) {
       S.mostrarErro(erro, e.message);
     }

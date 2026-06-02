@@ -9,8 +9,9 @@
 <body class="ess-app ess-fin-v2 fin-body" data-fin-page="{% block fin_page %}pagar{% endblock %}" data-fin-api="{% block fin_api %}/api/financeiro/contas-pagar{% endblock %}" data-fin-tipo="{% block fin_tipo %}pagar{% endblock %}">
 {% include "partials/app_shell_start.html" %}
 <div id="finToast"></div>
-<div class="fin-shell">
-  <aside class="fin-sidebar-left">
+<div class="fin-shell" id="finShell">
+  <aside class="fin-sidebar-left ess-filters-panel" id="finFiltersPanel">
+    {% include "partials/filtros_toolbar.html" %}
     <a href="/financeiro" class="fin-link-hub">← Hub Financeiro</a>
 
     <div class="fin-card">
@@ -58,27 +59,24 @@
 
   <main class="fin-main">
     <div class="fin-page-head">
+      <button type="button" class="ess-btn-show-filters" data-ess-toggle-filters="show" aria-label="Mostrar filtros" title="Mostrar filtros">
+        <span class="ess-toggle-icon" aria-hidden="true">›</span>
+        <span>Filtros</span>
+      </button>
+      <div class="fin-page-head-text">
       <h1>{% block titulo_centro %}Contas a pagar{% endblock %}</h1>
-    </div>
-    <div class="fin-quick-bar">
-      <div class="fin-quick-item">
-        <span class="fin-quick-icon">🏦</span>
-        <select id="topContaFin" title="Conta financeira"><option value="">Todas as contas financeiras</option></select>
       </div>
-      <div class="fin-quick-item fin-quick-search">
+    </div>
+    <div class="fin-quick-bar fin-quick-bar-lanc">
+      <div class="fin-quick-item fin-quick-search fin-quick-search-grow">
         <span class="fin-quick-icon">🔎</span>
         <input type="search" id="topBusca" placeholder="{% block placeholder_busca %}Fornecedor, CPF/CNPJ, e-mail ou histórico{% endblock %}">
       </div>
-      <div class="fin-quick-item fin-quick-dates">
-        <span class="fin-quick-icon">📅</span>
-        <input type="date" id="topDataIni" title="Vencimento de">
-        <span>até</span>
-        <input type="date" id="topDataFim" title="Vencimento até">
-      </div>
+      {% include "financeiro/_filtro_periodo.html" %}
     </div>
     <div class="fin-table-area">
       <div class="fin-table-wrap">
-        <table class="fin-table">
+        <table class="fin-table fin-table-lanc">
           <thead>
             <tr>
               <th style="width:36px"><input type="checkbox" id="chkTodos" title="Selecionar todos"></th>
@@ -88,7 +86,6 @@
               <th>Vencimento</th>
               <th>Valor</th>
               <th>Situação</th>
-              <th style="width:140px">Ações</th>
             </tr>
           </thead>
           <tbody id="tbodyLista"></tbody>
@@ -97,8 +94,10 @@
     </div>
   </main>
 
-  <aside class="fin-sidebar-right">
+  <aside class="fin-sidebar-right ess-sidebar-premium">
+    <div class="fin-side-block">
     <p class="fin-side-section-title">Ações principais</p>
+    <div class="fin-side-actions">
     <button type="button" class="fin-action-btn fin-action-btn-primary" id="btnIncluir">
       <span class="fin-action-btn-icon">+</span>
       <span>Incluir conta</span>
@@ -116,19 +115,24 @@
       <span>Gerar recibos</span>
     </button>
     {% block botoes_extra_receber %}{% endblock %}
+    </div>
+    </div>
 
+    <div class="fin-side-block fin-side-block-stats">
     <p class="fin-side-section-title">Resumo do filtro</p>
     <div class="fin-stats">
       <div class="fin-stat-card">
         <label>Quantidade</label>
         <b id="painelQtd">0</b>
       </div>
-      <div class="fin-stat-card full">
+      <div class="fin-stat-card fin-stat-card-highlight full">
         <label>Valor total</label>
         <b id="painelTotal">R$ 0,00</b>
       </div>
     </div>
+    </div>
 
+    <div class="fin-side-block fin-side-block-tools">
     <p class="fin-side-section-title">Ferramentas</p>
     <div class="fin-tool-list">
       {% block ferramentas %}
@@ -150,11 +154,13 @@
       </button>
       {% endblock %}
     </div>
+    </div>
   </aside>
 </div>
 {% include "partials/app_shell_end.html" %}
 {% include "financeiro/_modal_lancamento.html" %}
-<script src="/static/financeiro_shared.js"></script>
-<script src="/static/financeiro_lancamento.js"></script>
+{% block modais_extra %}{% endblock %}
+<script src="/static/financeiro_shared.js?v=20260601"></script>
+<script src="/static/financeiro_lancamento.js?v=20260602"></script>
 </body>
 </html>

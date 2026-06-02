@@ -9,8 +9,9 @@
 <body class="ess-app ess-fin-v2 fin-body">
 {% include "partials/app_shell_start.html" %}
 <div id="finToast"></div>
-<div class="fin-shell">
-  <aside class="fin-sidebar-left">
+<div class="fin-shell" id="finShell">
+  <aside class="fin-sidebar-left ess-filters-panel" id="finFiltersPanel">
+    {% include "partials/filtros_toolbar.html" %}
     <a href="/financeiro" class="fin-link-hub">← Hub Financeiro</a>
 
     <div class="fin-card">
@@ -51,8 +52,14 @@
 
   <main class="fin-main">
     <div class="fin-page-head">
+      <button type="button" class="ess-btn-show-filters" data-ess-toggle-filters="show" aria-label="Mostrar filtros" title="Mostrar filtros">
+        <span class="ess-toggle-icon" aria-hidden="true">›</span>
+        <span>Filtros</span>
+      </button>
+      <div>
       <h1>Notas Fiscais de Entrada</h1>
       <p class="fin-page-sub">Importe XML de NF-e de fornecedor e lance em Contas a Pagar</p>
+      </div>
     </div>
     <div class="fin-table-area">
       <div class="fin-table-wrap">
@@ -75,14 +82,20 @@
     </div>
   </main>
 
-  <aside class="fin-sidebar-right">
+  <aside class="fin-sidebar-right ess-sidebar-premium">
+    <div class="fin-side-block">
     <p class="fin-side-section-title">Principal</p>
+    <div class="fin-side-actions">
     <button type="button" class="fin-action-btn fin-action-btn-primary" id="btnImportarXml">
       <span class="fin-action-btn-icon">⬆</span>
       <span>Importar XML NF-e</span>
     </button>
+    </div>
+    </div>
 
+    <div class="fin-side-block">
     <p class="fin-side-section-title">Ferramentas</p>
+    <div class="fin-side-actions">
     <button type="button" class="fin-action-btn fin-action-btn-accent" id="btnLancarSel" disabled>
       <span class="fin-action-btn-icon">✓</span>
       <span>Lançar em contas a pagar</span>
@@ -91,11 +104,15 @@
       <span class="fin-action-btn-icon">👁</span>
       <span>Ver detalhes</span>
     </button>
+    </div>
+    </div>
 
+    <div class="fin-side-block fin-side-block-stats">
     <p class="fin-side-section-title">Resumo</p>
     <div class="fin-stats">
       <div class="fin-stat-card"><label>Quantidade</label><b id="painelQtd">0</b></div>
-      <div class="fin-stat-card full"><label>Valor total</label><b id="painelTotal">R$ 0,00</b></div>
+      <div class="fin-stat-card fin-stat-card-highlight full"><label>Valor total</label><b id="painelTotal">R$ 0,00</b></div>
+    </div>
     </div>
   </aside>
 </div>

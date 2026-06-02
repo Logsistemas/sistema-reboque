@@ -1,23 +1,59 @@
 <header class="ess-topbar">
-  <button type="button" class="ess-topbar-menu" id="essToggleSidebar" aria-label="Menu">☰</button>
-  <nav class="ess-topbar-nav">
+  <div class="ess-topbar-brand">
+    <span class="ess-logo-mark">E</span>
+    <div class="ess-topbar-brand-text">
+      <strong>Essência</strong>
+      <span>Logística</span>
+    </div>
+  </div>
+  <button type="button" class="ess-topbar-menu" id="essToggleNav" aria-label="Menu">☰</button>
+  <nav class="ess-topbar-nav" id="essTopNav">
     <a href="/" class="ess-top-link" data-ess-top="/">Dashboard</a>
+
     <div class="ess-top-dropdown">
-      <button type="button" class="ess-top-link">Serviços ▾</button>
+      <button type="button" class="ess-top-link ess-top-drop-btn" data-ess-top="/central">Operação ▾</button>
       <div class="ess-top-submenu">
-        <a href="/central">Central</a>
-        <a href="/servicos/novo">Cadastrar manualmente</a>
-        <a href="/servicos/importar">Importar Excel/PDF</a>
+        <a href="/central" data-ess-top="/central">Central de Serviços</a>
+        <a href="/operacao" data-ess-top="/operacao">Operação ao vivo</a>
+        <a href="/motoristas" data-ess-top="/motoristas">Motoristas</a>
       </div>
     </div>
-    <a href="/motoristas" class="ess-top-link" data-ess-top="/motoristas">Motoristas</a>
-    <a href="/cadastros" class="ess-top-link" data-ess-top="/cadastros">Cadastros</a>
-    <a href="/financeiro" class="ess-top-link" data-ess-top="/financeiro">Financeiro</a>
+
+    <div class="ess-top-dropdown">
+      <button type="button" class="ess-top-link ess-top-drop-btn" data-ess-top="/financeiro">Financeiro ▾</button>
+      <div class="ess-top-submenu">
+        <a href="/financeiro" data-ess-top="/financeiro">Hub Financeiro</a>
+        <a href="/financeiro/contas-a-pagar" data-ess-top="/financeiro/contas-a-pagar">Contas a Pagar</a>
+        <a href="/financeiro/contas-a-receber" data-ess-top="/financeiro/contas-a-receber">Contas a Receber</a>
+        <a href="/financeiro/caixa-e-bancos" data-ess-top="/financeiro/caixa-e-bancos">Caixa e Bancos</a>
+        <a href="/financeiro/contas-financeiras" data-ess-top="/financeiro/contas-financeiras">Contas Financeiras</a>
+        <a href="/financeiro/notas-entrada" data-ess-top="/financeiro/notas-entrada">Notas Fiscais de Entrada</a>
+      </div>
+    </div>
+
+    <div class="ess-top-dropdown">
+      <button type="button" class="ess-top-link ess-top-drop-btn" data-ess-top="/cadastros">Cadastros ▾</button>
+      <div class="ess-top-submenu">
+        <a href="/cadastros" data-ess-top="/cadastros">Hub Cadastros</a>
+        <a href="/cadastros/clientes" data-ess-top="/cadastros/clientes">Clientes</a>
+        <a href="/cadastros/fornecedores" data-ess-top="/cadastros/fornecedores">Fornecedores</a>
+        <a href="/cadastros/profissionais" data-ess-top="/cadastros/profissionais">Profissionais</a>
+        <a href="/cadastros/viaturas" data-ess-top="/cadastros/viaturas">Viaturas</a>
+      </div>
+    </div>
+
     <a href="/faturamento" class="ess-top-link" data-ess-top="/faturamento">Faturamento</a>
-    <a href="/historico" class="ess-top-link" data-ess-top="/historico">Relatórios</a>
-    <a href="/cadastros" class="ess-top-link" data-ess-top="/config">Configurações</a>
+
+    <div class="ess-top-dropdown">
+      <button type="button" class="ess-top-link ess-top-drop-btn" data-ess-top="/historico">Relatórios ▾</button>
+      <div class="ess-top-submenu">
+        <a href="/historico" data-ess-top="/historico">Fluxo de Caixa</a>
+        <a href="/historico" data-ess-top="/historico/dre">DRE</a>
+      </div>
+    </div>
   </nav>
   <div class="ess-topbar-right">
+    <a href="/central" class="ess-top-quick" title="Central do Sistema">⚡ Central</a>
     <button type="button" class="ess-top-icon" title="Notificações" aria-label="Notificações">🔔</button>
     <div class="ess-top-user">
       <span class="ess-top-avatar">EL</span>

@@ -1,0 +1,33 @@
+<div class="fin-period-wrap" id="finPeriodWrap">
+  <button type="button" class="fin-period-btn" id="btnPeriodo" aria-haspopup="true" aria-expanded="false">
+    <span class="fin-period-btn-icon">📅</span>
+    <span class="fin-period-label" id="lblPeriodo">Este mês</span>
+    <span class="fin-period-caret">▾</span>
+  </button>
+  <input type="hidden" id="topDataIni">
+  <input type="hidden" id="topDataFim">
+  <div class="fin-period-panel" id="panelPeriodo" hidden>
+    <div class="fin-period-presets">
+      <button type="button" class="fin-period-opt" data-preset="hoje">Hoje</button>
+      <button type="button" class="fin-period-opt" data-preset="esta_semana">Esta semana</button>
+      <button type="button" class="fin-period-opt" data-preset="semana_passada">Semana passada</button>
+      <button type="button" class="fin-period-opt" data-preset="este_mes">Este mês</button>
+      <button type="button" class="fin-period-opt" data-preset="mes_passado">Mês passado</button>
+      <button type="button" class="fin-period-opt" data-preset="selecionar_mes">Selecionar mês</button>
+      <button type="button" class="fin-period-opt" data-preset="customizado">Período customizado</button>
+    </div>
+    <div class="fin-period-sub" id="periodMonthWrap" hidden>
+      <label>Escolha o mês</label>
+      <input type="month" id="periodPickMonth">
+      <button type="button" class="fin-btn fin-btn-primary fin-btn-sm" id="periodMonthApply">Aplicar mês</button>
+    </div>
+    <div class="fin-period-sub fin-period-sub-custom" id="periodCustomWrap" hidden>
+      <label>De</label>
+      <input type="date" id="periodCustomIni">
+      <label>Até</label>
+      <input type="date" id="periodCustomFim">
+      <button type="button" class="fin-btn fin-btn-primary fin-btn-sm" id="periodCustomApply">Aplicar período</button>
+    </div>
+    <p class="fin-period-range muted" id="lblPeriodoRange"></p>
+  </div>
+</div>

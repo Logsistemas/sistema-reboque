@@ -1,0 +1,71 @@
+<div id="modalBaixa" class="fin-modal-baixa-wrap" aria-hidden="true">
+  <div class="fin-modal-baixa-shell">
+    <aside class="fin-baixa-side">
+      <button type="button" class="fin-baixa-close" id="btnFecharBaixa" title="Fechar">×</button>
+      <div class="fin-baixa-side-inner">
+        <span class="fin-baixa-badge">✓ Baixa</span>
+        <h2>Baixa de lançamentos</h2>
+        <p>Inclua as informações necessárias para a baixa dos lançamentos.</p>
+        <ul class="fin-baixa-side-list">
+          <li>Confira conta de destino e data</li>
+          <li>Ajuste juros, desconto e tarifas</li>
+          <li>O saldo bancário é atualizado na confirmação</li>
+        </ul>
+      </div>
+    </aside>
+    <main class="fin-baixa-main">
+      <header class="fin-baixa-head">
+        <div>
+          <h3>Configurações da baixa</h3>
+          <p class="muted" id="baixaResumoQtd">0 lançamento(s) selecionado(s)</p>
+        </div>
+        <div class="fin-baixa-toggles">
+          <label class="fin-toggle"><input type="checkbox" id="bx_agrupado"><span>Lançamento agrupado</span></label>
+          <label class="fin-toggle"><input type="checkbox" id="bx_cat_unica" checked><span>Categoria única para todos registros</span></label>
+          <label class="fin-toggle"><input type="checkbox" id="bx_usar_venc"><span>Utilizar data de vencimento</span></label>
+        </div>
+      </header>
+
+      <p id="baixaErro" class="fin-imp-erro" style="display:none;margin:0 0 12px"></p>
+
+      <div class="fin-baixa-config cad-form-grid">
+        <div><label>Conta financeira *</label><select id="bx_conta_global"><option value="">— Selecione —</option></select></div>
+        <div><label>Categoria</label><select id="bx_categoria_global"><option value="">— Selecione —</option></select></div>
+        <div><label>Data do pagamento *</label><input type="date" id="bx_data_global"></div>
+        <div><label>Valor total</label><input type="text" id="bx_valor_total" readonly class="fin-valor-readonly"></div>
+        <div class="full"><label>Histórico</label><input type="text" id="bx_historico_global" placeholder="Descrição da baixa"></div>
+      </div>
+
+      <div class="fin-baixa-table-wrap">
+        <table class="fin-table fin-baixa-table">
+          <thead>
+            <tr>
+              <th>Fornecedor</th>
+              <th>Nº doc.</th>
+              <th>Vencimento</th>
+              <th>Valor orig.</th>
+              <th>Categoria</th>
+              <th>Juros</th>
+              <th>Desconto</th>
+              <th>Multa</th>
+              <th>Tarifa</th>
+              <th>Valor pago</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyBaixa"></tbody>
+        </table>
+      </div>
+
+      <footer class="fin-baixa-footer">
+        <div class="fin-baixa-total">
+          <span>Total a pagar</span>
+          <strong id="bx_total_footer">R$ 0,00</strong>
+        </div>
+        <div class="fin-baixa-actions">
+          <button type="button" class="fin-btn fin-btn-outline" id="btnCancelarBaixa">Cancelar</button>
+          <button type="button" class="fin-btn fin-btn-primary" id="btnConfirmarBaixaModal">Baixar pagamento</button>
+        </div>
+      </footer>
+    </main>
+  </div>
+</div>

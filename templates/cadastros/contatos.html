@@ -14,8 +14,31 @@
   data-filtro-cliente="{{ '1' if filtro_cliente else '0' }}"
   data-filtro-fornecedor="{{ '1' if filtro_fornecedor else '0' }}">
 {% include "partials/app_shell_start.html" %}
-<div class="ctrl-wrap ess-cad-wrap">
+<div class="ess-filter-shell fin-shell ess-filter-shell-cad" id="finShell">
+  <aside class="fin-sidebar-left ess-filters-panel" id="finFiltersPanel">
+    {% include "partials/filtros_toolbar.html" %}
+    <a href="/cadastros" class="fin-link-hub">← Hub Cadastros</a>
+    <div class="fin-card">
+      <div class="fin-card-head"><span class="fin-card-icon">⚙</span><span>Filtros</span></div>
+      <div class="fin-filters-grid">
+        <div class="fin-field"><label>Nome</label><input type="search" id="filtroNome" placeholder="Nome, fantasia, razão..."></div>
+        <div class="fin-field"><label>CPF/CNPJ</label><input type="search" id="filtroDoc" placeholder="Documento"></div>
+        <div class="fin-field"><label>Cidade</label><input type="text" id="filtroCidade"></div>
+        <div class="fin-field"><label>Status</label>
+          <select id="filtroStatus"><option value="">Todos</option><option value="ativo">Ativo</option><option value="inativo">Inativo</option></select>
+        </div>
+        <div class="fin-field"><label>&nbsp;</label><button type="button" class="fin-btn fin-btn-outline" style="width:100%" id="btnLimparFiltrosC">Limpar</button></div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="ess-filter-main fin-main">
+<div class="ctrl-wrap ess-cad-wrap ess-cad-wrap-inner">
   <header class="ctrl-header">
+    <button type="button" class="ess-btn-show-filters" data-ess-toggle-filters="show" aria-label="Mostrar filtros" title="Mostrar filtros">
+      <span class="ess-toggle-icon" aria-hidden="true">›</span>
+      <span>Filtros</span>
+    </button>
     <div>
       <p class="ctrl-breadcrumb"><a href="/cadastros">Cadastros</a> / {{ titulo_modulo }}</p>
       <span class="ctrl-badge cad-badge">{{ icone_modulo }} Contatos</span>
@@ -35,19 +58,6 @@
   </div>
 
   <section class="ctrl-panel">
-    <h2>Filtros</h2>
-    <div class="ctrl-filters">
-      <div class="ctrl-field"><label>Nome</label><input type="search" id="filtroNome" placeholder="Nome, fantasia, razão..."></div>
-      <div class="ctrl-field"><label>CPF/CNPJ</label><input type="search" id="filtroDoc" placeholder="Documento"></div>
-      <div class="ctrl-field"><label>Cidade</label><input type="text" id="filtroCidade"></div>
-      <div class="ctrl-field"><label>Status</label>
-        <select id="filtroStatus"><option value="">Todos</option><option value="ativo">Ativo</option><option value="inativo">Inativo</option></select>
-      </div>
-      <div class="ctrl-field"><label>&nbsp;</label><button type="button" class="ctrl-btn ctrl-btn-outline" style="width:100%" id="btnLimparFiltrosC">Limpar</button></div>
-    </div>
-  </section>
-
-  <section class="ctrl-panel">
     <h2>Registros</h2>
     <div class="ctrl-table-wrap">
       <table class="ctrl-table" id="tabelaContatos">
@@ -58,6 +68,8 @@
       </table>
     </div>
   </section>
+</div>
+  </main>
 </div>
 
 <div id="modalContato" class="cad-modal" aria-hidden="true">
