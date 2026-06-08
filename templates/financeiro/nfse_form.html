@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{% if modo == 'editar' %}Editar{% else %}Incluir{% endif %} nota de serviço — Essência</title>
+  {% include "partials/head_financeiro_v2.html" %}
+</head>
+<body class="ess-app ess-fin-v2 fin-body nfse-form-body">
+{% include "partials/app_shell_start.html" %}
+<div id="finToast"></div>
+
+<div class="nfse-form-wrap">
+  <header class="nfse-form-head">
+    <div>
+      <p class="ctrl-breadcrumb"><a href="/financeiro">Financeiro</a> / <a href="/financeiro/notas-servico">Notas de serviço</a> / {% if modo == 'editar' %}Editar{% else %}Incluir{% endif %}</p>
+      <h1>{% if modo == 'editar' %}Editar nota de serviço{% else %}Incluir nota de serviço{% endif %}</h1>
+    </div>
+    <div class="nfse-form-head-actions">
+      <button type="button" class="fin-btn fin-btn-outline" id="btnCancelar">Cancelar</button>
+      <button type="button" class="fin-btn fin-btn-primary" id="btnSalvar">Salvar</button>
+    </div>
+  </header>
+
+  <p id="nfseErro" class="cad-erro nfse-erro" style="display:none"></p>
+
+  <form id="formNfse" class="nfse-form-sections" autocomplete="off">
+    <input type="hidden" id="nf_id" value="{{ nota_id }}">
+    <input type="hidden" id="nf_situacao" value="pendente">
+
+    <section class="nfse-section">
+      <h2>Dados gerais</h2>
+      <div class="cad-form-grid">
+        <div><label>Número RPS</label><input type="text" id="nf_numero_rps" value="{{ proximo_rps }}"></div>
+        <div><label>Série RPS</label><input type="text" id="nf_serie_rps" value="1"></div>
+        <div><label>Número NFS-e</label><input type="text" id="nf_numero_nfse" placeholder="Preenchido após emissão"></div>
+        <div><label>Data emissão</label><input type="date" id="nf_data_emissao"></div>
+        <div class="full"><label>Natureza da operação</label><input type="text" id="nf_natureza" value="Tributação no município"></div>
+      </div>
+    </section>
+
+    <section class="nfse-section">
+      <h2>Cliente</h2>
+      <div class="cad-form-grid">
+        <div class="full">
+          <label>Cliente</label>
+          <input type="text" id="nf_cliente_busca" list="dlClientesNfse" placeholder="Buscar cliente cadastrado...">
+          <datalist id="dlClientesNfse"></datalist>
+          <input type="hidden" id="nf_contato_id">
+        </div>
+        <div class="full"><label>Nome / Razão social</label><input type="text" id="nf_cliente_nome" required></div>
+        <div><label>CNPJ/CPF</label><input type="text" id="nf_cliente_doc"></div>
+        <div><label>Inscrição Estadual</label><input type="text" id="nf_cliente_ie"></div>
+        <div><label>Inscrição Municipal</label><input type="text" id="nf_cliente_im"></div>
+        <div><label>Tipo de operação</label><input type="text" id="nf_tipo_operacao"></div>
+        <div>
+          <label for="nf_consumidor_gov">Consumidor governamental</label>
+          <select id="nf_consumidor_gov">
+            <option value="0">Não</option>
+            <option value="1">Sim</option>
+          </select>
+        </div>
+        <div><label>CEP</label><input type="text" id="nf_cep"></div>
+        <div><label>UF</label><input type="text" id="nf_uf" maxlength="2"></div>
+        <div><label>Município</label><input type="text" id="nf_municipio"></div>
+        <div><label>Bairro</label><input type="text" id="nf_bairro"></div>
+        <div><label>Endereço</label><input type="text" id="nf_endereco"></div>
+        <div><label>Número</label><input type="text" id="nf_numero"></div>
+        <div><label>Complemento</label><input type="text" id="nf_complemento"></div>
+        <div><label>Fone/Fax</label><input type="text" id="nf_fone"></div>
+        <div><label>E-mail</label><input type="email" id="nf_email"></div>
+        <div><label>Município da prestação</label><input type="text" id="nf_municipio_prestacao"></div>
+      </div>
+    </section>
+
+    <section class="nfse-section">
+      <h2>Serviços</h2>
+      <div class="cad-form-grid">
+        <div class="full"><label>Descrição do serviço</label><textarea id="nf_servico_desc" rows="3"></textarea></div>
+        <div><label>Valor</label><input type="text" id="nf_servico_valor" inputmode="decimal" placeholder="0,00"></div>
+      </div>
+    </section>
+
+    <section class="nfse-section">
+      <h2>Tributação</h2>
+      <div class="cad-form-grid">
+        <div><label>Código de tributação</label><input type="text" id="imp_cod_trib"></div>
+        <div><label>Código CNAE nacional</label><input type="text" id="imp_cnae"></div>
+        <div><label>Código tributação municipal</label><input type="text" id="imp_trib_mun"></div>
+        <div><label>NBS</label><input type="text" id="imp_nbs"></div>
+        <div><label>Indicador de operação</label><input type="text" id="imp_indicador"></div>
+      </div>
+    </section>
+
+    <section class="nfse-section">
+      <h2>Impostos</h2>
+      <div class="cad-form-grid nfse-grid-4">
+        <div><label for="imp_aliq_ir">% IR</label><input type="text" id="imp_aliq_ir" inputmode="decimal" placeholder="0,00"></div>
+        <div><label for="imp_valor_ir">Valor do IR</label><input type="text" id="imp_valor_ir" inputmode="decimal" placeholder="0,00"></div>
+        <div><label for="imp_aliq_iss">% ISS</label><input type="text" id="imp_aliq_iss" inputmode="decimal" placeholder="0,00"></div>
+        <div><label for="imp_valor_iss">Valor ISS</label><input type="text" id="imp_valor_iss" inputmode="decimal" placeholder="0,00"></div>
+
+        <div>
+          <label for="imp_reter_iss">Reter ISS</label>
+          <select id="imp_reter_iss">
+            <option value="0">Não</option>
+            <option value="1">Sim</option>
+          </select>
+        </div>
+        <div>
+          <label for="imp_descontar_iss">Descontar ISS</label>
+          <select id="imp_descontar_iss">
+            <option value="0">Não</option>
+            <option value="1">Sim</option>
+          </select>
+        </div>
+        <div>
+          <label for="imp_reter_inss">Reter INSS</label>
+          <select id="imp_reter_inss">
+            <option value="0">Não</option>
+            <option value="1">Sim</option>
+          </select>
+        </div>
+        <div>
+          <label for="imp_reter_csll">Reter CSLL, PIS e COFINS</label>
+          <select id="imp_reter_csll">
+            <option value="0">Não</option>
+            <option value="1">Sim</option>
+          </select>
+        </div>
+
+        <div><label for="imp_ibpt">% Aprox. Trib. IBPT</label><input type="text" id="imp_ibpt" inputmode="decimal" placeholder="0,00"></div>
+        <div><label for="imp_aprox">Valor Aprox. Trib.</label><input type="text" id="imp_aprox" inputmode="decimal" placeholder="0,00"></div>
+      </div>
+    </section>
+
+    <section class="nfse-section">
+      <h2>IBS/CBS</h2>
+      <div class="cad-form-grid">
+        <div><label>Código situação tributária</label><input type="text" id="imp_cst"></div>
+        <div><label>Código classificação tributária</label><input type="text" id="imp_class"></div>
+      </div>
+    </section>
+
+    <section class="nfse-section">
+      <h2>Totais</h2>
+      <div class="cad-form-grid">
+        <div><label>Total dos serviços</label><input type="text" id="nf_total_servicos" readonly></div>
+        <div><label>Base de cálculo</label><input type="text" id="nf_base_calculo" inputmode="decimal"></div>
+        <div><label>Desconto incondicional</label><input type="text" id="nf_desconto" inputmode="decimal"></div>
+        <div><label>Total da nota</label><input type="text" id="nf_total_nota" inputmode="decimal"></div>
+      </div>
+    </section>
+
+    <section class="nfse-section">
+      <h2>Vendedor</h2>
+      <div class="cad-form-grid">
+        <div><label>Vendedor</label><input type="text" id="nf_vendedor"></div>
+        <div><label>Comissão %</label><input type="text" id="nf_comissao_pct" inputmode="decimal"></div>
+        <div><label>Valor comissão</label><input type="text" id="nf_comissao_valor" readonly></div>
+      </div>
+    </section>
+
+    <section class="nfse-section">
+      <h2>Pagamento</h2>
+      <div class="cad-form-grid">
+        <div><label>Condição de pagamento</label><input type="text" id="nf_condicao" placeholder="Ex: À vista, 3x"></div>
+        <div><label for="nf_dias_pagamento">Dias para pagamento</label><input type="number" id="nf_dias_pagamento" min="0" step="1" value="0" placeholder="0"></div>
+        <div><label for="nf_qtd_parcelas">Quantidade de parcelas</label><input type="number" id="nf_qtd_parcelas" min="1" step="1" value="1"></div>
+        <div><label for="nf_intervalo_parcelas">Intervalo entre parcelas (dias)</label><input type="number" id="nf_intervalo_parcelas" min="1" step="1" value="30"></div>
+        <div><label>Categoria</label><select id="nf_categoria"><option value="">— Selecione —</option></select></div>
+        <div class="full">
+          <button type="button" class="fin-btn fin-btn-outline" id="btnGerarParcelas">Gerar parcelas</button>
+        </div>
+      </div>
+      <div id="parcelasWrap" class="nfse-parcelas-wrap" style="display:none">
+        <table class="fin-table fin-hist-table">
+          <thead><tr><th>Parcela</th><th>Vencimento</th><th>Valor</th></tr></thead>
+          <tbody id="tbodyParcelas"></tbody>
+        </table>
+      </div>
+    </section>
+  </form>
+
+  <footer class="nfse-form-foot">
+    <button type="button" class="fin-btn fin-btn-outline" id="btnCancelar2">Cancelar</button>
+    <button type="button" class="fin-btn fin-btn-primary" id="btnSalvar2">Salvar</button>
+  </footer>
+</div>
+
+{% include "partials/app_shell_end.html" %}
+<script>
+  window.__NFSE_MODO = "{{ modo }}";
+  window.__NFSE_ID = "{{ nota_id }}";
+</script>
+<script src="/static/financeiro_shared.js"></script>
+<script src="/static/financeiro_nfse_form.js"></script>
+</body>
+</html>

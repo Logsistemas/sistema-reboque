@@ -47,3 +47,8 @@
         <span>Importar registros</span>
       </button>
 {% endblock %}
+{% block fin_baixa_panel %}{% include "financeiro/_baixa_panel_receber.html" %}{% endblock %}
+{% block modais_extra %}{% include "financeiro/_modal_baixa_receber.html" %}{% endblock %}
+{% block scripts_extra %}
+<script src="/static/financeiro_baixa_receber.js?v=20260605"></script>
+{% endblock %}

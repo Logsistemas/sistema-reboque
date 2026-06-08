@@ -47,6 +47,9 @@
     </div>
     <div class="ctrl-mod-actions">
       <a href="/cadastros" class="ctrl-btn ctrl-btn-outline">← Hub Cadastros</a>
+      {% if filtro_cliente %}
+      <button type="button" class="ctrl-btn ctrl-btn-outline" id="btnImportarClientes">⬆ Importar CSV</button>
+      {% endif %}
       <button type="button" class="ctrl-btn ctrl-btn-primary" id="btnNovoContato">+ Cadastrar</button>
     </div>
   </header>
@@ -71,6 +74,54 @@
 </div>
   </main>
 </div>
+
+{% if filtro_cliente %}
+<div id="modalImportClientes" class="cad-modal" aria-hidden="true">
+  <div class="cad-modal-shell" style="grid-template-columns:1fr;max-width:920px">
+    <main class="cad-modal-main">
+      <h2 class="cad-modal-title">Importar clientes (CSV)</h2>
+      <p class="muted">Importação incremental — clientes existentes (CNPJ/CPF ou código) são atualizados sem duplicar.</p>
+      <p id="impCliErro" class="cad-msg-erro" style="display:none"></p>
+
+      <div class="cad-form-grid">
+        <div class="full">
+          <label>Arquivo CSV</label>
+          <input type="file" id="impCliArquivo" accept=".csv,text/csv">
+        </div>
+      </div>
+
+      <div class="cad-import-actions" style="margin:14px 0;display:flex;gap:10px;flex-wrap:wrap">
+        <button type="button" class="ctrl-btn ctrl-btn-outline" id="btnImpCliPreview">Pré-visualizar</button>
+        <button type="button" class="ctrl-btn ctrl-btn-primary" id="btnImpCliConfirmar" disabled>Importar clientes</button>
+        <button type="button" class="ctrl-btn ctrl-btn-outline" id="btnImpCliFechar">Fechar</button>
+      </div>
+
+      <div id="impCliResumo" class="cad-import-resumo" style="display:none">
+        <div class="ctrl-kpis cad-import-kpis">
+          <div class="ctrl-kpi"><small>Registros no arquivo</small><b id="impCliTotal">0</b></div>
+          <div class="ctrl-kpi accent"><small>Novos clientes</small><b id="impCliNovos">0</b></div>
+          <div class="ctrl-kpi"><small>Atualizações</small><b id="impCliAtualiz">0</b></div>
+          <div class="ctrl-kpi"><small>Ignorados</small><b id="impCliIgnorados">0</b></div>
+        </div>
+        <h3 class="cad-section-title">Pré-visualização</h3>
+        <div class="ctrl-table-wrap">
+          <table class="ctrl-table">
+            <thead><tr><th>Linha</th><th>Nome</th><th>CPF/CNPJ</th><th>Cidade</th><th>Ação</th></tr></thead>
+            <tbody id="tbodyImpCliPreview"></tbody>
+          </table>
+        </div>
+        <div id="impCliAvisos" class="cad-import-avisos muted" style="display:none;margin-top:12px"></div>
+      </div>
+
+      <div id="impCliRelatorio" class="cad-import-relatorio" style="display:none;margin-top:16px">
+        <h3 class="cad-section-title">Relatório da importação</h3>
+        <p id="impCliRelatorioTxt" class="muted"></p>
+        <div id="impCliRelatorioErros" class="cad-import-avisos" style="display:none;margin-top:10px"></div>
+      </div>
+    </main>
+  </div>
+</div>
+{% endif %}
 
 <div id="modalContato" class="cad-modal" aria-hidden="true">
   <div class="cad-modal-shell cad-modal-prof">
@@ -214,5 +265,6 @@
 
 {% include "partials/app_shell_end.html" %}
 <script src="/static/cadastros_contatos.js"></script>
+{% if filtro_cliente %}<script src="/static/cadastros_import_clientes.js"></script>{% endif %}
 </body>
 </html>

@@ -1,0 +1,62 @@
+<div id="modalBaixaReceber" class="fin-modal-baixa-wrap" aria-hidden="true">
+  <div class="fin-modal-baixa-shell">
+    <aside class="fin-baixa-side">
+      <button type="button" class="fin-baixa-close" id="btnFecharBaixaReceber" title="Fechar">×</button>
+      <div class="fin-baixa-side-inner">
+        <span class="fin-baixa-badge">✓ Recebimento</span>
+        <h2>Baixa de recebimento</h2>
+        <p>Informe conta, categoria, ajustes e valor recebido. Baixas parciais mantêm o saldo em aberto.</p>
+        <ul class="fin-baixa-side-list">
+          <li>Valor recebido = entrada no Caixa</li>
+          <li>Juros e multa aumentam o saldo ajustado</li>
+          <li>Desconto, tarifa e taxas reduzem o recebível</li>
+        </ul>
+      </div>
+    </aside>
+    <main class="fin-baixa-main">
+      <header class="fin-baixa-head">
+        <div>
+          <h3 id="bxRecTitulo">Recebimento</h3>
+          <p class="muted" id="bxRecResumo">—</p>
+        </div>
+      </header>
+
+      <p id="baixaReceberErro" class="fin-imp-erro" style="display:none;margin:0 0 12px"></p>
+
+      <div class="fin-baixa-resumo-titulo cad-form-grid fin-baixa-resumo-grid">
+        <div><label>Cliente</label><input type="text" id="bxRec_cliente" readonly class="fin-valor-readonly"></div>
+        <div><label>Nº documento</label><input type="text" id="bxRec_numero_doc" readonly class="fin-valor-readonly"></div>
+        <div><label>Vencimento</label><input type="text" id="bxRec_vencimento" readonly class="fin-valor-readonly"></div>
+        <div><label>Valor original</label><input type="text" id="bxRec_valor_original" readonly class="fin-valor-readonly"></div>
+        <div><label>Já recebido</label><input type="text" id="bxRec_ja_recebido" readonly class="fin-valor-readonly"></div>
+        <div><label>Saldo em aberto</label><input type="text" id="bxRec_saldo_aberto" readonly class="fin-valor-readonly fin-saldo-aberto"></div>
+      </div>
+
+      <div class="fin-baixa-config cad-form-grid fin-baixa-rec-grid">
+        <div><label>Conta financeira *</label><select id="bxRec_conta"><option value="">— Selecione —</option></select></div>
+        <div><label>Categoria</label><select id="bxRec_categoria"><option value="">— Selecione —</option></select></div>
+        <div><label>Data do recebimento *</label><input type="date" id="bxRec_data"></div>
+        <div><label>Juros</label><input type="text" inputmode="decimal" id="bxRec_juros" value="0,00" class="bx-money-rec"></div>
+        <div><label>Desconto</label><input type="text" inputmode="decimal" id="bxRec_desconto" value="0,00" class="bx-money-rec"></div>
+        <div><label>Multa</label><input type="text" inputmode="decimal" id="bxRec_multa" value="0,00" class="bx-money-rec"></div>
+        <div><label>Tarifa</label><input type="text" inputmode="decimal" id="bxRec_tarifa" value="0,00" class="bx-money-rec"></div>
+        <div><label>Taxas de marketplace</label><input type="text" inputmode="decimal" id="bxRec_taxas" value="0,00" class="bx-money-rec"></div>
+        <div><label>Valor recebido *</label><input type="text" inputmode="decimal" id="bxRec_valor_recebido" class="bx-money-rec fin-valor-recebido"></div>
+        <div class="full"><label>Histórico</label><input type="text" id="bxRec_historico" placeholder="Descrição do recebimento"></div>
+      </div>
+
+      <div class="fin-baixa-calc-hint muted" id="bxRec_calc_hint"></div>
+
+      <footer class="fin-baixa-footer">
+        <div class="fin-baixa-total">
+          <span>Valor a receber nesta baixa</span>
+          <strong id="bxRec_total_footer">R$ 0,00</strong>
+        </div>
+        <div class="fin-baixa-actions">
+          <button type="button" class="fin-btn fin-btn-outline" id="btnCancelarBaixaReceber">Cancelar</button>
+          <button type="button" class="fin-btn fin-btn-primary" id="btnConfirmarBaixaReceber">Confirmar recebimento</button>
+        </div>
+      </footer>
+    </main>
+  </div>
+</div>

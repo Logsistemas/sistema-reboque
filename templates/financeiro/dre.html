@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>DRE — Essência</title>
+  {% include "partials/head_financeiro_v2.html" %}
+</head>
+<body class="ess-app ess-fin-v2 fin-body" data-fin-page="dre">
+{% include "partials/app_shell_start.html" %}
+<div id="finToast"></div>
+<div class="fin-shell fin-shell-dre" id="finShell">
+  <aside class="fin-sidebar-left fin-sidebar-min ess-filters-panel" id="finFiltersPanel">
+    {% include "partials/filtros_toolbar.html" %}
+    <a href="/financeiro" class="fin-link-hub">← Hub Financeiro</a>
+    <div class="fin-card">
+      <div class="fin-card-head">
+        <span class="fin-card-icon">ℹ</span>
+        <span>Sobre o DRE</span>
+      </div>
+      <p class="fin-caixa-hint muted">Agrupa movimentações de Caixa e Bancos por grupo DRE da categoria. Categorias marcadas como <strong>Não exibir DRE</strong> ficam fora do demonstrativo.</p>
+    </div>
+  </aside>
+
+  <main class="fin-main">
+    <div class="fin-page-head">
+      <button type="button" class="ess-btn-show-filters" data-ess-toggle-filters="show" aria-label="Mostrar filtros" title="Mostrar filtros">
+        <span class="ess-toggle-icon" aria-hidden="true">›</span>
+        <span>Filtros</span>
+      </button>
+      <div>
+        <h1>Demonstrativo de Resultados (DRE)</h1>
+        <p class="fin-page-sub" id="lblPeriodoDre">Período</p>
+      </div>
+    </div>
+    <div class="fin-quick-bar fin-quick-bar-caixa">
+      {% include "financeiro/_filtro_periodo.html" %}
+    </div>
+
+    <div class="fin-dre-hero">
+      <div class="fin-stat-card fin-stat-card-highlight">
+        <label>Receita Operacional Bruta</label>
+        <b id="dreReceitaBruta" class="fin-stat-green">—</b>
+      </div>
+    </div>
+
+    <div class="fin-table-area">
+      <div class="fin-table-wrap">
+        <table class="fin-table fin-dre-table">
+          <thead>
+            <tr>
+              <th>Grupo DRE</th>
+              <th>Natureza</th>
+              <th>Entradas</th>
+              <th>Saídas</th>
+              <th>Saldo</th>
+              <th>Movimentos</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyDre"></tbody>
+        </table>
+      </div>
+      <p id="dreEmpty" class="fin-dre-empty muted" style="display:none">Nenhum lançamento com grupo DRE visível no período selecionado.</p>
+    </div>
+  </main>
+
+  <aside class="fin-sidebar-right ess-sidebar-premium">
+    <div class="fin-side-block fin-side-block-stats">
+      <p class="fin-side-section-title">Resumo do período</p>
+      <div class="fin-stats">
+        <div class="fin-stat-card full">
+          <label>Grupos de receita</label>
+          <b id="dreQtdReceitas">0</b>
+        </div>
+        <div class="fin-stat-card full">
+          <label>Grupos de despesa</label>
+          <b id="dreQtdDespesas">0</b>
+        </div>
+      </div>
+    </div>
+  </aside>
+</div>
+{% include "partials/app_shell_end.html" %}
+<script src="/static/financeiro_shared.js?v=20260604"></script>
+<script src="/static/financeiro_dre.js?v=20260604"></script>
+</body>
+</html>

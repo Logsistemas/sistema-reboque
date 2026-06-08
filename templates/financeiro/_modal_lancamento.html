@@ -44,6 +44,7 @@
       </div>
 
       <div class="fin-tab-panel" data-fin-panel="baixa">
+        {% block fin_baixa_panel %}
         <p class="muted" id="baixaHint">Confirme a baixa total. Será gerada movimentação automática em Caixa e Bancos.</p>
         <div class="cad-form-grid">
           <div><label>Conta financeira</label><select id="bx_conta_financeira_id"><option value="">—</option></select></div>
@@ -51,6 +52,7 @@
           <div><label>Valor</label><input type="number" step="0.01" id="bx_valor"></div>
         </div>
         <button type="button" class="ctrl-btn ctrl-btn-primary" id="btnConfirmarBaixa" style="margin-top:12px">Confirmar baixa total</button>
+        {% endblock %}
       </div>
 
       <div class="fin-tab-panel" data-fin-panel="anexos">

@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Notas de serviço — Essência</title>
+  {% include "partials/head_financeiro_v2.html" %}
+</head>
+<body class="ess-app ess-fin-v2 fin-body">
+{% include "partials/app_shell_start.html" %}
+<div id="finToast"></div>
+<div class="fin-shell" id="finShell">
+  <aside class="fin-sidebar-left ess-filters-panel" id="finFiltersPanel">
+    {% include "partials/filtros_toolbar.html" %}
+    <a href="/financeiro" class="fin-link-hub">← Hub Financeiro</a>
+
+    <div class="fin-card">
+      <div class="fin-card-head"><span class="fin-card-icon">◎</span><span>Situação</span></div>
+      <div class="fin-pills" id="filtroSituacao">
+        <button type="button" class="fin-pill active" data-sit="">Todas</button>
+        <button type="button" class="fin-pill" data-sit="pendente">Pendentes</button>
+        <button type="button" class="fin-pill" data-sit="emitida">Emitidas</button>
+        <button type="button" class="fin-pill" data-sit="cancelada">Canceladas</button>
+      </div>
+    </div>
+
+    <div class="fin-card">
+      <div class="fin-card-head"><span class="fin-card-icon">⚙</span><span>Período</span></div>
+      <div class="fin-filters-grid">
+        <div class="fin-field"><label>Emissão de</label><input type="date" id="ff_data_ini"></div>
+        <div class="fin-field"><label>Emissão até</label><input type="date" id="ff_data_fim"></div>
+        <div class="fin-field full"><label>Busca</label><input type="search" id="ff_busca" placeholder="Cliente, RPS ou NFS-e"></div>
+      </div>
+      <div class="fin-filter-actions">
+        <button type="button" class="fin-btn fin-btn-primary" id="btnFiltrar">🔍 Aplicar</button>
+        <button type="button" class="fin-btn fin-btn-outline" id="btnLimpar">Limpar</button>
+      </div>
+    </div>
+  </aside>
+
+  <main class="fin-main">
+    <div class="fin-page-head">
+      <button type="button" class="ess-btn-show-filters" data-ess-toggle-filters="show" aria-label="Mostrar filtros" title="Mostrar filtros">
+        <span class="ess-toggle-icon" aria-hidden="true">›</span>
+        <span>Filtros</span>
+      </button>
+      <div>
+        <h1>Notas de serviço</h1>
+        <p class="fin-page-sub">NFS-e — emissão de nota fiscal de serviço eletrônica</p>
+      </div>
+      <div class="fin-head-actions">
+        <button type="button" class="fin-btn fin-btn-outline" id="btnImprimirSel" disabled>🖨 Imprimir</button>
+        <button type="button" class="fin-btn fin-btn-outline fin-btn-danger" id="btnExcluirSel" disabled>Excluir</button>
+        <a href="/financeiro/notas-servico/nova" class="fin-btn fin-btn-primary">+ Incluir nota</a>
+      </div>
+    </div>
+    <div class="fin-table-area">
+      <div class="fin-table-wrap">
+        <table class="fin-table">
+          <thead>
+            <tr>
+              <th style="width:36px"><input type="checkbox" id="chkTodos"></th>
+              <th>Número RPS / NFS-e</th>
+              <th>Data emissão</th>
+              <th>Cliente</th>
+              <th>Situação</th>
+              <th>Valor</th>
+              <th style="width:56px">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyNfse"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <aside class="fin-sidebar-right ess-sidebar-premium">
+    <div class="fin-side-block">
+      <p class="fin-side-section-title">Principal</p>
+      <div class="fin-side-actions">
+        <a href="/financeiro/notas-servico/nova" class="fin-action-btn fin-action-btn-primary">
+          <span class="fin-action-btn-icon">+</span><span>Incluir nota</span>
+        </a>
+      </div>
+    </div>
+    <div class="fin-side-block">
+      <p class="fin-side-section-title">Emissão</p>
+      <div class="fin-side-actions">
+        <button type="button" class="fin-action-btn fin-action-btn-accent" id="btnEmitirSel" disabled>
+          <span class="fin-action-btn-icon">📤</span><span>Enviar NFS-es selecionadas</span>
+        </button>
+        <button type="button" class="fin-action-btn" id="btnEmitirPendentes">
+          <span class="fin-action-btn-icon">⏳</span><span>Enviar NFS-es pendentes</span>
+        </button>
+        <button type="button" class="fin-action-btn" id="btnGerarTxt" disabled>
+          <span class="fin-action-btn-icon">📄</span><span>Gerar TXT selecionadas</span>
+        </button>
+      </div>
+    </div>
+    <div class="fin-side-block">
+      <p class="fin-side-section-title">Mais ações</p>
+      <div class="fin-side-actions">
+        <a href="/financeiro/configuracao-fiscal" class="fin-action-btn">
+          <span class="fin-action-btn-icon">⚙</span><span>Configuração Fiscal</span>
+        </a>
+        <button type="button" class="fin-action-btn" id="btnPortalPref" title="Abrir portal da prefeitura">
+          <span class="fin-action-btn-icon">🌐</span><span>Portal da prefeitura</span>
+        </button>
+      </div>
+    </div>
+    <div class="fin-side-block fin-side-block-stats">
+      <p class="fin-side-section-title">Informações</p>
+      <div class="fin-stats">
+        <div class="fin-stat-card"><label>Quantidade de notas</label><b id="painelQtd">0</b></div>
+        <div class="fin-stat-card fin-stat-card-highlight full"><label>Valor total</label><b id="painelTotal">R$ 0,00</b></div>
+      </div>
+    </div>
+  </aside>
+</div>
+
+{% include "partials/app_shell_end.html" %}
+
+<div id="modalEmail" class="cad-modal" aria-hidden="true">
+  <div class="cad-modal-shell" style="max-width:560px;grid-template-columns:1fr">
+    <main class="cad-modal-main">
+      <h2 class="cad-modal-title">Enviar NFS-e por e-mail</h2>
+      <p id="emailErro" class="cad-erro" style="display:none"></p>
+      <div class="cad-form-grid">
+        <div class="full"><label>E-mail</label><input type="email" id="emailDestino"></div>
+        <div class="full"><label>Assunto</label><input type="text" id="emailAssunto" value="Nota Fiscal de Serviço"></div>
+        <div class="full"><label>Mensagem</label><textarea id="emailMsg" rows="4">Segue em anexo a NFS-e referente aos serviços prestados.</textarea></div>
+      </div>
+      <div class="cad-modal-footer">
+        <button type="button" class="fin-btn fin-btn-outline" id="btnFecharEmail">Cancelar</button>
+        <button type="button" class="fin-btn fin-btn-primary" id="btnConfirmarEmail">Enviar</button>
+      </div>
+    </main>
+  </div>
+</div>
+
+<div id="menuContexto" class="fin-menu-ctx" style="display:none"></div>
+
+<script src="/static/financeiro_shared.js"></script>
+<script src="/static/financeiro_nfse.js"></script>
+</body>
+</html>

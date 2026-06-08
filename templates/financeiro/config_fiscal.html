@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Configuração Fiscal — Essência</title>
+  {% include "partials/head_financeiro_v2.html" %}
+</head>
+<body class="ess-app ess-fin-v2 fin-body fcf-page">
+{% include "partials/app_shell_start.html" %}
+<div id="finToast"></div>
+
+<div class="fcf-page-wrap">
+  <header class="fcf-page-header">
+    <div>
+      <a href="/financeiro" class="fin-link-hub">← Hub Financeiro</a>
+      <span class="ctrl-badge fin-badge">⚙️ Fiscal</span>
+      <h1>Configuração Fiscal</h1>
+      <p class="fcf-subtitle">Parâmetros da empresa emissora e certificado digital A1 para NFS-e Nacional</p>
+    </div>
+  </header>
+
+  <p id="fiscalErro" class="cad-erro nfse-erro" style="display:none"></p>
+
+  <div class="fcf-cards-stack">
+    <!-- CARD 1 — Status NFS-e -->
+    <section class="fin-card fcf-card-premium" aria-labelledby="fcfStTitle">
+      <div class="fin-card-head fcf-card-title-row">
+        <span class="fin-card-icon">📡</span>
+        <h2 id="fcfStTitle">Status NFS-e</h2>
+      </div>
+      <div class="fcf-status-row" id="painelStatus">
+        <div class="fcf-status-item">
+          <span class="fcf-status-label">Ambiente</span>
+          <span class="fcf-badge-pill" id="stAmbiente">—</span>
+        </div>
+        <div class="fcf-status-item">
+          <span class="fcf-status-label">Empresa</span>
+          <span class="fcf-badge-pill" id="stEmpresa">—</span>
+        </div>
+        <div class="fcf-status-item">
+          <span class="fcf-status-label">Certificado</span>
+          <span class="fcf-badge-pill" id="stCertificado">—</span>
+        </div>
+        <div class="fcf-status-item">
+          <span class="fcf-status-label">Comunicação</span>
+          <span class="fcf-badge-pill" id="stComunicacao">—</span>
+        </div>
+        <div class="fcf-status-item fcf-status-item-wide">
+          <span class="fcf-status-label">Última validação</span>
+          <span class="fcf-status-value" id="stUltimaValidacao">—</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- CARD 4 — Pendências (condicional) -->
+    <section class="fin-card fcf-card-premium fcf-card-pendencias" id="cardPendencias" aria-labelledby="fcfPendTitle">
+      <div class="fin-card-head fcf-card-title-row">
+        <span class="fin-card-icon">📋</span>
+        <h2 id="fcfPendTitle">Pendências</h2>
+      </div>
+      <div id="pendenciasConteudo">
+        <ul id="listaPendencias" class="fcf-pendencias-list"></ul>
+      </div>
+    </section>
+
+    <!-- CARD 2 — Configuração Fiscal -->
+    <section class="fin-card fcf-card-premium" aria-labelledby="fcfCfgTitle">
+      <div class="fin-card-head fcf-card-title-row">
+        <span class="fin-card-icon">🏢</span>
+        <h2 id="fcfCfgTitle">Configuração Fiscal</h2>
+      </div>
+      <form id="formConfigFiscal" autocomplete="off">
+        <div class="fcf-grid-3">
+          <div class="fcf-field"><label for="cf_razao">Razão Social</label><input type="text" id="cf_razao" required></div>
+          <div class="fcf-field"><label for="cf_fantasia">Nome Fantasia</label><input type="text" id="cf_fantasia"></div>
+          <div class="fcf-field"><label for="cf_cnpj">CNPJ</label><input type="text" id="cf_cnpj" placeholder="00.000.000/0000-00"></div>
+          <div class="fcf-field"><label for="cf_im">Inscrição Municipal</label><input type="text" id="cf_im"></div>
+          <div class="fcf-field"><label for="cf_cnae">CNAE</label><input type="text" id="cf_cnae"></div>
+          <div class="fcf-field"><label for="cf_municipio">Município</label><input type="text" id="cf_municipio"></div>
+          <div class="fcf-field"><label for="cf_ibge">Código IBGE</label><input type="text" id="cf_ibge" maxlength="7"></div>
+          <div class="fcf-field"><label for="cf_uf">UF</label><input type="text" id="cf_uf" maxlength="2"></div>
+          <div class="fcf-field"><label for="cf_cod_serv_nac">Código Serviço Nacional</label><input type="text" id="cf_cod_serv_nac"></div>
+          <div class="fcf-field"><label for="cf_cod_serv">Código Tributação Municipal</label><input type="text" id="cf_cod_serv"></div>
+          <div class="fcf-field">
+            <label for="cf_regime">Regime Tributário</label>
+            <select id="cf_regime">
+              <option value="">— Selecione —</option>
+              {% for r in regimes %}
+              <option value="{{ r }}">{{ r }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="fcf-field"><label for="cf_iss">Alíquota ISS (%)</label><input type="text" id="cf_iss" inputmode="decimal"></div>
+          <div class="fcf-field">
+            <label for="cf_ambiente">Ambiente NFS-e</label>
+            <select id="cf_ambiente">
+              <option value="homologacao">Homologação</option>
+              <option value="producao">Produção</option>
+            </select>
+          </div>
+          <div class="fcf-field"><label for="cf_ie">Inscrição Estadual</label><input type="text" id="cf_ie"></div>
+        </div>
+      </form>
+    </section>
+
+    <!-- CARD 3 — Certificado A1 -->
+    <section class="fin-card fcf-card-premium" aria-labelledby="fcfCertTitle">
+      <div class="fin-card-head fcf-card-title-row">
+        <span class="fin-card-icon">🔐</span>
+        <h2 id="fcfCertTitle">Certificado Digital A1</h2>
+      </div>
+
+      <div id="certAlerta" class="fcf-cert-alert" style="display:none"></div>
+
+      <div id="certDetalhes" class="fcf-cert-panel">
+        <p class="fcf-empty">Nenhum certificado configurado.</p>
+      </div>
+
+      <div class="fcf-cert-upload">
+        <p id="certErro" class="cad-erro" style="display:none"></p>
+        <div class="fcf-grid-3 fcf-grid-upload">
+          <div class="fcf-field fcf-field-span2"><label for="certArquivo">Arquivo (.pfx / .p12)</label><input type="file" id="certArquivo" accept=".pfx,.p12"></div>
+          <div class="fcf-field"><label for="certSenha">Senha</label><input type="password" id="certSenha" autocomplete="new-password"></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <footer class="fcf-footer-actions">
+    <button type="button" class="fin-btn fin-btn-primary" id="btnSalvarConfig">Salvar Configuração</button>
+    <button type="button" class="fin-btn fin-btn-outline" id="btnValidarCert">Validar Certificado</button>
+    <button type="button" class="fin-btn fin-btn-outline" id="btnSalvarCert">Atualizar Certificado</button>
+    <button type="button" class="fin-btn fin-btn-outline" id="btnTestarComunicacao">Testar Comunicação NFS-e</button>
+    <button type="button" class="fin-btn fin-btn-ghost" id="btnExportCert">Exportar Certificado</button>
+  </footer>
+</div>
+
+{% include "partials/app_shell_end.html" %}
+<script src="/static/financeiro_shared.js"></script>
+<script src="/static/financeiro_config_fiscal.js?v=20260608b"></script>
+</body>
+</html>

@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Certificado Digital — Essência</title>
+  {% include "partials/head_financeiro_v2.html" %}
+</head>
+<body class="ess-app ess-fin-v2 fin-body">
+{% include "partials/app_shell_start.html" %}
+<div id="finToast"></div>
+
+<div class="nfse-form-wrap cert-wrap">
+  <header class="nfse-form-head">
+    <div>
+      <p class="ctrl-breadcrumb"><a href="/financeiro">Financeiro</a> / Certificado Digital</p>
+      <h1>Certificado Digital</h1>
+      <p class="fin-page-sub">Configuração para emissão de NFS-e (A1 — Servidor)</p>
+    </div>
+  </header>
+
+  <section class="nfse-section cert-section">
+    <h2>Tipo de certificado</h2>
+    <div class="cert-tipos">
+      <label class="cert-tipo active"><input type="radio" name="tipo_cert" value="a1_servidor" checked> A1 — Servidor</label>
+      <label class="cert-tipo disabled"><input type="radio" disabled> A1 — Máquina do cliente</label>
+      <label class="cert-tipo disabled"><input type="radio" disabled> A3</label>
+      <label class="cert-tipo disabled"><input type="radio" disabled> Gerenciador do Windows</label>
+    </div>
+    <p class="muted cert-hint">Primeira versão: upload A1 no servidor. Demais opções em versões futuras.</p>
+  </section>
+
+  <section class="nfse-section cert-section">
+    <h2>Upload</h2>
+    <p id="certErro" class="cad-erro" style="display:none"></p>
+    <div class="cad-form-grid">
+      <div class="full"><label>Arquivo (.pfx ou .p12)</label><input type="file" id="certArquivo" accept=".pfx,.p12"></div>
+      <div class="full"><label>Senha do certificado</label><input type="password" id="certSenha" autocomplete="new-password"></div>
+    </div>
+    <div class="cert-actions">
+      <button type="button" class="fin-btn fin-btn-primary" id="btnSalvarCert">Atualizar certificado</button>
+      <button type="button" class="fin-btn fin-btn-outline" id="btnExportCert" {% if not certificado %}disabled{% endif %}>Exportar certificado</button>
+    </div>
+  </section>
+
+  <section class="nfse-section cert-section" id="certStatus">
+    <h2>Status</h2>
+    {% if certificado %}
+    <div class="cert-status-grid">
+      <div class="cert-status-item"><label>Situação</label><b class="{% if certificado.valido %}cert-ok{% else %}cert-warn{% endif %}">{% if certificado.valido %}Certificado válido{% else %}Verificar validade{% endif %}</b></div>
+      <div class="cert-status-item"><label>Validade</label><b>{{ certificado.validade_fmt or '—' }}</b></div>
+      <div class="cert-status-item"><label>Empresa</label><b>{{ certificado.razao_social or '—' }}</b></div>
+      <div class="cert-status-item"><label>CNPJ</label><b>{{ certificado.cnpj or '—' }}</b></div>
+    </div>
+    {% else %}
+    <p class="muted">Nenhum certificado configurado.</p>
+    {% endif %}
+  </section>
+</div>
+
+{% include "partials/app_shell_end.html" %}
+<script src="/static/financeiro_shared.js"></script>
+<script src="/static/financeiro_certificado.js"></script>
+</body>
+</html>

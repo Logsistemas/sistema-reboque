@@ -119,6 +119,30 @@ def init_financeiro_tables(cur):
         "alter table financeiro_contas_pagar add column if not exists categoria_id uuid references financeiro_categorias(id);",
         "alter table financeiro_contas_receber add column if not exists categoria_id uuid references financeiro_categorias(id);",
         "alter table financeiro_movimentacoes add column if not exists categoria_id uuid references financeiro_categorias(id);",
+        "alter table financeiro_movimentacoes add column if not exists competencia date;",
+        "alter table financeiro_movimentacoes add column if not exists cliente_fornecedor_id uuid;",
+        "alter table financeiro_movimentacoes add column if not exists cliente_fornecedor_nome text;",
+        """
+        create table if not exists financeiro_baixas_receber (
+          id uuid primary key default uuid_generate_v4(),
+          conta_receber_id uuid not null references financeiro_contas_receber(id) on delete cascade,
+          conta_financeira_id uuid,
+          categoria_id uuid references financeiro_categorias(id),
+          movimentacao_id uuid,
+          data_recebimento date not null,
+          valor_original numeric(14,2) default 0,
+          valor_recebido numeric(14,2) default 0,
+          juros numeric(14,2) default 0,
+          desconto numeric(14,2) default 0,
+          multa numeric(14,2) default 0,
+          tarifa numeric(14,2) default 0,
+          taxas_marketplace numeric(14,2) default 0,
+          saldo_anterior numeric(14,2) default 0,
+          saldo_restante numeric(14,2) default 0,
+          historico text,
+          created_at timestamp default now()
+        );""",
+        "create index if not exists idx_fin_baixas_receber_conta on financeiro_baixas_receber(conta_receber_id);",
     ):
         cur.execute(stmt)
 
@@ -151,7 +175,45 @@ def register(app, templates):
         return st
 
     def _status_efetivo_receber(item):
+        st = (item.get("status") or "em_aberto").lower()
+        if st in ("recebido", "cancelado", "parcialmente_recebido"):
+            return st
         return _status_efetivo_pagar(item)
+
+    def _saldo_aberto_receber(item):
+        if not item:
+            return 0.0
+        st = (item.get("status") or "").lower()
+        if st == "recebido":
+            return 0.0
+        vo = float(item.get("valor") or 0)
+        vr = float(item.get("valor_recebido") or 0)
+        return max(0.0, round(vo - vr, 2))
+
+    def _valor_recebido_baixa_receber(payload, valor_ajustado):
+        p = payload or {}
+        vr_raw = p.get("valor_recebido")
+        if vr_raw in (None, ""):
+            vr_raw = p.get("valor")
+        if vr_raw not in (None, ""):
+            vr = _num(vr_raw, 0)
+        else:
+            vr = float(valor_ajustado or 0)
+        if vr < 0:
+            raise ValueError("Valor recebido não pode ser negativo")
+        return vr
+
+    def _ajuste_baixa_receber(saldo_anterior, payload):
+        p = payload or {}
+        juros = _num(p.get("juros"), 0)
+        desconto = _num(p.get("desconto"), 0)
+        multa = _num(p.get("multa"), 0)
+        tarifa = _num(p.get("tarifa"), 0)
+        taxas = _num(p.get("taxas_marketplace"), 0)
+        valor_ajustado = float(saldo_anterior or 0) + juros + multa - desconto - tarifa - taxas
+        if valor_ajustado < 0:
+            valor_ajustado = 0.0
+        return valor_ajustado, juros, desconto, multa, tarifa, taxas
 
     def atualizar_saldo_conta(cid, delta):
         q(
@@ -159,19 +221,34 @@ def register(app, templates):
             (float(delta), str(cid)),
         )
 
-    def criar_movimentacao(conta_id, tipo, origem, origem_id, descricao, valor, data_mov=None, categoria_id=None, categoria=None):
+    def criar_movimentacao(
+        conta_id,
+        tipo,
+        origem,
+        origem_id,
+        descricao,
+        valor,
+        data_mov=None,
+        categoria_id=None,
+        categoria=None,
+        competencia=None,
+        cliente_fornecedor_id=None,
+        cliente_fornecedor_nome=None,
+    ):
         cat_id = (categoria_id or "").strip() or None
         cat_txt = _txt(categoria)
         if cat_id and not cat_txt:
             cat_row = categoria_por_id(cat_id)
             if cat_row:
                 cat_txt = cat_row.get("descricao")
+        parte_id = (cliente_fornecedor_id or "").strip() or None
+        parte_nome = _txt(cliente_fornecedor_nome)
         row = one(
             """
             insert into financeiro_movimentacoes (
               conta_financeira_id, tipo, origem, origem_id, descricao, valor, data_movimento, status,
-              categoria_id, categoria
-            ) values (%s,%s,%s,%s,%s,%s,%s,'confirmado',%s,%s) returning id
+              categoria_id, categoria, competencia, cliente_fornecedor_id, cliente_fornecedor_nome
+            ) values (%s,%s,%s,%s,%s,%s,%s,'confirmado',%s,%s,%s,%s,%s) returning id
             """,
             (
                 str(conta_id),
@@ -183,6 +260,9 @@ def register(app, templates):
                 data_mov or date.today(),
                 cat_id,
                 cat_txt,
+                _parse_data(competencia),
+                parte_id,
+                parte_nome,
             ),
         )
         delta = float(valor) if tipo == "entrada" else -float(valor)
@@ -447,6 +527,34 @@ def register(app, templates):
                 return str(row["id"]), row["descricao"], row.get("grupo_dre") or ""
         return None, txt, None
 
+    def _resolver_parte_mov(payload):
+        p = payload or {}
+        cid = (p.get("cliente_fornecedor_id") or "").strip()
+        nome = _txt(p.get("cliente_fornecedor_nome")) or _txt(p.get("parte_nome"))
+        if cid:
+            row = one(
+                """
+                select coalesce(nullif(trim(razao_social),''), nullif(trim(nome_fantasia),''), nullif(trim(nome),'')) as nome
+                  from cadastro_contatos where id=%s
+                """,
+                (cid,),
+            )
+            if not row:
+                raise ValueError("Cliente/Fornecedor não encontrado no cadastro")
+            return cid, (row.get("nome") or nome or "").strip()
+        return None, nome
+
+    def _parte_nome_mov(row):
+        if not row:
+            return "-"
+        if row.get("cliente_fornecedor_nome"):
+            return row["cliente_fornecedor_nome"]
+        if row.get("contato_nome"):
+            return row["contato_nome"]
+        if row.get("parte_nome"):
+            return row["parte_nome"]
+        return "-"
+
     def listar_categorias_hierarquia(natureza=None):
         wh, params = [], []
         if natureza:
@@ -552,6 +660,22 @@ def register(app, templates):
                 }
             )
         return out
+
+    def resumo_dre(filtros=None):
+        grupos = preview_dre_agrupamento(filtros)
+        receita_bruta = 0.0
+        for g in grupos:
+            if (g.get("grupo_dre") or "") == "Receita Operacional Bruta" and (g.get("natureza") or "") == "Receita":
+                receita_bruta += float(g.get("entradas") or 0)
+        receitas = [g for g in grupos if (g.get("natureza") or "") == "Receita"]
+        despesas = [g for g in grupos if (g.get("natureza") or "") == "Despesa"]
+        return {
+            "grupos": grupos,
+            "receitas": receitas,
+            "despesas": despesas,
+            "receita_operacional_bruta": receita_bruta,
+            "receita_operacional_bruta_fmt": _fmt_valor(receita_bruta),
+        }
 
     _SQL_CAT_SELECT = """
         cat.descricao as categoria_desc,
@@ -926,7 +1050,7 @@ def register(app, templates):
         q("delete from financeiro_anexos where referencia_tipo='pagar' and referencia_id=%s", (str(pid),))
         q("delete from financeiro_contas_pagar where id=%s", (str(pid),))
 
-    def normalizar_receber(r, com_anexos=False):
+    def normalizar_receber(r, com_anexos=False, com_baixas=False):
         if not r:
             return None
         i = dict(r)
@@ -935,6 +1059,16 @@ def register(app, templates):
             i["conta_financeira_id"] = str(i["conta_financeira_id"])
         i["valor"] = float(i.get("valor") or 0)
         i["valor_fmt"] = _fmt_valor(i["valor"])
+        i["valor_recebido"] = float(i.get("valor_recebido") or 0)
+        i["valor_recebido_fmt"] = _fmt_valor(i["valor_recebido"])
+        i["saldo_aberto"] = _saldo_aberto_receber(i)
+        i["saldo_aberto_fmt"] = _fmt_valor(i["saldo_aberto"])
+        if i["saldo_aberto"] > 0 and i.get("valor_recebido", 0) > 0:
+            i["valor_exibir"] = i["saldo_aberto"]
+            i["valor_exibir_fmt"] = i["saldo_aberto_fmt"]
+        else:
+            i["valor_exibir"] = i["valor"]
+            i["valor_exibir_fmt"] = i["valor_fmt"]
         i["status"] = _status_efetivo_receber(i)
         i["conta_nome"] = i.get("conta_nome") or "-"
         for d in ("competencia", "emissao", "vencimento", "data_recebimento"):
@@ -944,6 +1078,8 @@ def register(app, templates):
                 i[d + "_fmt"] = v.strftime("%d/%m/%Y")
         if com_anexos:
             i["anexos"] = listar_anexos("receber", i["id"])
+        if com_baixas:
+            i["baixas"] = listar_baixas_receber(i["id"])
         _meta_anexos_item(i, r, com_lista=com_anexos)
         i["historico"] = (i.get("descricao") or "").strip() or "-"
         return _aplicar_categoria_item(i)
@@ -954,11 +1090,13 @@ def register(app, templates):
         params = []
         sit = (f.get("situacao") or "").lower()
         if sit == "em_aberto":
-            wh.append("r.status = 'em_aberto'")
+            wh.append("r.status in ('em_aberto', 'parcialmente_recebido')")
         elif sit == "recebido":
             wh.append("r.status = 'recebido'")
+        elif sit == "parcialmente_recebido":
+            wh.append("r.status = 'parcialmente_recebido'")
         elif sit == "vencido":
-            wh.append("r.status = 'em_aberto' and r.vencimento < current_date")
+            wh.append("r.status in ('em_aberto', 'parcialmente_recebido') and r.vencimento < current_date")
         if f.get("categoria"):
             wh.append(
                 """(
@@ -1008,7 +1146,13 @@ def register(app, templates):
         where, params = _filtros_sql_receber(filtros)
         row = one(
             f"""
-            select count(*)::int as qtd, coalesce(sum(r.valor),0) as total
+            select count(*)::int as qtd,
+                   coalesce(sum(
+                     case when r.status in ('em_aberto', 'parcialmente_recebido', 'atrasado')
+                       then greatest(0, coalesce(r.valor,0) - coalesce(r.valor_recebido,0))
+                       else coalesce(r.valor,0)
+                     end
+                   ),0) as total
               from financeiro_contas_receber r
               {_SQL_CAT_JOIN.format(alias='r')}
              where {where}
@@ -1058,7 +1202,42 @@ def register(app, templates):
             """,
             (str(rid),),
         )
-        return normalizar_receber(r, com_anexos=True) if r else None
+        return normalizar_receber(r, com_anexos=True, com_baixas=True) if r else None
+
+    def normalizar_baixa_receber(r):
+        if not r:
+            return None
+        b = dict(r)
+        b["id"] = str(b["id"])
+        for k in ("conta_receber_id", "conta_financeira_id", "categoria_id", "movimentacao_id"):
+            if b.get(k):
+                b[k] = str(b[k])
+        for k in ("valor_original", "valor_recebido", "juros", "desconto", "multa", "tarifa", "taxas_marketplace", "saldo_anterior", "saldo_restante"):
+            b[k] = float(b.get(k) or 0)
+            b[k + "_fmt"] = _fmt_valor(b[k])
+        dv = b.get("data_recebimento")
+        if dv and hasattr(dv, "strftime"):
+            b["data_recebimento"] = dv.strftime("%Y-%m-%d")
+            b["data_recebimento_fmt"] = dv.strftime("%d/%m/%Y")
+        b["created_at_fmt"] = dt_str(b.get("created_at"))
+        b["conta_nome"] = b.get("conta_nome") or "-"
+        b["categoria_label"] = b.get("categoria_label") or b.get("categoria_desc") or "-"
+        return b
+
+    def listar_baixas_receber(rid):
+        rows = q(
+            f"""
+            select b.*, c.nome as conta_nome, cat.descricao as categoria_desc
+              from financeiro_baixas_receber b
+              left join financeiro_contas_financeiras c on c.id = b.conta_financeira_id
+              left join financeiro_categorias cat on cat.id = b.categoria_id
+             where b.conta_receber_id = %s
+             order by b.data_recebimento desc, b.created_at desc
+            """,
+            (str(rid),),
+            fetch=True,
+        )
+        return [normalizar_baixa_receber(r) for r in rows]
 
     def salvar_receber(payload):
         p = payload or {}
@@ -1076,8 +1255,10 @@ def register(app, templates):
                 raise ValueError("Use Receber/Baixar para quitar — o cadastro não altera o banco.")
             if st_atual == "recebido" and status_req != "recebido":
                 status_req = "recebido"
+            elif st_atual == "parcialmente_recebido":
+                status_req = "parcialmente_recebido"
             else:
-                status_req = st_atual if st_atual in ("recebido", "cancelado") else status_req
+                status_req = st_atual if st_atual in ("recebido", "cancelado", "parcialmente_recebido") else status_req
         else:
             status_req = "em_aberto"
         categoria_id, categoria_txt, _ = _resolver_categoria_payload(p, natureza="Receita")
@@ -1146,29 +1327,72 @@ def register(app, templates):
         conta_id = (payload.get("conta_financeira_id") or item.get("conta_financeira_id") or "").strip()
         if not conta_id:
             raise ValueError("Selecione a conta financeira de entrada")
-        valor = _num(payload.get("valor"), item["valor"])
-        data_rc = _parse_data(payload.get("data_recebimento")) or date.today()
+        data_rc = _parse_data(payload.get("data_recebimento"))
+        if not data_rc:
+            raise ValueError("Informe a data do recebimento")
+        saldo_anterior = _saldo_aberto_receber(item)
+        if saldo_anterior <= 0:
+            raise ValueError("Não há saldo em aberto para receber")
+        valor_ajustado, juros, desconto, multa, tarifa, taxas = _ajuste_baixa_receber(saldo_anterior, payload)
+        valor_recebido = _valor_recebido_baixa_receber(payload, valor_ajustado)
+        if valor_recebido <= 0:
+            raise ValueError("Valor recebido deve ser maior que zero")
+        saldo_restante = round(valor_ajustado - valor_recebido, 2)
+        if saldo_restante < -0.01:
+            raise ValueError("Valor recebido não pode ser maior que o saldo ajustado em aberto")
+        quita = saldo_restante <= 0.009
+        novo_acum = round(float(item.get("valor_recebido") or 0) + valor_recebido, 2)
         categoria_id, categoria, _ = _resolver_categoria_payload(payload, item, natureza="Receita")
-        q(
-            """
-            update financeiro_contas_receber set
-              status='recebido', data_recebimento=%s, valor_recebido=%s,
-              conta_financeira_id=%s, categoria=%s, categoria_id=%s, updated_at=now()
-            where id=%s
-            """,
-            (data_rc, valor, conta_id, categoria, categoria_id, str(rid)),
-        )
-        desc = item.get("descricao") or item.get("cliente") or "Recebimento"
-        criar_movimentacao(
+        historico = _txt(payload.get("historico")) or item.get("descricao") or item.get("cliente") or "Recebimento"
+        cliente = _txt(item.get("cliente"))
+        mov_id = criar_movimentacao(
             conta_id,
             "entrada",
             "recebimento",
             rid,
-            desc,
-            valor,
+            historico,
+            valor_recebido,
             data_rc,
             categoria_id=categoria_id,
             categoria=categoria,
+            cliente_fornecedor_nome=cliente,
+        )
+        row_bx = one(
+            """
+            insert into financeiro_baixas_receber (
+              conta_receber_id, conta_financeira_id, categoria_id, movimentacao_id,
+              data_recebimento, valor_original, valor_recebido,
+              juros, desconto, multa, tarifa, taxas_marketplace,
+              saldo_anterior, saldo_restante, historico
+            ) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) returning id
+            """,
+            (
+                str(rid),
+                conta_id,
+                categoria_id,
+                mov_id,
+                data_rc,
+                float(item.get("valor") or 0),
+                valor_recebido,
+                juros,
+                desconto,
+                multa,
+                tarifa,
+                taxas,
+                saldo_anterior,
+                max(0.0, saldo_restante) if not quita else 0.0,
+                historico,
+            ),
+        )
+        new_status = "recebido" if quita else "parcialmente_recebido"
+        q(
+            """
+            update financeiro_contas_receber set
+              status=%s, data_recebimento=%s, valor_recebido=%s,
+              conta_financeira_id=%s, categoria=%s, categoria_id=%s, updated_at=now()
+            where id=%s
+            """,
+            (new_status, data_rc, novo_acum, conta_id, categoria, categoria_id, str(rid)),
         )
         return receber_por_id(rid)
 
@@ -1201,10 +1425,12 @@ def register(app, templates):
                   coalesce(m.descricao,'') ilike %s or coalesce(m.categoria,'') ilike %s
                   or coalesce(cat.descricao,'') ilike %s or coalesce(cat_pai.descricao,'') ilike %s
                   or coalesce(pg.fornecedor,'') ilike %s or coalesce(rc.cliente,'') ilike %s
+                  or coalesce(m.cliente_fornecedor_nome,'') ilike %s
+                  or coalesce(ct.razao_social,'') ilike %s or coalesce(ct.nome_fantasia,'') ilike %s
                 )"""
             )
             b = f"%{f['busca']}%"
-            params.extend([b, b, b, b, b, b])
+            params.extend([b, b, b, b, b, b, b, b, b])
         return " and ".join(wh), params
 
     def resumo_painel_caixa(filtros=None):
@@ -1221,6 +1447,7 @@ def register(app, templates):
               coalesce(sum(m.valor) filter (where m.tipo='saida'),0) as saidas
             from financeiro_movimentacoes m
             {_SQL_CAT_JOIN.format(alias='m')}
+            left join cadastro_contatos ct on ct.id = m.cliente_fornecedor_id
             left join financeiro_contas_pagar pg on pg.id = m.origem_id and m.origem in ('pagamento', 'pagamento_lote')
             left join financeiro_contas_receber rc on rc.id = m.origem_id and m.origem = 'recebimento'
             where {where}
@@ -1253,50 +1480,107 @@ def register(app, templates):
             "saldo_final_fmt": _fmt_valor(saldo_final),
         }
 
+    def normalizar_movimentacao(r, com_anexos=False):
+        if not r:
+            return None
+        m = dict(r)
+        m["id"] = str(m["id"])
+        if m.get("conta_financeira_id"):
+            m["conta_financeira_id"] = str(m["conta_financeira_id"])
+        if m.get("cliente_fornecedor_id"):
+            m["cliente_fornecedor_id"] = str(m["cliente_fornecedor_id"])
+        else:
+            m["cliente_fornecedor_id"] = None
+        m["valor"] = float(m.get("valor") or 0)
+        m["valor_fmt"] = _fmt_valor(m["valor"])
+        m["historico"] = (m.get("descricao") or "").strip() or "-"
+        m = _aplicar_categoria_item(m)
+        m["parte_nome"] = _parte_nome_mov(m)
+        m["editavel"] = (m.get("origem") or "") == "manual"
+        dv = m.get("data_movimento")
+        if dv and hasattr(dv, "strftime"):
+            m["data_movimento"] = dv.strftime("%Y-%m-%d")
+            m["data_movimento_fmt"] = dv.strftime("%d/%m/%Y")
+        elif isinstance(dv, str) and len(dv) >= 10:
+            m["data_movimento"] = dv[:10]
+            p = m["data_movimento"].split("-")
+            if len(p) == 3:
+                m["data_movimento_fmt"] = f"{p[2]}/{p[1]}/{p[0]}"
+        comp = m.get("competencia")
+        if comp and hasattr(comp, "strftime"):
+            m["competencia"] = comp.strftime("%Y-%m-%d")
+            m["competencia_fmt"] = comp.strftime("%d/%m/%Y")
+        elif isinstance(comp, str) and len(comp) >= 10:
+            m["competencia"] = comp[:10]
+        else:
+            m["competencia"] = m.get("competencia") or ""
+        m["created_at_fmt"] = dt_str(m.get("created_at"))
+        qtd = int(r.get("qtd_anexos") or 0)
+        if com_anexos:
+            m["anexos"] = listar_anexos("movimentacao", m["id"])
+            qtd = len(m["anexos"])
+        m["qtd_anexos"] = qtd
+        m["tem_anexos"] = qtd > 0
+        for k in ("contato_nome",):
+            m.pop(k, None)
+        return m
+
+    def movimentacao_por_id(mid, com_anexos=False):
+        r = one(
+            f"""
+            select m.*, c.nome as conta_nome,
+                   coalesce(pg.fornecedor, rc.cliente) as parte_nome,
+                   coalesce(nullif(trim(ct.razao_social),''), nullif(trim(ct.nome_fantasia),''), nullif(trim(ct.nome),'')) as contato_nome,
+                   coalesce(a.qtd_anexos, 0) as qtd_anexos,
+                   {_SQL_CAT_SELECT}
+              from financeiro_movimentacoes m
+              left join financeiro_contas_financeiras c on c.id = m.conta_financeira_id
+              {_SQL_CAT_JOIN.format(alias='m')}
+              left join cadastro_contatos ct on ct.id = m.cliente_fornecedor_id
+              left join financeiro_contas_pagar pg on pg.id = m.origem_id and m.origem in ('pagamento', 'pagamento_lote')
+              left join financeiro_contas_receber rc on rc.id = m.origem_id and m.origem = 'recebimento'
+              left join (
+                select referencia_id, count(*)::int as qtd_anexos
+                  from financeiro_anexos
+                 where referencia_tipo = 'movimentacao'
+                 group by referencia_id
+              ) a on a.referencia_id = m.id
+             where m.id=%s
+            """,
+            (str(mid),),
+        )
+        return normalizar_movimentacao(r, com_anexos=com_anexos) if r else None
+
     def listar_movimentacoes(filtros=None):
         where, params = _filtros_sql_movimentacoes(filtros)
         rows = q(
             f"""
             select m.*, c.nome as conta_nome,
                    coalesce(pg.fornecedor, rc.cliente) as parte_nome,
+                   coalesce(nullif(trim(ct.razao_social),''), nullif(trim(ct.nome_fantasia),''), nullif(trim(ct.nome),'')) as contato_nome,
+                   coalesce(a.qtd_anexos, 0) as qtd_anexos,
                    {_SQL_CAT_SELECT}
               from financeiro_movimentacoes m
               left join financeiro_contas_financeiras c on c.id = m.conta_financeira_id
               {_SQL_CAT_JOIN.format(alias='m')}
+              left join cadastro_contatos ct on ct.id = m.cliente_fornecedor_id
               left join financeiro_contas_pagar pg on pg.id = m.origem_id and m.origem in ('pagamento', 'pagamento_lote')
               left join financeiro_contas_receber rc on rc.id = m.origem_id and m.origem = 'recebimento'
+              left join (
+                select referencia_id, count(*)::int as qtd_anexos
+                  from financeiro_anexos
+                 where referencia_tipo = 'movimentacao'
+                 group by referencia_id
+              ) a on a.referencia_id = m.id
              where {where}
              order by m.data_movimento desc, m.created_at desc
             """,
             tuple(params) if params else None,
             fetch=True,
         )
-        out = []
-        for r in rows:
-            m = dict(r)
-            m["id"] = str(m["id"])
-            if m.get("conta_financeira_id"):
-                m["conta_financeira_id"] = str(m["conta_financeira_id"])
-            m["valor"] = float(m.get("valor") or 0)
-            m["valor_fmt"] = _fmt_valor(m["valor"])
-            m["historico"] = (m.get("descricao") or "").strip() or "-"
-            m = _aplicar_categoria_item(m)
-            m["parte_nome"] = m.get("parte_nome") or "-"
-            dv = m.get("data_movimento")
-            if dv and hasattr(dv, "strftime"):
-                m["data_movimento"] = dv.strftime("%Y-%m-%d")
-                m["data_movimento_fmt"] = dv.strftime("%d/%m/%Y")
-            elif isinstance(dv, str) and len(dv) >= 10:
-                m["data_movimento"] = dv[:10]
-                p = m["data_movimento"].split("-")
-                if len(p) == 3:
-                    m["data_movimento_fmt"] = f"{p[2]}/{p[1]}/{p[0]}"
-            m["created_at_fmt"] = dt_str(m.get("created_at"))
-            out.append(m)
-        return out
+        return [normalizar_movimentacao(r) for r in rows]
 
-    def salvar_movimentacao_manual(payload):
-        p = payload or {}
+    def _payload_movimentacao_manual(p):
         conta_id = (p.get("conta_financeira_id") or "").strip()
         if not conta_id:
             raise ValueError("Conta financeira obrigatória")
@@ -1310,34 +1594,73 @@ def register(app, templates):
         desc = _txt(p.get("descricao")) or "Lançamento manual"
         natureza = "Receita" if tipo == "entrada" else "Despesa"
         categoria_id, categoria, _ = _resolver_categoria_payload(p, natureza=natureza)
+        parte_id, parte_nome = _resolver_parte_mov(p)
+        competencia = _parse_data(p.get("competencia"))
+        return {
+            "conta_id": conta_id,
+            "tipo": tipo,
+            "valor": valor,
+            "data_mov": data_mov,
+            "desc": desc,
+            "categoria_id": categoria_id,
+            "categoria": categoria,
+            "parte_id": parte_id,
+            "parte_nome": parte_nome,
+            "competencia": competencia,
+        }
+
+    def salvar_movimentacao_manual(payload):
+        d = _payload_movimentacao_manual(payload)
         mid = criar_movimentacao(
-            conta_id,
-            tipo,
+            d["conta_id"],
+            d["tipo"],
             "manual",
             None,
-            desc,
-            valor,
-            data_mov,
-            categoria_id=categoria_id,
-            categoria=categoria,
+            d["desc"],
+            d["valor"],
+            d["data_mov"],
+            categoria_id=d["categoria_id"],
+            categoria=d["categoria"],
+            competencia=d["competencia"],
+            cliente_fornecedor_id=d["parte_id"],
+            cliente_fornecedor_nome=d["parte_nome"],
         )
-        row = one(
-            f"""
-            select m.*, c.nome as conta_nome, {_SQL_CAT_SELECT}
-              from financeiro_movimentacoes m
-              left join financeiro_contas_financeiras c on c.id = m.conta_financeira_id
-              {_SQL_CAT_JOIN.format(alias='m')}
-             where m.id=%s
+        return movimentacao_por_id(mid, com_anexos=True)
+
+    def atualizar_movimentacao_manual(mid, payload):
+        old = movimentacao_por_id(mid)
+        if not old:
+            raise ValueError("Movimentação não encontrada")
+        if old.get("origem") != "manual":
+            raise ValueError("Somente lançamentos manuais podem ser editados")
+        d = _payload_movimentacao_manual(payload)
+        old_delta = float(old["valor"]) if old["tipo"] == "entrada" else -float(old["valor"])
+        atualizar_saldo_conta(old["conta_financeira_id"], -old_delta)
+        q(
+            """
+            update financeiro_movimentacoes set
+              conta_financeira_id=%s, tipo=%s, descricao=%s, valor=%s, data_movimento=%s,
+              categoria_id=%s, categoria=%s, competencia=%s,
+              cliente_fornecedor_id=%s, cliente_fornecedor_nome=%s
+            where id=%s
             """,
-            (mid,),
+            (
+                d["conta_id"],
+                d["tipo"],
+                d["desc"],
+                d["valor"],
+                d["data_mov"],
+                d["categoria_id"],
+                d["categoria"],
+                d["competencia"],
+                d["parte_id"],
+                d["parte_nome"],
+                str(mid),
+            ),
         )
-        if row:
-            m = dict(row)
-            m["id"] = str(m["id"])
-            m["valor"] = float(m.get("valor") or 0)
-            m["valor_fmt"] = _fmt_valor(m["valor"])
-            return _aplicar_categoria_item(m)
-        return None
+        new_delta = float(d["valor"]) if d["tipo"] == "entrada" else -float(d["valor"])
+        atualizar_saldo_conta(d["conta_id"], new_delta)
+        return movimentacao_por_id(mid, com_anexos=True)
 
     def resumo_hub_financeiro():
         pagar = one(
@@ -1355,11 +1678,23 @@ def register(app, templates):
         receber = one(
             """
             select
-              coalesce(sum(valor) filter (where status='em_aberto'),0) as aberto,
-              coalesce(sum(valor) filter (where status='em_aberto' and vencimento < current_date),0) as vencido_receber,
-              coalesce(sum(valor_recebido) filter (
+              coalesce(sum(
+                case when status in ('em_aberto', 'parcialmente_recebido')
+                  then greatest(0, coalesce(valor,0) - coalesce(valor_recebido,0))
+                  else 0 end
+              ),0) as aberto,
+              coalesce(sum(
+                case when status in ('em_aberto', 'parcialmente_recebido') and vencimento < current_date
+                  then greatest(0, coalesce(valor,0) - coalesce(valor_recebido,0))
+                  else 0 end
+              ),0) as vencido_receber,
+              coalesce((
+                select sum(b.valor_recebido)
+                  from financeiro_baixas_receber b
+                 where date_trunc('month', b.data_recebimento) = date_trunc('month', current_date)
+              ), coalesce(sum(valor_recebido) filter (
                 where status='recebido' and date_trunc('month', data_recebimento) = date_trunc('month', current_date)
-              ),0) as recebido_mes
+              ),0)) as recebido_mes
             from financeiro_contas_receber
             where status <> 'cancelado'
             """
@@ -1383,6 +1718,28 @@ def register(app, templates):
         }
 
     def historico_lancamento(tipo, lid):
+        if tipo == "receber":
+            baixas = listar_baixas_receber(lid)
+            if baixas:
+                out = []
+                for b in baixas:
+                    out.append(
+                        {
+                            "id": b["id"],
+                            "tipo": "entrada",
+                            "data_movimento_fmt": b.get("data_recebimento_fmt") or "-",
+                            "conta_nome": b.get("conta_nome") or "-",
+                            "valor_fmt": b.get("valor_recebido_fmt") or "-",
+                            "descricao": b.get("historico") or "Recebimento",
+                            "juros_fmt": b.get("juros_fmt"),
+                            "desconto_fmt": b.get("desconto_fmt"),
+                            "multa_fmt": b.get("multa_fmt"),
+                            "tarifa_fmt": b.get("tarifa_fmt"),
+                            "taxas_marketplace_fmt": b.get("taxas_marketplace_fmt"),
+                            "saldo_restante_fmt": b.get("saldo_restante_fmt"),
+                        }
+                    )
+                return out
         movs = q(
             """
             select m.*, c.nome as conta_nome from financeiro_movimentacoes m
@@ -1406,7 +1763,10 @@ def register(app, templates):
         {"titulo": "Contas a Pagar", "icone": "📤", "descricao": "Despesas, fornecedores e pagamentos.", "rota": "/financeiro/contas-a-pagar"},
         {"titulo": "Contas a Receber", "icone": "📥", "descricao": "Receitas, clientes e cobranças.", "rota": "/financeiro/contas-a-receber"},
         {"titulo": "Caixa e Bancos", "icone": "🏦", "descricao": "Movimentações, entradas e saídas consolidadas.", "rota": "/financeiro/caixa-e-bancos"},
+        {"titulo": "DRE", "icone": "📊", "descricao": "Demonstrativo de resultados por grupo de categorias.", "rota": "/financeiro/dre"},
         {"titulo": "Notas Fiscais de Entrada", "icone": "📥", "descricao": "Importação de XML NF-e e lançamento em contas a pagar.", "rota": "/financeiro/notas-entrada"},
+        {"titulo": "Notas de Serviço / NFS-e", "icone": "📄", "descricao": "Emissão de nota fiscal de serviço eletrônica.", "rota": "/financeiro/notas-servico"},
+        {"titulo": "Configuração Fiscal", "icone": "⚙", "descricao": "Dados da empresa emissora, ambiente e certificado A1.", "rota": "/financeiro/configuracao-fiscal"},
         {"titulo": "Contas Financeiras", "icone": "💳", "descricao": "Bancos, caixa físico e carteiras.", "rota": "/financeiro/contas-financeiras"},
     ]
 
@@ -1437,6 +1797,10 @@ def register(app, templates):
     @app.get("/financeiro/caixa-e-bancos", response_class=HTMLResponse)
     def fin_pagina_caixa(request: Request):
         return templates.TemplateResponse("financeiro/caixa_e_bancos.html", tpl_ctx(request, {"kpis": resumo_hub_financeiro()}))
+
+    @app.get("/financeiro/dre", response_class=HTMLResponse)
+    def fin_pagina_dre(request: Request):
+        return templates.TemplateResponse("financeiro/dre.html", tpl_ctx(request, {"kpis": resumo_hub_financeiro()}))
 
     # --- APIs contas financeiras ---
     @app.get("/api/financeiro/contas-financeiras")
@@ -1493,7 +1857,8 @@ def register(app, templates):
             "data_ini": request.query_params.get("data_ini"),
             "data_fim": request.query_params.get("data_fim"),
         }
-        return {"ok": True, "grupos": preview_dre_agrupamento(filtros)}
+        data = resumo_dre(filtros)
+        return {"ok": True, **data}
 
     def _filtros_query(request: Request):
         qparams = request.query_params
@@ -1761,13 +2126,53 @@ def register(app, templates):
         except Exception:
             p = {}
         try:
-            salvar_movimentacao_manual(p)
+            item = salvar_movimentacao_manual(p)
             filtros = {"conta_financeira_id": p.get("conta_financeira_id"), "aba": p.get("aba")}
             return {
                 "ok": True,
+                "item": item,
                 "itens": listar_movimentacoes(filtros),
+                "contas": listar_contas_financeiras(),
                 "painel": resumo_painel_caixa(filtros),
                 "kpis": resumo_hub_financeiro(),
             }
+        except Exception as e:
+            return JSONResponse({"ok": False, "erro": str(e)}, 400)
+
+    @app.get("/api/financeiro/movimentacoes/{mid}")
+    def api_fin_get_mov(mid: str):
+        item = movimentacao_por_id(mid, com_anexos=True)
+        if not item:
+            return JSONResponse({"ok": False, "erro": "Movimentação não encontrada"}, 404)
+        return {"ok": True, "item": item, "contas": listar_contas_financeiras()}
+
+    @app.put("/api/financeiro/movimentacoes/{mid}")
+    async def api_fin_put_mov(mid: str, request: Request):
+        try:
+            p = await request.json()
+        except Exception:
+            p = {}
+        try:
+            item = atualizar_movimentacao_manual(mid, p)
+            filtros = {"conta_financeira_id": p.get("conta_financeira_id"), "aba": p.get("aba")}
+            return {
+                "ok": True,
+                "item": item,
+                "itens": listar_movimentacoes(filtros),
+                "contas": listar_contas_financeiras(),
+                "painel": resumo_painel_caixa(filtros),
+                "kpis": resumo_hub_financeiro(),
+            }
+        except Exception as e:
+            return JSONResponse({"ok": False, "erro": str(e)}, 400)
+
+    @app.post("/api/financeiro/movimentacoes/{mid}/anexos")
+    async def api_fin_anexo_mov(mid: str, request: Request):
+        if not movimentacao_por_id(mid):
+            return JSONResponse({"ok": False, "erro": "Movimentação não encontrada"}, 404)
+        form = await request.form()
+        try:
+            await salvar_anexo("movimentacao", mid, form, form.get("arquivo"))
+            return {"ok": True, "anexos": listar_anexos("movimentacao", mid)}
         except Exception as e:
             return JSONResponse({"ok": False, "erro": str(e)}, 400)

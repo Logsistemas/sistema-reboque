@@ -7,6 +7,9 @@
   let abaAtual = "movimentacoes";
   let catDespesa = null;
   let catReceita = null;
+  let itemAtual = null;
+  let anexosPendentes = [];
+  let contatosOpcoes = [];
   const tbody = document.getElementById("tbodyMov");
   const modal = document.getElementById("modalMov");
   const erro = document.getElementById("movErro");
@@ -115,6 +118,11 @@
     });
   }
 
+  function clipAnexo(item) {
+    if (!item?.tem_anexos) return "";
+    return '<span class="fin-clip" title="Possui anexos" aria-label="Possui anexos"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M16.5 6v11.5a4 4 0 0 1-8 0V5a2.5 2.5 0 0 1 5 0v10.5a1 1 0 0 1-2 0V6H10v9.5a2.5 2.5 0 0 0 5 0V5a4 4 0 0 0-8 0v12.5a5.5 5.5 0 0 0 11 0V6h-1.5z"/></svg></span>';
+  }
+
   function renderMov() {
     const msgConc = el("msgConciliacao");
     const wrap = document.querySelector(".fin-table-wrap");
@@ -153,21 +161,36 @@
         const cls = m.tipo === "entrada" ? "fin-tipo-entrada" : "fin-tipo-saida";
         const sinal = m.tipo === "entrada" ? "+" : "−";
         const origemLbl = S.labelOrigemMov(m.origem);
-        return `<tr>
-          <td><input type="checkbox" class="chk-mov" value="${m.id}"></td>
+        return `<tr class="fin-row-clickable" data-id="${m.id}" tabindex="0" role="button" aria-label="Abrir lançamento">
+          <td class="fin-col-chk"><input type="checkbox" class="chk-mov" value="${m.id}"></td>
           <td>${m.data_movimento_fmt || "-"}</td>
           <td>${S.labelCategoria(m)}</td>
           <td>${m.historico || m.descricao || "-"}</td>
           <td>${m.parte_nome || "-"}</td>
-          <td class="fin-valor ${cls}">${sinal} ${m.valor_fmt}</td>
-          <td><button type="button" class="fin-btn-table btn-mov-info" data-origem="${origemLbl}" data-desc="${(m.historico || m.descricao || "").replace(/"/g, "&quot;")}">Ver</button></td>
+          <td class="fin-valor ${cls}"><span class="fin-valor-inner">${sinal} ${m.valor_fmt}${clipAnexo(m)}</span></td>
+          <td><button type="button" class="fin-btn-table btn-mov-abrir" data-id="${m.id}">${m.editavel ? "Editar" : "Ver"}</button></td>
         </tr>`;
       })
       .join("");
-    tbody.querySelectorAll(".btn-mov-info").forEach((b) => {
-      b.addEventListener("click", () => {
-        S.toast(`${b.dataset.origem}: ${b.dataset.desc || "—"}`);
-      });
+    bindLinhasMov();
+  }
+
+  function bindLinhasMov() {
+    if (!tbody || tbody.dataset.movBound) return;
+    tbody.dataset.movBound = "1";
+    tbody.addEventListener("click", (e) => {
+      if (e.target.closest(".chk-mov") || e.target.closest(".fin-col-chk")) return;
+      const btn = e.target.closest(".btn-mov-abrir");
+      const row = e.target.closest("tr[data-id]");
+      const id = btn?.dataset.id || row?.dataset.id;
+      if (id) abrirMovimentacao(id).catch((err) => S.toast(err.message));
+    });
+    tbody.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      const row = e.target.closest("tr[data-id]");
+      if (!row || e.target.closest(".chk-mov")) return;
+      e.preventDefault();
+      abrirMovimentacao(row.dataset.id).catch((err) => S.toast(err.message));
     });
   }
 
@@ -196,6 +219,236 @@
     });
     S.preencherSelectContas(el("m_conta"), contas, valor || "");
     atualizarLabelConta();
+  }
+
+  async function carregarContatosOpcoes() {
+    if (contatosOpcoes.length) return;
+    try {
+      const j = await S.apiJson("/api/cadastros/contatos/opcoes");
+      contatosOpcoes = j.itens || [];
+      const dl = el("dlContatosCaixa");
+      if (dl) {
+        dl.innerHTML = contatosOpcoes
+          .map((c) => `<option value="${String(c.nome).replace(/"/g, "&quot;")}">`)
+          .join("");
+      }
+    } catch (_) {}
+  }
+
+  function resolverPartePayload() {
+    const nome = el("m_parte")?.value?.trim() || "";
+    const match = contatosOpcoes.find((c) => c.nome.toLowerCase() === nome.toLowerCase());
+    if (match) return { cliente_fornecedor_id: match.id, cliente_fornecedor_nome: "" };
+    return { cliente_fornecedor_id: "", cliente_fornecedor_nome: nome };
+  }
+
+  function limparAnexosPendentes() {
+    anexosPendentes = [];
+    if (el("anexoMovArquivo")) el("anexoMovArquivo").value = "";
+    if (el("anexoMovNome")) el("anexoMovNome").value = "";
+    if (el("anexoMovTipo")) el("anexoMovTipo").value = "";
+  }
+
+  function anexosParaExibir(salvos) {
+    const pendentes = anexosPendentes.map((p, idx) => ({
+      id: `pending-${idx}`,
+      nome_arquivo: p.nome,
+      tipo: p.tipo,
+      created_at_fmt: "Aguardando salvar",
+      pendente: true,
+      pendingIdx: idx,
+    }));
+    return [...(salvos || []), ...pendentes];
+  }
+
+  function renderAnexosLista(salvos) {
+    const tb = el("tbodyAnexosMov");
+    if (!tb) return;
+    const anexos = anexosParaExibir(salvos);
+    if (!anexos.length) {
+      tb.innerHTML = '<tr><td colspan="4" class="muted">Sem anexos.</td></tr>';
+      return;
+    }
+    tb.innerHTML = anexos
+      .map((a) => {
+        const nome = String(a.nome_arquivo || "arquivo").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+        const nomeCell = a.pendente
+          ? `<span class="fin-anexo-link fin-anexo-pendente">${nome}</span> <span class="fin-anexo-badge">novo</span>`
+          : `<a href="${a.url_download || "#"}" class="fin-anexo-link" target="_blank" rel="noopener">${nome}</a>`;
+        const btn = a.pendente
+          ? `<button type="button" class="fin-btn-table btn-del-pending-mov" data-idx="${a.pendingIdx}">Remover</button>`
+          : `<button type="button" class="fin-btn-table fin-btn-table-danger btn-del-anexo-mov" data-id="${a.id}">Excluir</button>`;
+        return `<tr>
+        <td>${nomeCell}</td>
+        <td>${a.tipo || "-"}</td>
+        <td>${a.created_at_fmt || "-"}</td>
+        <td class="fin-acoes-anexo">${btn}</td></tr>`;
+      })
+      .join("");
+  }
+
+  function bindAnexosMov() {
+    const tb = el("tbodyAnexosMov");
+    if (!tb || tb.dataset.anexosBound) return;
+    tb.dataset.anexosBound = "1";
+    tb.addEventListener("click", async (e) => {
+      const btnPending = e.target.closest(".btn-del-pending-mov");
+      if (btnPending) {
+        e.preventDefault();
+        const idx = parseInt(btnPending.dataset.idx, 10);
+        if (!Number.isNaN(idx)) {
+          anexosPendentes.splice(idx, 1);
+          renderAnexosLista(itemAtual?.anexos || []);
+        }
+        return;
+      }
+      const btn = e.target.closest(".btn-del-anexo-mov");
+      if (!btn) return;
+      e.preventDefault();
+      if (!confirm("Excluir este anexo?")) return;
+      try {
+        const r = await fetch(`/api/financeiro/anexos/${btn.dataset.id}`, { method: "DELETE" });
+        const j = await r.json();
+        if (!j.ok) throw new Error(j.erro || "Erro ao excluir");
+        if (itemAtual) itemAtual.anexos = j.anexos || [];
+        renderAnexosLista(j.anexos || []);
+        await carregar();
+        S.toast("Anexo excluído.");
+      } catch (err) {
+        S.toast(err.message || "Erro ao excluir anexo");
+      }
+    });
+  }
+
+  function adicionarAnexoPendente(file) {
+    if (!file || !file.size) return;
+    anexosPendentes.push({
+      file,
+      nome: el("anexoMovNome")?.value?.trim() || file.name,
+      tipo: el("anexoMovTipo")?.value?.trim() || "Outros",
+    });
+    if (el("anexoMovNome")) el("anexoMovNome").value = "";
+    if (el("anexoMovTipo")) el("anexoMovTipo").value = "";
+    if (el("anexoMovArquivo")) el("anexoMovArquivo").value = "";
+    renderAnexosLista(itemAtual?.anexos || []);
+    S.toast("Arquivo adicionado. Clique em Salvar para gravar.");
+  }
+
+  async function enviarAnexosPendentes(movId) {
+    if (!anexosPendentes.length) return itemAtual?.anexos || [];
+    let anexos = itemAtual?.anexos || [];
+    for (const p of anexosPendentes) {
+      const fd = new FormData();
+      fd.append("arquivo", p.file, p.file.name);
+      fd.append("nome", p.nome);
+      fd.append("tipo", p.tipo);
+      const r = await fetch(`${API}/${movId}/anexos`, { method: "POST", body: fd });
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.erro || "Erro ao gravar anexo");
+      anexos = j.anexos || anexos;
+    }
+    anexosPendentes = [];
+    return anexos;
+  }
+
+  function setModoFormulario(editavel) {
+    const campos = ["m_categoria_id", "m_data", "m_valor", "m_tipo", "m_competencia", "m_conta", "m_descricao", "m_parte"];
+    campos.forEach((id) => {
+      const node = el(id);
+      if (node) node.disabled = !editavel;
+    });
+    const formAnexo = el("formAnexoMov");
+    if (formAnexo) formAnexo.style.display = editavel ? "" : "none";
+    const hint = el("movAnexoHint");
+    if (hint) hint.style.display = editavel ? "" : "none";
+    const viewHint = el("movViewHint");
+    if (viewHint) viewHint.style.display = editavel ? "none" : "block";
+    const btnSalvar = el("btnSalvarMov");
+    if (btnSalvar) {
+      btnSalvar.style.display = editavel ? "" : "none";
+      btnSalvar.textContent = el("m_id")?.value ? "Salvar" : "Salvar";
+    }
+    const btnFechar = el("btnFecharMov");
+    if (btnFechar) btnFechar.textContent = editavel ? "Cancelar" : "Fechar";
+  }
+
+  function preencherFormMov(item) {
+    el("m_id").value = item?.id || "";
+    el("m_contato_id").value = item?.cliente_fornecedor_id || "";
+    el("m_data").value = item?.data_movimento || S.hojeISO();
+    el("m_competencia").value = item?.competencia || "";
+    el("m_valor").value = item?.valor ?? "";
+    el("m_descricao").value = item?.descricao && item.descricao !== "-" ? item.descricao : item?.historico || "";
+    el("m_tipo").value = item?.tipo || "entrada";
+    el("m_parte").value =
+      item?.parte_nome && item.parte_nome !== "-" ? item.parte_nome : item?.cliente_fornecedor_nome || "";
+    preencherCategoriaMov(item?.tipo || "entrada", item?.categoria_id || "");
+    S.preencherSelectContas(el("m_conta"), contas, item?.conta_financeira_id || obterContaId());
+  }
+
+  function resetModalTabs() {
+    modal?.querySelector('[data-fin-tab="geral"]')?.click();
+  }
+
+  async function abrirNovo() {
+    const conta = el("topContaCaixa")?.value;
+    if (!conta) {
+      S.toast("Selecione uma conta financeira no topo.");
+      return;
+    }
+    await ensureCategoriasCaixa();
+    await carregarContatosOpcoes();
+    itemAtual = null;
+    limparAnexosPendentes();
+    modal.classList.add("open");
+    S.mostrarErro(erro, "");
+    resetModalTabs();
+    el("modalMovTitulo").textContent = "Incluir lançamento manual";
+    el("modalMovNavTitulo").textContent = "Novo lançamento";
+    preencherFormMov(null);
+    el("m_data").value = S.hojeISO();
+    el("m_tipo").value = "entrada";
+    preencherCategoriaMov("entrada", "");
+    S.preencherSelectContas(el("m_conta"), contas, conta);
+    setModoFormulario(true);
+    renderAnexosLista([]);
+  }
+
+  async function abrirMovimentacao(id) {
+    await ensureCategoriasCaixa();
+    await carregarContatosOpcoes();
+    const j = await S.apiJson(`${API}/${id}`);
+    itemAtual = j.item;
+    contas = j.contas || contas;
+    limparAnexosPendentes();
+    modal.classList.add("open");
+    S.mostrarErro(erro, "");
+    resetModalTabs();
+    const editavel = !!itemAtual?.editavel;
+    const origem = S.labelOrigemMov(itemAtual?.origem);
+    el("modalMovTitulo").textContent = editavel
+      ? "Editar lançamento manual"
+      : `Lançamento — ${origem}`;
+    el("modalMovNavTitulo").textContent = itemAtual?.historico || "Lançamento";
+    preencherFormMov(itemAtual);
+    setModoFormulario(editavel);
+    renderAnexosLista(itemAtual?.anexos || []);
+  }
+
+  function payloadFormMov() {
+    const parte = resolverPartePayload();
+    return {
+      conta_financeira_id: el("m_conta").value,
+      tipo: el("m_tipo").value,
+      valor: el("m_valor").value,
+      data_movimento: el("m_data").value,
+      competencia: el("m_competencia").value,
+      descricao: el("m_descricao").value,
+      categoria_id: el("m_categoria_id").value,
+      cliente_fornecedor_id: parte.cliente_fornecedor_id,
+      cliente_fornecedor_nome: parte.cliente_fornecedor_nome,
+      aba: abaAtual,
+    };
   }
 
   async function carregar(opts = {}) {
@@ -232,49 +485,50 @@
     });
   });
 
-  el("btnIncluirMov")?.addEventListener("click", async () => {
-    const conta = el("topContaCaixa")?.value;
-    if (!conta) {
-      S.toast("Selecione uma conta financeira no topo.");
-      return;
-    }
-    modal.classList.add("open");
-    S.mostrarErro(erro, "");
-    el("m_data").value = S.hojeISO();
-    el("m_valor").value = "";
-    el("m_descricao").value = "";
-    el("m_tipo").value = "entrada";
-    await ensureCategoriasCaixa();
-    preencherCategoriaMov("entrada", "");
-    S.preencherSelectContas(el("m_conta"), contas, conta);
-  });
+  el("btnIncluirMov")?.addEventListener("click", () => abrirNovo().catch((e) => S.toast(e.message)));
 
-  el("btnFecharMov")?.addEventListener("click", () => modal.classList.remove("open"));
+  el("btnFecharMov")?.addEventListener("click", () => {
+    modal.classList.remove("open");
+    itemAtual = null;
+    limparAnexosPendentes();
+  });
   modal?.addEventListener("click", (e) => {
-    if (e.target === modal) modal.classList.remove("open");
+    if (e.target === modal) {
+      modal.classList.remove("open");
+      itemAtual = null;
+      limparAnexosPendentes();
+    }
   });
 
   el("btnSalvarMov")?.addEventListener("click", async () => {
+    const id = el("m_id")?.value;
+    const url = id ? `${API}/${id}` : API;
+    const method = id ? "PUT" : "POST";
     try {
-      await S.apiJson(API, {
-        method: "POST",
+      const j = await S.apiJson(url, {
+        method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          conta_financeira_id: el("m_conta").value,
-          tipo: el("m_tipo").value,
-          valor: el("m_valor").value,
-          data_movimento: el("m_data").value,
-          descricao: el("m_descricao").value,
-          categoria_id: el("m_categoria_id").value,
-          aba: abaAtual,
-        }),
+        body: JSON.stringify(payloadFormMov()),
       });
+      const movId = j.item?.id || id;
+      if (movId && anexosPendentes.length) {
+        await enviarAnexosPendentes(movId);
+      }
       modal.classList.remove("open");
+      itemAtual = null;
+      limparAnexosPendentes();
       await carregar();
-      S.toast("Lançamento registrado.");
+      S.toast(id ? "Lançamento atualizado." : "Lançamento registrado.");
     } catch (e) {
       S.mostrarErro(erro, e.message);
     }
+  });
+
+  el("formAnexoMov")?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const file = el("anexoMovArquivo")?.files?.[0];
+    if (!file) return S.toast("Selecione um arquivo.");
+    adicionarAnexoPendente(file);
   });
 
   el("topContaCaixa")?.addEventListener("change", () => {
@@ -293,10 +547,21 @@
 
   el("m_tipo")?.addEventListener("change", async () => {
     await ensureCategoriasCaixa();
-    preencherCategoriaMov(el("m_tipo").value, "");
+    preencherCategoriaMov(el("m_tipo").value, el("m_categoria_id")?.value || "");
+  });
+
+  el("m_parte")?.addEventListener("input", () => {
+    const nome = el("m_parte")?.value?.trim() || "";
+    const match = contatosOpcoes.find((c) => c.nome.toLowerCase() === nome.toLowerCase());
+    if (el("m_contato_id")) el("m_contato_id").value = match ? match.id : "";
   });
 
   S.bindToolStubs();
+  bindAnexosMov();
+  if (modal && !modal.dataset.tabsInit) {
+    modal.dataset.tabsInit = "1";
+    S.initTabsModal(modal);
+  }
   restaurarFiltros();
   S.initFiltroPeriodo({
     storageKey: "fin_caixa_periodo",

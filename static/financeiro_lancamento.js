@@ -132,8 +132,26 @@
   }
 
   function labelStatus(st) {
-    const m = { em_aberto: "Em aberto", pago: "Pago", recebido: "Recebido", atrasado: "Vencido", cancelado: "Cancelado" };
+    const m = {
+      em_aberto: "Em aberto",
+      pago: "Pago",
+      recebido: "Recebido",
+      parcialmente_recebido: "Parcialmente recebida",
+      atrasado: "Vencido",
+      cancelado: "Cancelado",
+    };
     return m[st] || st;
+  }
+
+  function podeBaixarItem(i) {
+    if (isPagar) return i.status === "em_aberto" || i.status === "atrasado";
+    if (window.FinBaixaReceber?.podeBaixar) return window.FinBaixaReceber.podeBaixar(i);
+    return i.status === "em_aberto" || i.status === "atrasado";
+  }
+
+  function valorListaFmt(i) {
+    if (!isPagar && window.FinBaixaReceber?.valorExibir) return window.FinBaixaReceber.valorExibir(i);
+    return i.valor_fmt;
   }
 
   function bindTabelaLinhas() {
@@ -169,7 +187,7 @@
       .map((i) => {
         const parte = isPagar ? i.fornecedor : i.cliente;
         const forma = isPagar ? i.forma_pagamento : i.forma_recebimento;
-        const podeBaixar = i.status === "em_aberto" || i.status === "atrasado";
+        const podeBaixar = podeBaixarItem(i);
         const clip = i.tem_anexos
           ? '<span class="fin-clip" title="Possui anexos" aria-label="Possui anexos"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M16.5 6v11.5a4 4 0 0 1-8 0V5a2.5 2.5 0 0 1 5 0v10.5a1 1 0 0 1-2 0V6H10v9.5a2.5 2.5 0 0 0 5 0V5a4 4 0 0 0-8 0v12.5a5.5 5.5 0 0 0 11 0V6h-1.5z"/></svg></span>'
           : "";
@@ -179,7 +197,7 @@
           <td>${i.historico || i.descricao || "-"}</td>
           <td>${forma || "-"}</td>
           <td>${i.vencimento_fmt || i.vencimento || "-"}</td>
-          <td class="fin-valor"><span class="fin-valor-inner">${i.valor_fmt}${clip}</span></td>
+          <td class="fin-valor"><span class="fin-valor-inner">${valorListaFmt(i)}${clip}</span></td>
           <td>${S.statusBadge(i.status)}</td>
         </tr>`;
       })
@@ -191,10 +209,14 @@
     const j = await S.apiJson(montarQuery());
     itens = j.itens || [];
     contas = j.contas || [];
+    window.__finContas = contas;
     S.atualizarPainel(j.painel);
     if (j.kpis) S.atualizarKpis(j.kpis);
     render();
   }
+
+  window.__finRecarregarLista = carregarLista;
+  window.__finPreencherForm = preencherForm;
 
   function payloadForm() {
     const base = {
@@ -249,15 +271,20 @@
     atualizarStatusLabel(item?.status || "em_aberto");
     el("f_observacoes").value = item?.observacoes || "";
     S.preencherSelectContas(el("f_conta_financeira_id"), contas, item?.conta_financeira_id);
-    S.preencherSelectContas(el("bx_conta_financeira_id"), contas, item?.conta_financeira_id);
-    el("bx_data").value = S.isoDate(isPagar ? item?.data_pagamento : item?.data_recebimento) || S.hojeISO();
-    el("bx_valor").value = item?.valor ?? "";
-    const fechado = item && (item.status === "pago" || item.status === "recebido");
-    if (el("btnConfirmarBaixa")) el("btnConfirmarBaixa").disabled = !!fechado;
-    if (el("baixaHint")) {
-      el("baixaHint").textContent = fechado
-        ? "Lançamento já baixado. Consulte o histórico de movimentações."
-        : "A baixa gera movimentação no Caixa e Bancos e atualiza o saldo da conta escolhida.";
+    if (isPagar) {
+      S.preencherSelectContas(el("bx_conta_financeira_id"), contas, item?.conta_financeira_id);
+      el("bx_data").value = S.isoDate(item?.data_pagamento) || S.hojeISO();
+      el("bx_valor").value = item?.valor ?? "";
+      const fechado = item && item.status === "pago";
+      if (el("btnConfirmarBaixa")) el("btnConfirmarBaixa").disabled = !!fechado;
+      if (el("baixaHint")) {
+        el("baixaHint").textContent = fechado
+          ? "Lançamento já baixado. Consulte o histórico de movimentações."
+          : "A baixa gera movimentação no Caixa e Bancos e atualiza o saldo da conta escolhida.";
+      }
+    } else if (window.FinBaixaReceber) {
+      window.__finContas = contas;
+      window.FinBaixaReceber.preencherTabBaixa(item);
     }
     renderAnexosLista(item?.anexos || []);
     renderHistorico(item?.historico || []);
@@ -742,6 +769,9 @@
   }
 
   async function confirmarBaixa() {
+    if (!isPagar && window.FinBaixaReceber) {
+      return window.FinBaixaReceber.confirmarTab();
+    }
     const id = el("regId").value;
     if (!id) {
       S.mostrarErro(erro, "Salve o lançamento antes de dar baixa.");
@@ -826,6 +856,12 @@
       return;
     }
     if (ids.length === 1) {
+      const item = itens.find((i) => i.id === ids[0]);
+      if (window.FinBaixaReceber?.podeBaixar(item)) {
+        window.__finContas = contas;
+        window.FinBaixaReceber.abrirModal(item);
+        return;
+      }
       abrirDetalhe(ids[0], true);
       return;
     }

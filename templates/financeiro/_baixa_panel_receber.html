@@ -1,0 +1,23 @@
+        <p class="muted" id="baixaHint">Informe conta, categoria, ajustes e valor recebido. Baixas parciais mantêm saldo em aberto.</p>
+        <div class="fin-baixa-resumo-titulo cad-form-grid fin-baixa-resumo-grid">
+          <div><label>Cliente</label><input type="text" id="bxRecTab_cliente" readonly class="fin-valor-readonly"></div>
+          <div><label>Nº documento</label><input type="text" id="bxRecTab_numero_doc" readonly class="fin-valor-readonly"></div>
+          <div><label>Vencimento</label><input type="text" id="bxRecTab_vencimento" readonly class="fin-valor-readonly"></div>
+          <div><label>Valor original</label><input type="text" id="bxRecTab_valor_original" readonly class="fin-valor-readonly"></div>
+          <div><label>Já recebido</label><input type="text" id="bxRecTab_ja_recebido" readonly class="fin-valor-readonly"></div>
+          <div><label>Saldo em aberto</label><input type="text" id="bxRecTab_saldo_aberto" readonly class="fin-valor-readonly fin-saldo-aberto"></div>
+        </div>
+        <div class="cad-form-grid fin-baixa-rec-grid">
+          <div><label>Conta financeira *</label><select id="bxRecTab_conta"><option value="">—</option></select></div>
+          <div><label>Categoria</label><select id="bxRecTab_categoria"><option value="">— Selecione —</option></select></div>
+          <div><label>Data do recebimento *</label><input type="date" id="bxRecTab_data"></div>
+          <div><label>Juros</label><input type="text" inputmode="decimal" id="bxRecTab_juros" value="0,00" class="bx-money-rec-tab"></div>
+          <div><label>Desconto</label><input type="text" inputmode="decimal" id="bxRecTab_desconto" value="0,00" class="bx-money-rec-tab"></div>
+          <div><label>Multa</label><input type="text" inputmode="decimal" id="bxRecTab_multa" value="0,00" class="bx-money-rec-tab"></div>
+          <div><label>Tarifa</label><input type="text" inputmode="decimal" id="bxRecTab_tarifa" value="0,00" class="bx-money-rec-tab"></div>
+          <div><label>Taxas de marketplace</label><input type="text" inputmode="decimal" id="bxRecTab_taxas" value="0,00" class="bx-money-rec-tab"></div>
+          <div><label>Valor recebido *</label><input type="text" inputmode="decimal" id="bxRecTab_valor_recebido" class="bx-money-rec-tab fin-valor-recebido"></div>
+          <div class="full"><label>Histórico</label><input type="text" id="bxRecTab_historico"></div>
+        </div>
+        <p class="muted fin-baixa-calc-hint" id="bxRecTab_calc_hint"></p>
+        <button type="button" class="ctrl-btn ctrl-btn-primary" id="btnConfirmarBaixa" style="margin-top:12px">Confirmar recebimento</button>

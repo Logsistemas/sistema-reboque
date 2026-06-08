@@ -52,7 +52,7 @@
     </div>
     <div class="fin-table-area">
       <div class="fin-table-wrap">
-        <table class="fin-table">
+        <table class="fin-table fin-table-lanc">
           <thead>
             <tr>
               <th style="width:36px"><input type="checkbox" id="chkTodosMov"></th>
@@ -129,27 +129,58 @@
 </div>
 
 <div id="modalMov" class="cad-modal" aria-hidden="true">
-  <div class="cad-modal-shell" style="grid-template-columns:1fr">
+  <div class="cad-modal-shell cad-modal-prof fin-modal-mov">
+    <nav class="cad-modal-nav">
+      <h3 id="modalMovNavTitulo">Lançamento</h3>
+      <button type="button" class="cad-nav-btn active" data-fin-tab="geral">📋 Dados</button>
+      <button type="button" class="cad-nav-btn" data-fin-tab="anexos">📎 Anexos</button>
+    </nav>
     <main class="cad-modal-main">
-      <h2 class="cad-modal-title">Incluir lançamento manual</h2>
+      <h2 class="cad-modal-title" id="modalMovTitulo">Incluir lançamento manual</h2>
+      <input type="hidden" id="m_id">
+      <input type="hidden" id="m_contato_id">
       <p id="movErro" class="cad-erro" style="display:none"></p>
-      <div class="cad-form-grid">
-        <div><label>Conta financeira *</label><select id="m_conta"><option value="">—</option></select></div>
-        <div><label>Tipo *</label><select id="m_tipo"><option value="entrada">Entrada</option><option value="saida">Saída</option></select></div>
-        <div><label>Categoria</label><select id="m_categoria_id"><option value="">— Selecione —</option></select></div>
-        <div><label>Valor *</label><input type="number" step="0.01" id="m_valor"></div>
-        <div><label>Data</label><input type="date" id="m_data"></div>
-        <div class="full"><label>Histórico / descrição</label><input id="m_descricao"></div>
+      <p id="movViewHint" class="muted fin-mov-view-hint" style="display:none">Lançamento automático — somente visualização.</p>
+
+      <div class="fin-tab-panel active" data-fin-panel="geral">
+        <div class="cad-form-grid">
+          <div><label>Categoria</label><select id="m_categoria_id"><option value="">— Selecione —</option></select></div>
+          <div><label>Data *</label><input type="date" id="m_data"></div>
+          <div><label>Valor *</label><input type="number" step="0.01" id="m_valor"></div>
+          <div><label>Tipo *</label><select id="m_tipo"><option value="entrada">Entrada</option><option value="saida">Saída</option></select></div>
+          <div><label>Competência</label><input type="date" id="m_competencia"></div>
+          <div><label>Conta financeira *</label><select id="m_conta"><option value="">—</option></select></div>
+          <div class="full"><label>Histórico / descrição</label><input id="m_descricao" placeholder="Descrição do lançamento"></div>
+          <div class="full"><label>Cliente ou fornecedor</label>
+            <input id="m_parte" list="dlContatosCaixa" placeholder="Selecione ou digite..." autocomplete="off">
+            <datalist id="dlContatosCaixa"></datalist>
+          </div>
+        </div>
       </div>
-      <div class="cad-modal-footer" style="margin-top:16px">
+
+      <div class="fin-tab-panel" data-fin-panel="anexos">
+        <p class="muted fin-anexo-hint" id="movAnexoHint">Selecione o arquivo para adicionar à lista. Os anexos são gravados ao clicar em <strong>Salvar</strong>.</p>
+        <form id="formAnexoMov" class="cad-form-grid fin-anexo-form-mov">
+          <div><label>Nome</label><input name="nome" id="anexoMovNome"></div>
+          <div><label>Tipo</label><input name="tipo" id="anexoMovTipo" placeholder="NF, Boleto..."></div>
+          <div class="full"><label>Arquivo</label><input type="file" name="arquivo" id="anexoMovArquivo"></div>
+          <div><button type="submit" class="ctrl-btn ctrl-btn-outline">Adicionar à lista</button></div>
+        </form>
+        <table class="ctrl-table fin-hist-table fin-anexos-table" style="margin-top:14px">
+          <thead><tr><th>Nome do arquivo</th><th>Tipo</th><th>Enviado em</th><th style="width:90px">Ações</th></tr></thead>
+          <tbody id="tbodyAnexosMov"></tbody>
+        </table>
+      </div>
+
+      <div class="cad-modal-footer">
         <button type="button" class="fin-btn fin-btn-outline" id="btnFecharMov">Cancelar</button>
-        <button type="button" class="fin-btn fin-btn-primary" id="btnSalvarMov">Registrar</button>
+        <button type="button" class="fin-btn fin-btn-primary" id="btnSalvarMov">Salvar</button>
       </div>
     </main>
   </div>
 </div>
 {% include "partials/app_shell_end.html" %}
-<script src="/static/financeiro_shared.js?v=20260601"></script>
-<script src="/static/financeiro_caixa.js?v=20260601"></script>
+<script src="/static/financeiro_shared.js?v=20260603"></script>
+<script src="/static/financeiro_caixa.js?v=20260603"></script>
 </body>
 </html>

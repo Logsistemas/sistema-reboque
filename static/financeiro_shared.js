@@ -1,11 +1,17 @@
 window.FinShared = {
-  toast(msg, ms = 3200) {
+  toast(msg, msOrError = 3200) {
     const t = document.getElementById("finToast");
     if (!t) return;
+    const isError = msOrError === true;
+    const ms = isError ? 6500 : (typeof msOrError === "number" ? msOrError : 3200);
     t.textContent = msg;
+    t.classList.toggle("fin-toast-erro", isError);
     t.style.display = "block";
     clearTimeout(t._tm);
-    t._tm = setTimeout(() => { t.style.display = "none"; }, ms);
+    t._tm = setTimeout(() => {
+      t.style.display = "none";
+      t.classList.remove("fin-toast-erro");
+    }, ms);
   },
 
   atualizarKpis(k) {
@@ -38,6 +44,7 @@ window.FinShared = {
       em_aberto: "Em aberto",
       pago: "Pago",
       recebido: "Recebido",
+      parcialmente_recebido: "Parcialmente recebida",
       atrasado: "Vencido",
       cancelado: "Cancelado",
     }[s] || st;

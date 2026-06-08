@@ -287,3 +287,44 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Importação CSV — Clientes */
+.cad-import-actions {
+  margin: 14px 0;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.cad-import-kpis {
+  margin-bottom: 16px;
+}
+
+.cad-import-resumo .cad-section-title,
+.cad-import-relatorio .cad-section-title {
+  margin: 16px 0 10px;
+  font-size: 0.95rem;
+}
+
+.cad-import-avisos {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(255, 193, 7, 0.08);
+  border: 1px solid rgba(255, 193, 7, 0.25);
+  font-size: 0.88rem;
+}
+
+.cad-import-avisos ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.cad-import-relatorio {
+  padding-top: 8px;
+  border-top: 1px solid var(--ctrl-border, rgba(255, 255, 255, 0.08));
+}
+
+#modalImportClientes .cad-modal-shell {
+  max-width: 920px;
+  grid-template-columns: 1fr;
+}

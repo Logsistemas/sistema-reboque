@@ -1115,6 +1115,19 @@ def init_db():
               url text,
               created_at timestamp default now()
             );""")
+            contatos_alters = [
+                "alter table cadastro_contatos add column if not exists codigo_cliente text;",
+                "alter table cadastro_contatos add column if not exists fax text;",
+                "alter table cadastro_contatos add column if not exists website text;",
+                "alter table cadastro_contatos add column if not exists email_nfse text;",
+                "alter table cadastro_contatos add column if not exists segmento text;",
+                "alter table cadastro_contatos add column if not exists vendedor text;",
+                "alter table cadastro_contatos add column if not exists condicao_pagamento text;",
+                "alter table cadastro_contatos add column if not exists regime_tributario text;",
+                "alter table cadastro_contatos add column if not exists cliente_desde date;",
+            ]
+            for a in contatos_alters:
+                cur.execute(a)
             cur.execute("""
                 update cadastro_profissionais set
                   nome_completo = coalesce(nullif(trim(nome_completo),''), nome),
@@ -1171,6 +1184,10 @@ def init_db():
             financeiro_routes.init_financeiro_tables(cur)
             import financeiro_notas_entrada
             financeiro_notas_entrada.init_notas_entrada_tables(cur)
+            import financeiro_nfse
+            financeiro_nfse.init_nfse_tables(cur)
+            import financeiro_config_fiscal
+            financeiro_config_fiscal.init_config_fiscal_tables(cur)
             cur.execute("select count(*) as total from tabela_precos")
             total_precos = cur.fetchone()["total"]
             if not total_precos:
@@ -5663,5 +5680,11 @@ def exportar(data_ini: str="", data_fim: str="", seguradora: str="", tipo: str="
 
 import financeiro_routes
 import financeiro_notas_entrada
+import financeiro_nfse
+import financeiro_config_fiscal
+import cadastros_import_clientes
 financeiro_routes.register(app, templates)
 financeiro_notas_entrada.register(app, templates)
+financeiro_config_fiscal.register(app, templates)
+financeiro_nfse.register(app, templates)
+cadastros_import_clientes.register(app)

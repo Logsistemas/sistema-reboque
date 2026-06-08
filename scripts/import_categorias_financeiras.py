@@ -113,13 +113,24 @@ def importar(linhas, conn):
                 (ln["natureza"], ln["tipo_categoria"], ln["descricao"]),
             )
             existing = cur.fetchone()
+            pai_id = pai_atual if ln["tipo_categoria"] == "Subcategoria" else None
+
             if existing:
                 stats["duplicadas"] += 1
+                cur.execute(
+                    """
+                    update financeiro_categorias set
+                      grupo_dre = %s,
+                      categoria_pai_id = %s,
+                      ordem = %s,
+                      updated_at = now()
+                    where id = %s
+                    """,
+                    (ln["grupo_dre"], str(pai_id) if pai_id else None, ln["ordem"], str(existing["id"])),
+                )
                 if ln["tipo_categoria"] == "Categoria Principal":
                     pai_atual = existing["id"]
                 continue
-
-            pai_id = pai_atual if ln["tipo_categoria"] == "Subcategoria" else None
 
             cur.execute(
                 """
@@ -178,7 +189,7 @@ def main():
     print(f"Categorias importadas: {stats['importadas']}")
     print(f"Categorias principais: {stats['principais']}")
     print(f"Subcategorias: {stats['subcategorias']}")
-    print(f"Duplicadas ignoradas: {stats['duplicadas']}")
+    print(f"Duplicadas (atualizadas): {stats['duplicadas']}")
     if stats["ignoradas_sem_descricao"]:
         print(f"Linhas sem descrição ignoradas: {stats['ignoradas_sem_descricao']}")
 

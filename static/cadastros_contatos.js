@@ -89,6 +89,9 @@
     render();
   }
 
+  window.__cadRecarregarContatos = carregar;
+  window.__cadAtualizarKpis = atualizarKpis;
+
   function toggleTipoPessoa() {
     const tp = document.querySelector('input[name="c_tipo_pessoa"]:checked')?.value || "juridica";
     el("blocoPF").style.display = tp === "fisica" ? "grid" : "none";
