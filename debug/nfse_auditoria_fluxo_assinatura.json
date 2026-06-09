@@ -1,0 +1,105 @@
+{
+  "gerado_em": "2026-06-09T16:48:40-03:00",
+  "apos_sign": {
+    "descricao": "Imediatamente após signer.sign() (signed_copy)",
+    "valido": true,
+    "erro": "",
+    "snapshot": {
+      "CanonicalizationMethod": "http://www.w3.org/TR/2001/REC-xml-c14n-20010315",
+      "SignatureMethod": "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256",
+      "DigestMethod": "http://www.w3.org/2001/04/xmlenc#sha256",
+      "Reference_URI": "#DPS330455723149489900017000001064509929799255",
+      "DigestValue": "styPrjqmDe0oCa/aDXjuOueTmlNuxbjXvxHSx8wgyZY=",
+      "SignatureValue_inicio": "rY8/SkcQjLH/7QAZDOZqIE5yNjQcDP92ADLKZ6EKE0GGwBAPmg2Ag8mOy6LLn1ujVbE5y4hAUP/WUOjP",
+      "SignedInfo_c14n": "<SignedInfo xmlns=\"http://www.w3.org/2000/09/xmldsig#\"><CanonicalizationMethod Algorithm=\"http://www.w3.org/TR/2001/REC-xml-c14n-20010315\"></CanonicalizationMethod><SignatureMethod Algorithm=\"http://www.w3.org/2001/04/xmldsig-more#rsa-sha256\"></SignatureMethod><Reference URI=\"#DPS330455723149489900017000001064509929799255\"><Transforms xmlns=\"\"><Transform xmlns=\"\" Algorithm=\"http://www.w3.org/2000/09/xmldsig#enveloped-signature\"></Transform><Transform xmlns=\"\" Algorithm=\"http://www.w3.org/TR/2001/REC-xml-c14n-20010315\"></Transform></Transforms><DigestMethod xmlns=\"\" Algorithm=\"http://www.w3.org/2001/04/xmlenc#sha256\"></DigestMethod><DigestValue xmlns=\"\">styPrjqmDe0oCa/aDXjuOueTmlNuxbjXvxHSx8wgyZY=</DigestValue></Reference></SignedInfo>",
+      "SignedInfo_c14n_len": 744,
+      "Signature_nsmap": {
+        "(default)": "http://www.w3.org/2000/09/xmldsig#"
+      },
+      "namespaces_ancestrais": [
+        {
+          "tag": "Signature",
+          "nsmap": {
+            "(default)": "http://www.w3.org/2000/09/xmldsig#"
+          }
+        },
+        {
+          "tag": "infDPS",
+          "nsmap": {
+            "(default)": "http://www.sped.fazenda.gov.br/nfse"
+          }
+        }
+      ]
+    }
+  },
+  "apos_mover_signature": {
+    "descricao": "Após _extrair_signatures_para_root() (Signature irmã de infDPS)",
+    "valido": true,
+    "erro": "",
+    "snapshot": {
+      "CanonicalizationMethod": "http://www.w3.org/TR/2001/REC-xml-c14n-20010315",
+      "SignatureMethod": "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256",
+      "DigestMethod": "http://www.w3.org/2001/04/xmlenc#sha256",
+      "Reference_URI": "#DPS330455723149489900017000001064509929799255",
+      "DigestValue": "styPrjqmDe0oCa/aDXjuOueTmlNuxbjXvxHSx8wgyZY=",
+      "SignatureValue_inicio": "rY8/SkcQjLH/7QAZDOZqIE5yNjQcDP92ADLKZ6EKE0GGwBAPmg2Ag8mOy6LLn1ujVbE5y4hAUP/WUOjP",
+      "SignedInfo_c14n": "<SignedInfo xmlns=\"http://www.w3.org/2000/09/xmldsig#\"><CanonicalizationMethod Algorithm=\"http://www.w3.org/TR/2001/REC-xml-c14n-20010315\"></CanonicalizationMethod><SignatureMethod Algorithm=\"http://www.w3.org/2001/04/xmldsig-more#rsa-sha256\"></SignatureMethod><Reference URI=\"#DPS330455723149489900017000001064509929799255\"><Transforms xmlns=\"\"><Transform xmlns=\"\" Algorithm=\"http://www.w3.org/2000/09/xmldsig#enveloped-signature\"></Transform><Transform xmlns=\"\" Algorithm=\"http://www.w3.org/TR/2001/REC-xml-c14n-20010315\"></Transform></Transforms><DigestMethod xmlns=\"\" Algorithm=\"http://www.w3.org/2001/04/xmlenc#sha256\"></DigestMethod><DigestValue xmlns=\"\">styPrjqmDe0oCa/aDXjuOueTmlNuxbjXvxHSx8wgyZY=</DigestValue></Reference></SignedInfo>",
+      "SignedInfo_c14n_len": 744,
+      "Signature_nsmap": {
+        "(default)": "http://www.w3.org/2000/09/xmldsig#"
+      },
+      "namespaces_ancestrais": [
+        {
+          "tag": "Signature",
+          "nsmap": {
+            "(default)": "http://www.w3.org/2000/09/xmldsig#"
+          }
+        },
+        {
+          "tag": "DPS",
+          "nsmap": {
+            "(default)": "http://www.sped.fazenda.gov.br/nfse"
+          }
+        }
+      ]
+    }
+  },
+  "apos_serializacao": {
+    "descricao": "Após serializar_dps_assinado() (XML final bytes)",
+    "valido": true,
+    "erro": "",
+    "snapshot": {
+      "CanonicalizationMethod": "http://www.w3.org/TR/2001/REC-xml-c14n-20010315",
+      "SignatureMethod": "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256",
+      "DigestMethod": "http://www.w3.org/2001/04/xmlenc#sha256",
+      "Reference_URI": "#DPS330455723149489900017000001064509929799255",
+      "DigestValue": "styPrjqmDe0oCa/aDXjuOueTmlNuxbjXvxHSx8wgyZY=",
+      "SignatureValue_inicio": "rY8/SkcQjLH/7QAZDOZqIE5yNjQcDP92ADLKZ6EKE0GGwBAPmg2Ag8mOy6LLn1ujVbE5y4hAUP/WUOjP",
+      "SignedInfo_c14n": "<SignedInfo xmlns=\"http://www.w3.org/2000/09/xmldsig#\"><CanonicalizationMethod Algorithm=\"http://www.w3.org/TR/2001/REC-xml-c14n-20010315\"></CanonicalizationMethod><SignatureMethod Algorithm=\"http://www.w3.org/2001/04/xmldsig-more#rsa-sha256\"></SignatureMethod><Reference URI=\"#DPS330455723149489900017000001064509929799255\"><Transforms xmlns=\"\"><Transform xmlns=\"\" Algorithm=\"http://www.w3.org/2000/09/xmldsig#enveloped-signature\"></Transform><Transform xmlns=\"\" Algorithm=\"http://www.w3.org/TR/2001/REC-xml-c14n-20010315\"></Transform></Transforms><DigestMethod xmlns=\"\" Algorithm=\"http://www.w3.org/2001/04/xmlenc#sha256\"></DigestMethod><DigestValue xmlns=\"\">styPrjqmDe0oCa/aDXjuOueTmlNuxbjXvxHSx8wgyZY=</DigestValue></Reference></SignedInfo>",
+      "SignedInfo_c14n_len": 744,
+      "Signature_nsmap": {
+        "(default)": "http://www.w3.org/2000/09/xmldsig#"
+      },
+      "namespaces_ancestrais": [
+        {
+          "tag": "Signature",
+          "nsmap": {
+            "(default)": "http://www.w3.org/2000/09/xmldsig#"
+          }
+        },
+        {
+          "tag": "DPS",
+          "nsmap": {
+            "(default)": "http://www.sped.fazenda.gov.br/nfse"
+          }
+        }
+      ]
+    }
+  },
+  "etapa_quebra": null,
+  "resumo": {
+    "ASSINATURA_VALIDA_APOS_SIGN": true,
+    "ASSINATURA_VALIDA_APOS_MOVER_SIGNATURE": true,
+    "ASSINATURA_VALIDA_APOS_SERIALIZACAO": true
+  }
+}

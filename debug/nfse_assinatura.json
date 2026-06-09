@@ -1,0 +1,20 @@
+{
+  "infDPS_Id": "DPS330455723149489900017000001064509929799255",
+  "reference_uri": "#DPS330455723149489900017000001064509929799255",
+  "digest_method": "http://www.w3.org/2001/04/xmlenc#sha256",
+  "signature_method": "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256",
+  "digest_value": "styPrjqmDe0oCa/aDXjuOueTmlNuxbjXvxHSx8wgyZY=",
+  "signature_value_inicio": "rY8/SkcQjLH/7QAZDOZqIE5yNjQcDP92ADLKZ6EKE0GGwBAPmg",
+  "cert_subject": "CN=EZ LOGISTICA LTDA:31494899000170,OU=videoconferencia,OU=34345592000103,OU=RFB e-CNPJ A1,OU=Secretaria da Receita Federal do Brasil - RFB,L=RIO DE JANEIRO,ST=RJ,O=ICP-Brasil,C=BR",
+  "cert_serial": "8474998685299976591",
+  "cert_cnpj": "31494899000170",
+  "validacoes_ok": true,
+  "erros_validacao": [],
+  "contagens": {
+    "Signature": 1,
+    "DigestValue": 1,
+    "SignatureValue": 1
+  },
+  "debug_xml": "C:\\Users\\Ezequiel.Sousa\\Dropbox\\PC\\Desktop\\SISTEMAS\\APP ESSÊNCIA DA RUA\\sistema-reboque-v39-dev\\debug\\nfse_assinada.xml",
+  "gerado_em": "2026-06-09T16:48:40-03:00"
+}

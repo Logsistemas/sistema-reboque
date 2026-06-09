@@ -1,0 +1,167 @@
+==================================
+AUDITORIA CADEIA ICP-BRASIL — NFS-e Nacional
+Gerado em: 2026-06-09T15:23:25-03:00
+==================================
+
+=== CONTEXTO ===
+AC emissora identificada: AC SAFEWEB RFB v5
+Cadeia esperada (tipica ICP-Brasil e-CNPJ A1):
+  [1] Certificado leaf (e-CNPJ A1) — EZ LOGISTICA
+  [2] AC SAFEWEB RFB v5 (intermediario)
+  [3] Autoridade Certificadora Raiz Brasileira v5/v10 (raiz ICP-Brasil)
+
+Nota: PFX PKCS#12 deve incluir ao menos o(s) intermediario(s), nao necessariamente a raiz.
+
+=== ARQUIVO PFX CONFIGURADO ===
+caminho: C:\Users\Ezequiel.Sousa\Dropbox\PC\Desktop\SISTEMAS\APP ESSÊNCIA DA RUA\sistema-reboque-v39-dev\static\uploads\financeiro\config_fiscal\certificados\cert_beeb0a5ceb3846f281cf170bec387a86.pfx
+chain_len_atual: 3
+chain_len_esperado (intermediarios no PFX): 1
+
+=== CERTIFICADO LEAF (principal) ===
+subject: CN=EZ LOGISTICA LTDA:31494899000170,OU=videoconferencia,OU=34345592000103,OU=RFB e-CNPJ A1,OU=Secretaria da Receita Federal do Brasil - RFB,L=RIO DE JANEIRO,ST=RJ,O=ICP-Brasil,C=BR
+issuer:  CN=AC SAFEWEB RFB v5,OU=Secretaria da Receita Federal do Brasil - RFB,O=ICP-Brasil,C=BR
+emissor_cn: AC SAFEWEB RFB v5
+serial:  8474998685299976591
+CNPJ: 31494899000170
+validade: 2025-08-12T16:06:53-03:00 ate 2026-08-12T16:06:53-03:00
+sha256: 296eda155cab1a211063d3ec3d9dea9d92720affde2d538af11f3453d4ab5808
+
+=== CADEIA NO PFX (atual) ===
+  - Autoridade Certificadora Raiz Brasileira v5
+    subject: CN=Autoridade Certificadora Raiz Brasileira v5,OU=Instituto Nacional de Tecnologia da Informacao - ITI,O=ICP-Brasil,C=BR
+    issuer:  CN=Autoridade Certificadora Raiz Brasileira v5,OU=Instituto Nacional de Tecnologia da Informacao - ITI,O=ICP-Brasil,C=BR
+    sha256: caa53fc6091c6951887c976e378f6ef89aa6377c55d97b6475422b71ed7e9b17
+  - AC Secretaria da Receita Federal do Brasil v4
+    subject: CN=AC Secretaria da Receita Federal do Brasil v4,OU=Autoridade Certificadora Raiz Brasileira v5,O=ICP-Brasil,C=BR
+    issuer:  CN=Autoridade Certificadora Raiz Brasileira v5,OU=Instituto Nacional de Tecnologia da Informacao - ITI,O=ICP-Brasil,C=BR
+    sha256: 2c7a8ad75458f7e2fe8d7f7884a585127e4f242bd5c3ebea499dacb630315e21
+  - AC SAFEWEB RFB v5
+    subject: CN=AC SAFEWEB RFB v5,OU=Secretaria da Receita Federal do Brasil - RFB,O=ICP-Brasil,C=BR
+    issuer:  CN=AC Secretaria da Receita Federal do Brasil v4,OU=Autoridade Certificadora Raiz Brasileira v5,O=ICP-Brasil,C=BR
+    sha256: 7b3a4be434dccfb19009d4835104a052a8ab64850145a48c625784e821e053ea
+
+=== CADEIA ENCONTRADA NO WINDOWS ===
+repositorios auditados: CurrentUser\\My, LocalMachine\\My, CurrentUser\\CA, LocalMachine\\CA
+  + Root (referencia): CurrentUser\Root, LocalMachine\Root
+total_certificados_lidos: 199
+
+  [1] AC SAFEWEB RFB v5 (intermediario)
+      store: CurrentUser\CA
+      thumbprint: A338B1007EE682B6D90BB7CBFC82F1838879462F
+      issuer: CN=AC Secretaria da Receita Federal do Brasil v4, OU=Autoridade Certificadora Raiz Brasileira v5, O=ICP-Brasil, C=BR
+      validade_ate: 2029-02-20T14:12:26.0000000-03:00
+  [2] AC Secretaria da Receita Federal do Brasil v4 (intermediario)
+      store: CurrentUser\CA
+      thumbprint: 0E182E25504C1C6EDFE9598900F5D173055DE696
+      issuer: CN=Autoridade Certificadora Raiz Brasileira v5, OU=Instituto Nacional de Tecnologia da Informacao - ITI, O=ICP-Brasil, C=BR
+      validade_ate: 2029-03-02T09:00:04.0000000-03:00
+  [3] Autoridade Certificadora Raiz Brasileira v5 (raiz)
+      store: CurrentUser\Root
+      thumbprint: 4ACADAB14B74BF4FBA7BACE64B91801C44B8CC66
+      issuer: CN=Autoridade Certificadora Raiz Brasileira v5, OU=Instituto Nacional de Tecnologia da Informacao - ITI, O=ICP-Brasil, C=BR
+      validade_ate: 2029-03-02T20:59:38.0000000-03:00
+
+=== AC SAFEWEB RFB v5 (busca direta nos repositorios) ===
+  encontrado em: CurrentUser\CA
+  subject: CN=AC SAFEWEB RFB v5, OU=Secretaria da Receita Federal do Brasil - RFB, O=ICP-Brasil, C=BR
+  thumbprint: A338B1007EE682B6D90BB7CBFC82F1838879462F
+  has_private_key: False
+
+=== LEAF NO WINDOWS (busca por CN) ===
+  *** CERTIFICADO CORRETO (emissor AC SAFEWEB RFB v5, chave privada) ***
+  store: CurrentUser\My
+  subject: CN=EZ LOGISTICA LTDA:31494899000170, OU=videoconferencia, OU=34345592000103, OU=RFB e-CNPJ A1, OU=Secretaria da Receita Federal do Brasil - RFB, L=RIO DE JANEIRO, S=RJ, O=ICP-Brasil, C=BR
+  thumbprint: C4B3C39C525353B60097278243940810C256DA98
+  serial_pfx: 8474998685299976591
+
+  Total encontrados com mesmo CN: 5 (inclui certificados antigos)
+  store: CurrentUser\My <-- USAR ESTE
+  subject: CN=EZ LOGISTICA LTDA:31494899000170, OU=videoconferencia, OU=34345592000103, OU=RFB e-CNPJ A1, OU=Secretaria da Receita Federal do Brasil - RFB, L=RIO DE JANEIRO, S=RJ, O=ICP-Brasil, C=BR
+  issuer: CN=AC SAFEWEB RFB v5, OU=Secretaria da Receita Federal do Brasil - RFB, O=ICP-Brasil, C=BR
+  thumbprint: C4B3C39C525353B60097278243940810C256DA98
+  has_private_key: True
+  store: CurrentUser\My
+  subject: CN=EZ LOGISTICA LTDA:31494899000170, OU=AC SyngularID Multipla, OU=04555555000150, OU=Videoconferencia, OU=Certificado Digital PJ A1, O=ICP-Brasil, C=BR
+  issuer: CN=AC SyngularID Multipla, O=ICP-Brasil, OU=AC SyngularID, C=BR
+  thumbprint: 690D5C213DA74AFEBDD6167D4925C935A4E15231
+  has_private_key: True
+  store: CurrentUser\My
+  subject: CN=EZ LOGISTICA LTDA:31494899000170, OU=Certificado PJ A1, OU=Videoconferencia, OU=04555555000150, OU=AC CCN COMPANHIA CERTIFICADORA NACIONAL v5, L=Rio de Janeiro, S=RJ, O=ICP-Brasil, C=BR
+  issuer: CN=AC CCN COMPANHIA CERTIFICADORA NACIONAL v5, OU=AC SOLUTI v5 G2, O=ICP-Brasil, C=BR
+  thumbprint: 55421277B89323A832D1C34BD1F2D09A8F62EB72
+  has_private_key: True
+  store: LocalMachine\My
+  subject: CN=EZ LOGISTICA LTDA:31494899000170, OU=AC SyngularID Multipla, OU=04555555000150, OU=Videoconferencia, OU=Certificado Digital PJ A1, O=ICP-Brasil, C=BR
+  issuer: CN=AC SyngularID Multipla, O=ICP-Brasil, OU=AC SyngularID, C=BR
+  thumbprint: 690D5C213DA74AFEBDD6167D4925C935A4E15231
+  has_private_key: True
+  store: LocalMachine\My
+  subject: CN=EZ LOGISTICA LTDA:31494899000170, OU=Certificado PJ A1, OU=Videoconferencia, OU=04555555000150, OU=AC CCN COMPANHIA CERTIFICADORA NACIONAL v5, L=Rio de Janeiro, S=RJ, O=ICP-Brasil, C=BR
+  issuer: CN=AC CCN COMPANHIA CERTIFICADORA NACIONAL v5, OU=AC SOLUTI v5 G2, O=ICP-Brasil, C=BR
+  thumbprint: 55421277B89323A832D1C34BD1F2D09A8F62EB72
+  has_private_key: True
+
+=== CADEIA AUSENTE ===
+  Nenhum intermediario ausente no PFX (cadeia PKCS#12 completa).
+
+=== RESUMO ===
+chain_len_atual:    3
+chain_len_esperado: 1
+exportacao_sem_cadeia: NAO
+
+=== INSTRUCOES (nao executadas automaticamente) ===
+
+=== OPCAO A: Exportar novo PFX com cadeia completa (Windows) ===
+
+1. Abra certmgr.msc (Win+R -> certmgr.msc).
+2. Va em: Pessoal -> Certificados.
+3. Localize o certificado: EZ LOGISTICA LTDA:31494899000170
+   (emissor esperado: AC SAFEWEB RFB v5)
+4. Clique direito -> Todas as tarefas -> Exportar...
+5. Escolha: Sim, exportar a chave privada.
+6. Marque: Incluir todos os certificados no caminho de certificacao, se possivel.
+7. Marque: Exportar extensoes de propriedade.
+8. Defina senha forte e salve como novo arquivo .pfx.
+9. Substitua manualmente o arquivo configurado no sistema:
+   C:\Users\Ezequiel.Sousa\Dropbox\PC\Desktop\SISTEMAS\APP ESSÊNCIA DA RUA\sistema-reboque-v39-dev\static\uploads\financeiro\config_fiscal\certificados\cert_beeb0a5ceb3846f281cf170bec387a86.pfx
+10. Rode novamente: python scripts/auditar_cadeia_icp.py
+
+Certificados intermediarios que precisam constar no PFX:
+  - AC SAFEWEB RFB v5
+
+PowerShell alternativo (exportar do repositorio CurrentUser\My):
+
+  # Certificado correto identificado (thumbprint C4B3C39C525353B60097278243940810C256DA98):
+  $pwd = ConvertTo-SecureString -String 'SUA_SENHA' -Force -AsPlainText
+  Export-PfxCertificate -Cert 'Cert:\CurrentUser\My\C4B3C39C525353B60097278243940810C256DA98' `
+    -FilePath 'C:\temp\ez_logistica_com_cadeia.pfx' -Password $pwd
+
+Nota: Export-PfxCertificate inclui a cadeia disponivel no Windows.
+
+=== OPCAO B: Reconstruir PFX manualmente (leaf + chave + intermediarios) ===
+
+Pre-requisito: intermediarios localizados nos repositorios Windows (secao acima).
+
+Passos com OpenSSL (nao executar automaticamente — apenas referencia):
+
+  # 1) Extrair leaf e chave do PFX atual
+  openssl pkcs12 -in "C:\Users\Ezequiel.Sousa\Dropbox\PC\Desktop\SISTEMAS\APP ESSÊNCIA DA RUA\sistema-reboque-v39-dev\static\uploads\financeiro\config_fiscal\certificados\cert_beeb0a5ceb3846f281cf170bec387a86.pfx" -nocerts -nodes -out ez_chave.pem
+  openssl pkcs12 -in "C:\Users\Ezequiel.Sousa\Dropbox\PC\Desktop\SISTEMAS\APP ESSÊNCIA DA RUA\sistema-reboque-v39-dev\static\uploads\financeiro\config_fiscal\certificados\cert_beeb0a5ceb3846f281cf170bec387a86.pfx" -clcerts -nokeys -out ez_leaf.pem
+
+  # 2) Exportar cada intermediario ausente do Windows (exemplo PowerShell):
+  # AC SAFEWEB RFB v5
+  Export-Certificate -Cert 'Cert:\CurrentUser\CA\A338B1007EE682B6D90BB7CBFC82F1838879462F' -FilePath 'C:\temp\AC_SAFEWEB_RFB_v5.cer'
+  # AC Secretaria da Receita Federal do Brasil v4
+  Export-Certificate -Cert 'Cert:\CurrentUser\CA\0E182E25504C1C6EDFE9598900F5D173055DE696' -FilePath 'C:\temp\AC_Secretaria_da_Receita_Federal_do_Brasil_v4.cer'
+  # Autoridade Certificadora Raiz Brasileira v5
+  Export-Certificate -Cert 'Cert:\CurrentUser\Root\4ACADAB14B74BF4FBA7BACE64B91801C44B8CC66' -FilePath 'C:\temp\Autoridade_Certificadora_Raiz_Brasileira_v5.cer'
+
+  # 3) Montar arquivo de cadeia (intermediarios, ordem leaf -> raiz, sem incluir raiz se autoassinada):
+  type AC_SAFEWEB_RFB_v5.cer > ez_cadeia.pem
+
+  # 4) Gerar novo PFX com cadeia:
+  openssl pkcs12 -export -out ez_com_cadeia.pfx -inkey ez_chave.pem -in ez_leaf.pem -certfile ez_cadeia.pem
+
+Certificados intermediarios a incluir em ez_cadeia.pem:
+  - AC SAFEWEB RFB v5
+

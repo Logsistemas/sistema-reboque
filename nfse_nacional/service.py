@@ -1,13 +1,11 @@
 import logging
-from lxml import etree
 
 from nfse_nacional.client import NfseNacionalClient, NfseNacionalErro
-from nfse_nacional.constants import NS_DS
 from nfse_nacional.dps_builder import montar_dps_xml
 from nfse_nacional.evento_builder import montar_evento_cancelamento
 from nfse_nacional.ids import ndps_deterministico, so_digitos
 from nfse_nacional.parser import processar_resposta_emissao
-from nfse_nacional.signer import carregar_pfx, extrair_cnpj_certificado
+from nfse_nacional.signer import assinar_dps, assinar_evento, extrair_cnpj_certificado
 
 log = logging.getLogger("financeiro.nfse.nacional")
 
@@ -142,46 +140,12 @@ def validar_emissao_completa(config, cert, nota, dec_senha_fn):
     return True
 
 
-def _assinar_dps(dps_root, inf_dps, pfx_path, senha):
-    key_pem, cert_pem = carregar_pfx(pfx_path, senha)
-    from signxml import XMLSigner, methods
-
-    ref_id = inf_dps.get("Id")
-    signer = XMLSigner(
-        method=methods.enveloped,
-        signature_algorithm="rsa-sha256",
-        digest_algorithm="sha256",
-        c14n_algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315",
-    )
-    signed_inf = signer.sign(inf_dps, key=key_pem, cert=cert_pem, reference_uri={"uri": f"#{ref_id}"})
-    sigs = signed_inf.findall(f".//{{{NS_DS}}}Signature")
-    for sig in sigs:
-        parent = sig.getparent()
-        if parent is not None:
-            parent.remove(sig)
-        dps_root.append(sig)
-    return etree.tostring(dps_root, xml_declaration=True, encoding="UTF-8").decode("utf-8")
+def _assinar_dps(dps_root, inf_dps, pfx_path, senha, ambiente=None):
+    return assinar_dps(dps_root, inf_dps, pfx_path, senha, ambiente=ambiente)
 
 
-def _assinar_evento(root, inf, pfx_path, senha):
-    key_pem, cert_pem = carregar_pfx(pfx_path, senha)
-    from signxml import XMLSigner, methods
-
-    ref_id = inf.get("Id")
-    signer = XMLSigner(
-        method=methods.enveloped,
-        signature_algorithm="rsa-sha256",
-        digest_algorithm="sha256",
-        c14n_algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315",
-    )
-    signed_inf = signer.sign(inf, key=key_pem, cert=cert_pem, reference_uri={"uri": f"#{ref_id}"})
-    sigs = signed_inf.findall(f".//{{{NS_DS}}}Signature")
-    for sig in sigs:
-        parent = sig.getparent()
-        if parent is not None:
-            parent.remove(sig)
-        root.append(sig)
-    return etree.tostring(root, xml_declaration=True, encoding="UTF-8").decode("utf-8")
+def _assinar_evento(root, inf, pfx_path, senha, ambiente=None):
+    return assinar_evento(root, inf, pfx_path, senha, ambiente=ambiente)
 
 
 def _cliente(config, cert, dec_senha_fn):
@@ -200,9 +164,41 @@ def emitir_nota(config, cert, nota, dec_senha_fn):
     dps_root, inf_dps, id_dps, n_dps_val, xml_sem_assinatura = montar_dps_xml(
         config, nota, n_dps=n_dps
     )
-    xml_assinado = _assinar_dps(
-        dps_root, inf_dps, cert["caminho_arquivo"], dec_senha_fn(cert.get("senha_criptografada") or "")
+    from nfse_nacional.dps_builder import extrair_trecho_cserv, extrair_trecho_tributos, extrair_codigos_cserv
+
+    codigos = extrair_codigos_cserv(dps_root)
+    log.info(
+        "DPS códigos serviço antes da assinatura:\ncTribNac=%s\ncTribMun=%s\nNBS=%s",
+        codigos["cTribNac"],
+        codigos["cTribMun"],
+        codigos["NBS"],
     )
+    log.info("DPS cServ antes do envio:\n%s", extrair_trecho_cserv(dps_root))
+    log.info("DPS tributos antes do envio:\n%s", extrair_trecho_tributos(dps_root))
+    xml_assinado = _assinar_dps(
+        dps_root,
+        inf_dps,
+        cert["caminho_arquivo"],
+        dec_senha_fn(cert.get("senha_criptografada") or ""),
+        ambiente=config.get("ambiente"),
+    )
+    from nfse_nacional.xml_serial import analisar_xml_dps
+
+    info = analisar_xml_dps(xml_assinado)
+    log.info(
+        "DPS XML pronto SEFIN | tag_raiz=%s | namespaces=%s | prefixos=%s | len=%s",
+        info["tag_raiz"],
+        info["namespaces"],
+        info["prefixos_tags"] or "nenhum",
+        len(xml_assinado),
+    )
+
+    from nfse_nacional.schema_validator import NfseSchemaErro, validar_dps_xml
+
+    erros_xsd = validar_dps_xml(xml_assinado)
+    if erros_xsd:
+        log.error("DPS rejeitado na validação XSD local:\n%s", "\n".join(erros_xsd))
+        raise NfseSchemaErro(erros_xsd)
 
     client = _cliente(config, cert, dec_senha_fn)
     try:
@@ -223,7 +219,9 @@ def emitir_nota(config, cert, nota, dec_senha_fn):
 
     dados = processar_resposta_emissao(resposta, config.get("ambiente"))
     dados["id_dps"] = dados.get("id_dps") or id_dps
-    dados["xml_enviado"] = xml_assinado
+    dados["xml_enviado"] = (
+        xml_assinado.decode("utf-8") if isinstance(xml_assinado, bytes) else xml_assinado
+    )
     dados["n_dps"] = n_dps_val
 
     chave = (dados.get("chave_acesso") or "").strip()
@@ -254,7 +252,11 @@ def cancelar_nfse(config, cert, nota, motivo, dec_senha_fn, codigo_motivo=1):
 
     root, inf, _id, _xml = montar_evento_cancelamento(config, chave, motivo, codigo_motivo)
     xml_assinado = _assinar_evento(
-        root, inf, cert["caminho_arquivo"], dec_senha_fn(cert.get("senha_criptografada") or "")
+        root,
+        inf,
+        cert["caminho_arquivo"],
+        dec_senha_fn(cert.get("senha_criptografada") or ""),
+        ambiente=config.get("ambiente"),
     )
     client = _cliente(config, cert, dec_senha_fn)
     return client.cancelar_nfse(chave, xml_assinado)

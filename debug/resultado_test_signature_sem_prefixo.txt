@@ -1,0 +1,86 @@
+==================================
+TESTE ASSINATURA SEM PREFIXO ds:
+==================================
+
+=== PADRÃO signxml (ds:) ===
+  Arquivo: C:\Users\Ezequiel.Sousa\Dropbox\PC\Desktop\SISTEMAS\APP ESSÊNCIA DA RUA\sistema-reboque-v39-dev\debug\nfse_assinada_padrao_ds.xml
+  Assinatura válida (XMLVerifier): True
+  Assinatura válida (RSA direto):  True
+  Digest válido:                   True
+--- Padrão signxml (ds:) ---
+  Tags com prefixo: ['ds']
+  xmlns: declarados: ['ds']
+  Signature xmlns default xmldsig#: False
+  PREFIXOS MONITORADOS:
+    ds: SIM
+    ns0: nao
+    ns1: nao
+    ns2: nao
+    soap: nao
+    xsi: nao
+    xsd: nao
+    xml: nao
+
+=== EXPERIMENTAL namespace default xmldsig# ===
+  Arquivo: C:\Users\Ezequiel.Sousa\Dropbox\PC\Desktop\SISTEMAS\APP ESSÊNCIA DA RUA\sistema-reboque-v39-dev\debug\nfse_assinada_namespace_default.xml
+  Assinatura válida (XMLVerifier): False
+  Assinatura válida (RSA direto):  True
+  Digest válido:                   True
+  XMLVerifier falhou (limitação signxml com ds: xpath): Expected to find XML element DigestMethod in {http://www.w3.org/2000/09/xmldsig#}Reference
+--- Experimental namespace default xmldsig# ---
+  Tags com prefixo: (nenhum)
+  xmlns: declarados: (nenhum)
+  Signature xmlns default xmldsig#: True
+  PREFIXOS MONITORADOS:
+    ds: nao
+    ns0: nao
+    ns1: nao
+    ns2: nao
+    soap: nao
+    xsi: nao
+    xsd: nao
+    xml: nao
+
+=== SIMULAÇÃO PRÉ-POST ===
+  XML gravado em: C:\Users\Ezequiel.Sousa\Dropbox\PC\Desktop\SISTEMAS\APP ESSÊNCIA DA RUA\sistema-reboque-v39-dev\debug\nfse_post_final.xml
+--- nfse_post_final.xml (padrão ds:) ---
+  Tags com prefixo: ['ds']
+  xmlns: declarados: ['ds']
+  Signature xmlns default xmldsig#: False
+  PREFIXOS MONITORADOS:
+    ds: SIM
+    ns0: nao
+    ns1: nao
+    ns2: nao
+    soap: nao
+    xsi: nao
+    xsd: nao
+    xml: nao
+
+PREFIXOS ENCONTRADOS (consolidado nfse_post_final.xml):
+  ds:
+
+=== nfse_assinada.xml (emissão real) ===
+--- nfse_assinada.xml ---
+  Tags com prefixo: ['ds']
+  xmlns: declarados: ['ds']
+  Signature xmlns default xmldsig#: False
+  PREFIXOS MONITORADOS:
+    ds: SIM
+    ns0: nao
+    ns1: nao
+    ns2: nao
+    soap: nao
+    xsi: nao
+    xsd: nao
+    xml: nao
+  XMLVerifier emissão real: True
+
+=== CONCLUSÃO ===
+signxml PODE assinar sem prefixo ds: usando self.namespaces = {None: xmldsig#}.
+Assinatura RSA + Digest válidos; XML sem prefixo ds:.
+XMLVerifier falha apenas porque signxml procura filhos com prefixo ds: internamente.
+
+Próximo passo (futuro, NÃO agora):
+  - Aplicar _XMLSignerSemPrefixoDs em signer.py (antes do sign, não na serialização).
+  - Manter serializar_dps_assinado() com etree.tostring direto.

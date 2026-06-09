@@ -1,0 +1,45 @@
+==================================
+TESTE REMOÇÃO PREFIXO ds: (E1228)
+==================================
+
+Arquivo original:     C:\Users\Ezequiel.Sousa\Dropbox\PC\Desktop\SISTEMAS\APP ESSÊNCIA DA RUA\sistema-reboque-v39-dev\debug\nfse_assinada.xml
+Arquivo experimental: C:\Users\Ezequiel.Sousa\Dropbox\PC\Desktop\SISTEMAS\APP ESSÊNCIA DA RUA\sistema-reboque-v39-dev\debug\nfse_assinada_sem_prefixo.xml
+
+Assinatura original válida:    True
+Assinatura sem prefixo válida: False
+  Erro sem prefixo: Signature verification failed: 
+
+--- Análise original ---
+  ds: prefixo em tags: True
+  xmlns:ds declarado:  True
+
+--- Análise sem prefixo ---
+  ds: prefixo em tags: False
+  xmlns:ds declarado:  False
+  Signature xmlns default xmldsig#: True
+
+SignedInfo c14n idêntico: False
+
+--- Diff SignedInfo canonical (original vs sem prefixo) ---
+  --- original
+  +++ sem_prefixo
+  @@ -1 +1 @@
+  -<ds:SignedInfo xmlns="http://www.sped.fazenda.gov.br/nfse" xmlns:ds="http://www.w3.org/2000/09/xmldsig#"><ds:CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"></ds:CanonicalizationMethod><ds:SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"></ds:SignatureMethod><ds:Reference URI="#DPS330455723149489900017000001064509929799255"><ds:Transforms><ds:Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"></ds:Transform><ds:Transform Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"></ds:Transform></ds:Transforms><ds:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"></ds:DigestMethod><ds:DigestValue>ktJDhXOlSokuc2tSAwaoeZNZ5D0=</ds:DigestValue></ds:Reference></ds:SignedInfo>
+  +<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#"><CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"></CanonicalizationMethod><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"></SignatureMethod><Reference URI="#DPS330455723149489900017000001064509929799255"><Transforms xmlns=""><Transform xmlns="" Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"></Transform><Transform xmlns="" Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"></Transform></Transforms><DigestMethod xmlns="" Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"></DigestMethod><DigestValue xmlns="">ktJDhXOlSokuc2tSAwaoeZNZ5D0=</DigestValue></Reference></SignedInfo>
+  (tamanho original=776 sem_prefixo=720)
+
+=== RECOMENDAÇÃO PARA serializar_dps_assinado() ===
+
+A assinatura NÃO permanece válida após remover o prefixo ds: post-assinatura.
+
+Conclusão:
+  - Não é possível remover ds: após signer.sign() sem recalcular SignatureValue.
+  - A canonicalização do SignedInfo inclui o contexto de namespaces com ds: prefix.
+
+Alternativas para resolver E1228 sem quebrar E0714:
+  A) Assinar já com Signature em namespace default (sem ds:) — exige ajuste no signxml
+     ANTES da assinatura, não após serializar_dps_assinado().
+  B) Negociar/validar se SEFIN aceita prefixo ds: (padrão XMLDSIG W3C).
+  C) Re-assinar após transformação de namespace (recalcular digest + signature).
+
+Manter serialização atual (etree.tostring direto) para preservar assinatura.

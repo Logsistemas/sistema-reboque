@@ -1,0 +1,28 @@
+==================================
+AUDITORIA FLUXO ASSINATURA NFS-E
+Gerado em: 2026-06-09T16:48:40-03:00
+==================================
+
+ASSINATURA VÁLIDA APÓS SIGN = True
+ASSINATURA VÁLIDA APÓS MOVER SIGNATURE = True
+ASSINATURA VÁLIDA APÓS SERIALIZAÇÃO = True
+
+--- Após signer.sign() ---
+  Válida: True
+  CanonicalizationMethod: http://www.w3.org/TR/2001/REC-xml-c14n-20010315
+  SignatureMethod: http://www.w3.org/2001/04/xmldsig-more#rsa-sha256
+  Signature nsmap: {'(default)': 'http://www.w3.org/2000/09/xmldsig#'}
+
+--- Após _extrair_signatures_para_root() ---
+  Válida: True
+  CanonicalizationMethod: http://www.w3.org/TR/2001/REC-xml-c14n-20010315
+  SignatureMethod: http://www.w3.org/2001/04/xmldsig-more#rsa-sha256
+  Signature nsmap: {'(default)': 'http://www.w3.org/2000/09/xmldsig#'}
+
+--- Após serializar_dps_assinado() ---
+  Válida: True
+  CanonicalizationMethod: http://www.w3.org/TR/2001/REC-xml-c14n-20010315
+  SignatureMethod: http://www.w3.org/2001/04/xmldsig-more#rsa-sha256
+  Signature nsmap: {'(default)': 'http://www.w3.org/2000/09/xmldsig#'}
+
+ETAPA EM QUE A ASSINATURA QUEBRA: (nenhuma — válida em todas)

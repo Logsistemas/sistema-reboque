@@ -1,0 +1,32 @@
+==================================
+DIAGNÓSTICO NFS-E
+==================================
+
+infDPS.Id:
+DPS330455723149489900017000001000000000000001
+Reference.URI:
+#DPS330455723149489900017000001000000000000001
+DigestMethod:
+http://www.w3.org/2000/09/xmldsig#sha1
+SignatureMethod:
+http://www.w3.org/2000/09/xmldsig#rsa-sha1
+
+Digest XML:
+VF1+uaO1aE8ltrfZyRbReyDvzEk=
+
+Digest Recalculado:
+VF1+uaO1aE8ltrfZyRbReyDvzEk=
+
+MATCH:
+True
+
+==================================
+
+Assinatura válida localmente:
+False
+Erro XMLVerifier: Expected to find XML element DigestMethod in {http://www.w3.org/2000/09/xmldsig#}Reference
+
+Nota: DigestValue confere com o XML final, mas a verificação RSA do SignedInfo falhou (possível alteração do bloco Signature na serialização).
+
+CENÁRIO: C) Assinatura inválida localmente
+

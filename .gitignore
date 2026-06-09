@@ -1,3 +1,5 @@
 .env
 __pycache__/
 *.pyc
+nfse_nacional/schemas/v1.01/.validation_cache/
+debug/nfse_assinatura.log

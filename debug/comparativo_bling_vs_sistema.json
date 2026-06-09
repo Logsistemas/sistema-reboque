@@ -1,0 +1,786 @@
+{
+  "gerado_em": "2026-06-09T15:50:37-03:00",
+  "bling_arquivo": "C:\\Users\\Ezequiel.Sousa\\Dropbox\\PC\\Downloads\\33045572231494899000170000000000058926069771313560.xml",
+  "sistema_arquivo": "C:\\Users\\Ezequiel.Sousa\\Dropbox\\PC\\Desktop\\SISTEMAS\\APP ESSÊNCIA DA RUA\\sistema-reboque-v39-dev\\debug\\nfse_payload_descompactado.xml",
+  "bling": {
+    "rotulo": "bling",
+    "arquivo": "C:\\Users\\Ezequiel.Sousa\\Dropbox\\PC\\Downloads\\33045572231494899000170000000000058926069771313560.xml",
+    "bytes": 10349,
+    "root_tag": "NFSe",
+    "tipo_documento": "NFSe_autorizada",
+    "versao_raiz": "1.01",
+    "ambiente": {
+      "tpAmb": "1",
+      "label": "producao",
+      "endpoint_esperado": "https://sefin.nfse.gov.br/SefinNacional/nfse",
+      "ambGer_nfse": "2",
+      "tpEmis_nfse": "1"
+    },
+    "chave_arquivo_nome": "33045572231494899000170000000000058926069771313560",
+    "inf_nfse": {
+      "presente": true,
+      "nNFSe": "589",
+      "verAplic": "SefinNacional_1.6.0",
+      "ambGer": "2",
+      "dhProc": "2026-06-05T08:17:15-03:00"
+    },
+    "id_dps": {
+      "valor": "DPS330455723149489900017000001000000000008009",
+      "tamanho": 45,
+      "valido_formato": true,
+      "prefixo": "DPS",
+      "cMun": "3304557",
+      "tpInsc": "2",
+      "inscFederal": "31494899000170",
+      "serie": "00001",
+      "nDPS_id": "000000000008009",
+      "id_recomposto": "DPS330455723149489900017000001000000000008009",
+      "bate_com_gerar_id_dps": true,
+      "infDPS_Id_attr": "DPS330455723149489900017000001000000000008009",
+      "nDPS_elemento": "8009",
+      "serie_elemento": "1",
+      "cLocEmi": "3304557",
+      "bate_id_com_elementos": true
+    },
+    "numeracao": {
+      "serie": "1",
+      "nDPS": "8009",
+      "dCompet": "2026-06-05",
+      "dhEmi": "2026-06-05T08:17:14-03:00",
+      "verAplic": "Bling 1.00",
+      "tpEmit": "1",
+      "cLocEmi": "3304557"
+    },
+    "prestador": {
+      "CNPJ": "31494899000170",
+      "CPF": "",
+      "IM": "",
+      "fone": "21964395890",
+      "email": "ezequiel.souza@ezlogistica.com.br",
+      "opSimpNac": "1",
+      "regApTribSN": "",
+      "regEspTrib": "0",
+      "tags_presentes": [
+        "CNPJ",
+        "fone",
+        "email",
+        "regTrib"
+      ]
+    },
+    "tomador": {
+      "CNPJ": "61550141000172",
+      "CPF": "",
+      "xNome": "YELUM SEGUROS S.A",
+      "fone": "",
+      "email": "",
+      "xLgr": "",
+      "nro": "",
+      "xBairro": "",
+      "cMun": "3550308",
+      "CEP": "04571020",
+      "UF": "",
+      "tags_presentes": [
+        "CNPJ",
+        "xNome",
+        "end"
+      ]
+    },
+    "servico": {
+      "cLocPrestacao": "3304557",
+      "cTribNac": "141401",
+      "cTribMun": "",
+      "xDescServ": "REFERENTE AOS SERVIÇOS PRESTADOS DE REBOQUE.    DADOS BANCÁRIOS:  ITAÚ  AG: 5813   C/C: 05342-7",
+      "cNBS": "106044000",
+      "cIntContrib": ""
+    },
+    "valores": {
+      "vServ": "35160.87",
+      "tribISSQN": "4",
+      "tpRetISSQN": "1",
+      "pAliq": "",
+      "vTotTrib": "",
+      "indTotTrib": "",
+      "pTotTribSN": "",
+      "totTrib_tags": [
+        "vTotTrib"
+      ],
+      "trib_tags": [
+        "tribMun",
+        "totTrib"
+      ]
+    },
+    "ibscbs": {
+      "presente": true,
+      "finNFSe": "0",
+      "indFinal": "1",
+      "cIndOp": "050104",
+      "indDest": "0",
+      "CST": [
+        "000"
+      ],
+      "cClassTrib": [
+        "000001"
+      ],
+      "campos": {
+        "IBSCBS/finNFSe": "0",
+        "IBSCBS/indFinal": "1",
+        "IBSCBS/cIndOp": "050104",
+        "IBSCBS/indDest": "0",
+        "IBSCBS/valores/trib/gIBSCBS/CST": "000",
+        "IBSCBS/valores/trib/gIBSCBS/cClassTrib": "000001"
+      }
+    },
+    "assinatura_dps": {
+      "presente": true,
+      "parent_element": "DPS",
+      "posicao": "filho_direto_DPS",
+      "namespace": "http://www.w3.org/2000/09/xmldsig#",
+      "prefixos": [],
+      "CanonicalizationMethod": "http://www.w3.org/TR/2001/REC-xml-c14n-20010315",
+      "SignatureMethod": "http://www.w3.org/2000/09/xmldsig#rsa-sha1",
+      "DigestMethod": "http://www.w3.org/2000/09/xmldsig#sha1",
+      "Reference_URI": "#DPS330455723149489900017000001000000000008009",
+      "Transforms": [
+        "http://www.w3.org/2000/09/xmldsig#enveloped-signature",
+        "http://www.w3.org/TR/2001/REC-xml-c14n-20010315"
+      ],
+      "DigestValue_len": 28,
+      "SignatureValue_len": 344,
+      "X509Certificate_count": 1,
+      "X509Certificate_chars": [
+        2700
+      ],
+      "KeyInfo_presente": true
+    },
+    "assinatura_nfse": {
+      "presente": true,
+      "parent_element": "DPS",
+      "posicao": "filho_direto_DPS",
+      "namespace": "http://www.w3.org/2000/09/xmldsig#",
+      "prefixos": [],
+      "CanonicalizationMethod": "http://www.w3.org/TR/2001/REC-xml-c14n-20010315",
+      "SignatureMethod": "http://www.w3.org/2000/09/xmldsig#rsa-sha1",
+      "DigestMethod": "http://www.w3.org/2000/09/xmldsig#sha1",
+      "Reference_URI": "#DPS330455723149489900017000001000000000008009",
+      "Transforms": [
+        "http://www.w3.org/2000/09/xmldsig#enveloped-signature",
+        "http://www.w3.org/TR/2001/REC-xml-c14n-20010315"
+      ],
+      "DigestValue_len": 28,
+      "SignatureValue_len": 344,
+      "X509Certificate_count": 1,
+      "X509Certificate_chars": [
+        2700
+      ],
+      "KeyInfo_presente": true
+    },
+    "elementos_infDPS": [
+      "tpAmb",
+      "dhEmi",
+      "verAplic",
+      "serie",
+      "nDPS",
+      "dCompet",
+      "tpEmit",
+      "cLocEmi",
+      "prest",
+      "toma",
+      "serv",
+      "valores",
+      "IBSCBS"
+    ],
+    "flat_infDPS": {
+      "infDPS/tpAmb": "1",
+      "infDPS/dhEmi": "2026-06-05T08:17:14-03:00",
+      "infDPS/verAplic": "Bling 1.00",
+      "infDPS/serie": "1",
+      "infDPS/nDPS": "8009",
+      "infDPS/dCompet": "2026-06-05",
+      "infDPS/tpEmit": "1",
+      "infDPS/cLocEmi": "3304557",
+      "infDPS/prest/CNPJ": "31494899000170",
+      "infDPS/prest/fone": "21964395890",
+      "infDPS/prest/email": "ezequiel.souza@ezlogistica.com.br",
+      "infDPS/prest/regTrib/opSimpNac": "1",
+      "infDPS/prest/regTrib/regEspTrib": "0",
+      "infDPS/toma/CNPJ": "61550141000172",
+      "infDPS/toma/xNome": "YELUM SEGUROS S.A",
+      "infDPS/toma/end/endNac/cMun": "3550308",
+      "infDPS/toma/end/endNac/CEP": "04571020",
+      "infDPS/toma/end/xLgr": "RUA DOUTOR GERALDO CAMPOS MOREIRA",
+      "infDPS/toma/end/nro": "110",
+      "infDPS/toma/end/xBairro": "CIDADE MONCOES",
+      "infDPS/serv/locPrest/cLocPrestacao": "3304557",
+      "infDPS/serv/cServ/cTribNac": "141401",
+      "infDPS/serv/cServ/xDescServ": "REFERENTE AOS SERVIÇOS PRESTADOS DE REBOQUE.    DADOS BANCÁRIOS:  ITAÚ  AG: 5813   C/C: 05342-7",
+      "infDPS/serv/cServ/cNBS": "106044000",
+      "infDPS/valores/vServPrest/vServ": "35160.87",
+      "infDPS/valores/trib/tribMun/tribISSQN": "4",
+      "infDPS/valores/trib/tribMun/tpRetISSQN": "1",
+      "infDPS/valores/trib/totTrib/vTotTrib/vTotTribFed": "0.00",
+      "infDPS/valores/trib/totTrib/vTotTrib/vTotTribEst": "0.00",
+      "infDPS/valores/trib/totTrib/vTotTrib/vTotTribMun": "0.00",
+      "infDPS/IBSCBS/finNFSe": "0",
+      "infDPS/IBSCBS/indFinal": "1",
+      "infDPS/IBSCBS/cIndOp": "050104",
+      "infDPS/IBSCBS/indDest": "0",
+      "infDPS/IBSCBS/valores/trib/gIBSCBS/CST": "000",
+      "infDPS/IBSCBS/valores/trib/gIBSCBS/cClassTrib": "000001"
+    }
+  },
+  "sistema": {
+    "rotulo": "sistema",
+    "arquivo": "C:\\Users\\Ezequiel.Sousa\\Dropbox\\PC\\Desktop\\SISTEMAS\\APP ESSÊNCIA DA RUA\\sistema-reboque-v39-dev\\debug\\nfse_payload_descompactado.xml",
+    "bytes": 4772,
+    "root_tag": "DPS",
+    "tipo_documento": "DPS_envio",
+    "versao_raiz": "1.00",
+    "ambiente": {
+      "tpAmb": "2",
+      "label": "homologacao",
+      "endpoint_esperado": "https://sefin.producaorestrita.nfse.gov.br/SefinNacional/nfse",
+      "ambGer_nfse": "",
+      "tpEmis_nfse": ""
+    },
+    "chave_arquivo_nome": "",
+    "inf_nfse": {
+      "presente": false,
+      "nNFSe": "",
+      "verAplic": "",
+      "ambGer": "",
+      "dhProc": ""
+    },
+    "id_dps": {
+      "valor": "DPS330455723149489900017000001064509929799255",
+      "tamanho": 45,
+      "valido_formato": true,
+      "prefixo": "DPS",
+      "cMun": "3304557",
+      "tpInsc": "2",
+      "inscFederal": "31494899000170",
+      "serie": "00001",
+      "nDPS_id": "064509929799255",
+      "id_recomposto": "DPS330455723149489900017000001064509929799255",
+      "bate_com_gerar_id_dps": true,
+      "infDPS_Id_attr": "DPS330455723149489900017000001064509929799255",
+      "nDPS_elemento": "64509929799255",
+      "serie_elemento": "00001",
+      "cLocEmi": "3304557",
+      "bate_id_com_elementos": true
+    },
+    "numeracao": {
+      "serie": "00001",
+      "nDPS": "64509929799255",
+      "dCompet": "2026-06-09",
+      "dhEmi": "2026-06-09T15:23:26-03:00",
+      "verAplic": "1.00",
+      "tpEmit": "1",
+      "cLocEmi": "3304557"
+    },
+    "prestador": {
+      "CNPJ": "31494899000170",
+      "CPF": "",
+      "IM": "11321232",
+      "fone": "",
+      "email": "",
+      "opSimpNac": "1",
+      "regApTribSN": "",
+      "regEspTrib": "0",
+      "tags_presentes": [
+        "CNPJ",
+        "IM",
+        "regTrib"
+      ]
+    },
+    "tomador": {
+      "CNPJ": "52910023000137",
+      "CPF": "",
+      "xNome": "AWP SERVICE BRASIL LTDA",
+      "fone": "",
+      "email": "",
+      "xLgr": "",
+      "nro": "",
+      "xBairro": "",
+      "cMun": "",
+      "CEP": "",
+      "UF": "",
+      "tags_presentes": [
+        "CNPJ",
+        "xNome"
+      ]
+    },
+    "servico": {
+      "cLocPrestacao": "3304557",
+      "cTribNac": "141401",
+      "cTribMun": "",
+      "xDescServ": "TESTE",
+      "cNBS": "106044000",
+      "cIntContrib": ""
+    },
+    "valores": {
+      "vServ": "1.00",
+      "tribISSQN": "1",
+      "tpRetISSQN": "1",
+      "pAliq": "5.00",
+      "vTotTrib": "",
+      "indTotTrib": "0",
+      "pTotTribSN": "",
+      "totTrib_tags": [
+        "indTotTrib"
+      ],
+      "trib_tags": [
+        "tribMun",
+        "totTrib"
+      ]
+    },
+    "ibscbs": {
+      "presente": false
+    },
+    "assinatura_dps": {
+      "presente": true,
+      "parent_element": "DPS",
+      "posicao": "filho_direto_DPS",
+      "namespace": "http://www.w3.org/2000/09/xmldsig#",
+      "prefixos": [],
+      "CanonicalizationMethod": "http://www.w3.org/TR/2001/REC-xml-c14n-20010315",
+      "SignatureMethod": "http://www.w3.org/2000/09/xmldsig#rsa-sha1",
+      "DigestMethod": "http://www.w3.org/2000/09/xmldsig#sha1",
+      "Reference_URI": "#DPS330455723149489900017000001064509929799255",
+      "Transforms": [
+        "http://www.w3.org/2000/09/xmldsig#enveloped-signature",
+        "http://www.w3.org/TR/2001/REC-xml-c14n-20010315"
+      ],
+      "DigestValue_len": 28,
+      "SignatureValue_len": 344,
+      "X509Certificate_count": 1,
+      "X509Certificate_chars": [
+        2700
+      ],
+      "KeyInfo_presente": true
+    },
+    "assinatura_nfse": {
+      "presente": false
+    },
+    "elementos_infDPS": [
+      "tpAmb",
+      "dhEmi",
+      "verAplic",
+      "serie",
+      "nDPS",
+      "dCompet",
+      "tpEmit",
+      "cLocEmi",
+      "prest",
+      "toma",
+      "serv",
+      "valores"
+    ],
+    "flat_infDPS": {
+      "infDPS/tpAmb": "2",
+      "infDPS/dhEmi": "2026-06-09T15:23:26-03:00",
+      "infDPS/verAplic": "1.00",
+      "infDPS/serie": "00001",
+      "infDPS/nDPS": "64509929799255",
+      "infDPS/dCompet": "2026-06-09",
+      "infDPS/tpEmit": "1",
+      "infDPS/cLocEmi": "3304557",
+      "infDPS/prest/CNPJ": "31494899000170",
+      "infDPS/prest/IM": "11321232",
+      "infDPS/prest/regTrib/opSimpNac": "1",
+      "infDPS/prest/regTrib/regEspTrib": "0",
+      "infDPS/toma/CNPJ": "52910023000137",
+      "infDPS/toma/xNome": "AWP SERVICE BRASIL LTDA",
+      "infDPS/serv/locPrest/cLocPrestacao": "3304557",
+      "infDPS/serv/cServ/cTribNac": "141401",
+      "infDPS/serv/cServ/xDescServ": "TESTE",
+      "infDPS/serv/cServ/cNBS": "106044000",
+      "infDPS/valores/vServPrest/vServ": "1.00",
+      "infDPS/valores/trib/tribMun/tribISSQN": "1",
+      "infDPS/valores/trib/tribMun/tpRetISSQN": "1",
+      "infDPS/valores/trib/tribMun/pAliq": "5.00",
+      "infDPS/valores/trib/totTrib/indTotTrib": "0"
+    }
+  },
+  "diferencas": [
+    {
+      "secao": "ambiente",
+      "campo": "tpAmb",
+      "bling": "1",
+      "sistema": "2",
+      "igual": false,
+      "score_e0714": 90
+    },
+    {
+      "secao": "assinatura_dps",
+      "campo": "Reference_URI",
+      "bling": "#DPS330455723149489900017000001000000000008009",
+      "sistema": "#DPS330455723149489900017000001064509929799255",
+      "igual": false,
+      "score_e0714": 90
+    },
+    {
+      "secao": "meta",
+      "campo": "tipo_documento",
+      "bling": "NFSe_autorizada",
+      "sistema": "DPS_envio",
+      "igual": false,
+      "nota": "Bling pode exportar NFSe autorizada; sistema envia DPS",
+      "score_e0714": 90
+    },
+    {
+      "secao": "id_dps",
+      "campo": "nDPS_id",
+      "bling": "000000000008009",
+      "sistema": "064509929799255",
+      "igual": false,
+      "score_e0714": 55
+    },
+    {
+      "secao": "numeracao",
+      "campo": "serie",
+      "bling": "1",
+      "sistema": "00001",
+      "igual": false,
+      "score_e0714": 55
+    },
+    {
+      "secao": "numeracao",
+      "campo": "nDPS",
+      "bling": "8009",
+      "sistema": "64509929799255",
+      "igual": false,
+      "score_e0714": 55
+    },
+    {
+      "secao": "numeracao",
+      "campo": "verAplic",
+      "bling": "Bling 1.00",
+      "sistema": "1.00",
+      "igual": false,
+      "score_e0714": 55
+    },
+    {
+      "secao": "prestador",
+      "campo": "IM",
+      "bling": "",
+      "sistema": "11321232",
+      "igual": false,
+      "score_e0714": 55
+    },
+    {
+      "secao": "prestador",
+      "campo": "fone",
+      "bling": "21964395890",
+      "sistema": "",
+      "igual": false,
+      "score_e0714": 55
+    },
+    {
+      "secao": "prestador",
+      "campo": "email",
+      "bling": "ezequiel.souza@ezlogistica.com.br",
+      "sistema": "",
+      "igual": false,
+      "score_e0714": 55
+    },
+    {
+      "secao": "valores",
+      "campo": "indTotTrib",
+      "bling": "",
+      "sistema": "0",
+      "igual": false,
+      "score_e0714": 55
+    },
+    {
+      "secao": "ibscbs",
+      "campo": "presente",
+      "bling": true,
+      "sistema": false,
+      "igual": false,
+      "score_e0714": 55
+    },
+    {
+      "secao": "ambiente",
+      "campo": "label",
+      "bling": "producao",
+      "sistema": "homologacao",
+      "igual": false,
+      "score_e0714": 40
+    },
+    {
+      "secao": "ambiente",
+      "campo": "endpoint_esperado",
+      "bling": "https://sefin.nfse.gov.br/SefinNacional/nfse",
+      "sistema": "https://sefin.producaorestrita.nfse.gov.br/SefinNacional/nfse",
+      "igual": false,
+      "score_e0714": 40
+    },
+    {
+      "secao": "ambiente",
+      "campo": "ambGer_nfse",
+      "bling": "2",
+      "sistema": "",
+      "igual": false,
+      "score_e0714": 40
+    },
+    {
+      "secao": "id_dps",
+      "campo": "valor",
+      "bling": "DPS330455723149489900017000001000000000008009",
+      "sistema": "DPS330455723149489900017000001064509929799255",
+      "igual": false,
+      "score_e0714": 40
+    },
+    {
+      "secao": "id_dps",
+      "campo": "nDPS_elemento",
+      "bling": "8009",
+      "sistema": "64509929799255",
+      "igual": false,
+      "score_e0714": 40
+    },
+    {
+      "secao": "id_dps",
+      "campo": "serie_elemento",
+      "bling": "1",
+      "sistema": "00001",
+      "igual": false,
+      "score_e0714": 40
+    },
+    {
+      "secao": "tomador",
+      "campo": "CNPJ",
+      "bling": "61550141000172",
+      "sistema": "52910023000137",
+      "igual": false,
+      "score_e0714": 40
+    },
+    {
+      "secao": "tomador",
+      "campo": "xNome",
+      "bling": "YELUM SEGUROS S.A",
+      "sistema": "AWP SERVICE BRASIL LTDA",
+      "igual": false,
+      "score_e0714": 40
+    },
+    {
+      "secao": "tomador",
+      "campo": "cMun",
+      "bling": "3550308",
+      "sistema": "",
+      "igual": false,
+      "score_e0714": 40
+    },
+    {
+      "secao": "tomador",
+      "campo": "CEP",
+      "bling": "04571020",
+      "sistema": "",
+      "igual": false,
+      "score_e0714": 40
+    },
+    {
+      "secao": "valores",
+      "campo": "tribISSQN",
+      "bling": "4",
+      "sistema": "1",
+      "igual": false,
+      "score_e0714": 40
+    },
+    {
+      "secao": "valores",
+      "campo": "pAliq",
+      "bling": "",
+      "sistema": "5.00",
+      "igual": false,
+      "score_e0714": 40
+    },
+    {
+      "secao": "ibscbs",
+      "campo": "finNFSe",
+      "bling": "0",
+      "sistema": "",
+      "igual": false,
+      "score_e0714": 40
+    },
+    {
+      "secao": "ibscbs",
+      "campo": "indFinal",
+      "bling": "1",
+      "sistema": "",
+      "igual": false,
+      "score_e0714": 40
+    },
+    {
+      "secao": "ibscbs",
+      "campo": "cIndOp",
+      "bling": "050104",
+      "sistema": "",
+      "igual": false,
+      "score_e0714": 40
+    },
+    {
+      "secao": "ibscbs",
+      "campo": "indDest",
+      "bling": "0",
+      "sistema": "",
+      "igual": false,
+      "score_e0714": 40
+    },
+    {
+      "secao": "tags",
+      "campo": "prestador",
+      "bling": [
+        "email",
+        "fone"
+      ],
+      "sistema": [
+        "IM"
+      ],
+      "igual": false,
+      "score_e0714": 35
+    },
+    {
+      "secao": "tags",
+      "campo": "tomador",
+      "bling": [
+        "end"
+      ],
+      "sistema": [],
+      "igual": false,
+      "score_e0714": 35
+    },
+    {
+      "secao": "tags",
+      "campo": "totTrib",
+      "bling": [
+        "vTotTrib"
+      ],
+      "sistema": [
+        "indTotTrib"
+      ],
+      "igual": false,
+      "score_e0714": 35
+    },
+    {
+      "secao": "numeracao",
+      "campo": "dCompet",
+      "bling": "2026-06-05",
+      "sistema": "2026-06-09",
+      "igual": false,
+      "score_e0714": 20
+    },
+    {
+      "secao": "numeracao",
+      "campo": "dhEmi",
+      "bling": "2026-06-05T08:17:14-03:00",
+      "sistema": "2026-06-09T15:23:26-03:00",
+      "igual": false,
+      "score_e0714": 20
+    },
+    {
+      "secao": "servico",
+      "campo": "xDescServ",
+      "bling": "REFERENTE AOS SERVIÇOS PRESTADOS DE REBOQUE.    DADOS BANCÁRIOS:  ITAÚ  AG: 5813   C/C: 05342-7",
+      "sistema": "TESTE",
+      "igual": false,
+      "score_e0714": 20
+    },
+    {
+      "secao": "valores",
+      "campo": "vServ",
+      "bling": "35160.87",
+      "sistema": "1.00",
+      "igual": false,
+      "score_e0714": 20
+    }
+  ],
+  "total_diferencas": 35,
+  "top5_diferencas": [
+    {
+      "secao": "ambiente",
+      "campo": "tpAmb",
+      "bling": "1",
+      "sistema": "2",
+      "igual": false,
+      "score_e0714": 90
+    },
+    {
+      "secao": "assinatura_dps",
+      "campo": "Reference_URI",
+      "bling": "#DPS330455723149489900017000001000000000008009",
+      "sistema": "#DPS330455723149489900017000001064509929799255",
+      "igual": false,
+      "score_e0714": 90
+    },
+    {
+      "secao": "meta",
+      "campo": "tipo_documento",
+      "bling": "NFSe_autorizada",
+      "sistema": "DPS_envio",
+      "igual": false,
+      "nota": "Bling pode exportar NFSe autorizada; sistema envia DPS",
+      "score_e0714": 90
+    },
+    {
+      "secao": "id_dps",
+      "campo": "nDPS_id",
+      "bling": "000000000008009",
+      "sistema": "064509929799255",
+      "igual": false,
+      "score_e0714": 55
+    },
+    {
+      "secao": "numeracao",
+      "campo": "serie",
+      "bling": "1",
+      "sistema": "00001",
+      "igual": false,
+      "score_e0714": 55
+    }
+  ],
+  "mais_provavel_e0714": {
+    "secao": "ambiente",
+    "campo": "tpAmb",
+    "bling": "1",
+    "sistema": "2",
+    "igual": false,
+    "score_e0714": 90
+  },
+  "recomendacao": "Bling exporta NFSe autorizada (pós-processamento SEFIN); o sistema envia DPS. Compare principalmente o bloco infDPS embutido no XML Bling com o DPS do sistema. Prioridade: confirmar tpAmb/endpoint — emissão deve usar o mesmo ambiente em que o Bling foi autorizado.",
+  "tags_prestador": {
+    "secao": "prestador",
+    "so_bling": [
+      "email",
+      "fone"
+    ],
+    "so_sistema": [
+      "IM"
+    ],
+    "comuns": [
+      "CNPJ",
+      "regTrib"
+    ]
+  },
+  "tags_tomador": {
+    "secao": "tomador",
+    "so_bling": [
+      "end"
+    ],
+    "so_sistema": [],
+    "comuns": [
+      "CNPJ",
+      "xNome"
+    ]
+  },
+  "tags_totTrib": {
+    "secao": "totTrib",
+    "so_bling": [
+      "vTotTrib"
+    ],
+    "so_sistema": [
+      "indTotTrib"
+    ],
+    "comuns": []
+  }
+}

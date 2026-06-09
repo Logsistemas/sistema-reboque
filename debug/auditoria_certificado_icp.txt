@@ -1,0 +1,46 @@
+==================================
+AUDITORIA CERTIFICADO ICP-BRASIL — NFS-e Nacional
+Gerado em: 2026-06-09T13:39:24-03:00
+==================================
+
+=== ARQUIVO PFX ===
+caminho: C:\Users\Ezequiel.Sousa\Dropbox\PC\Desktop\SISTEMAS\APP ESSÊNCIA DA RUA\sistema-reboque-v39-dev\static\uploads\financeiro\config_fiscal\certificados\cert_29d0738a858c4f5a8707eca13f1d9ed0.pfx
+tamanho_bytes: 3756
+
+=== CERTIFICADO PRINCIPAL (leaf) ===
+subject: CN=EZ LOGISTICA LTDA:31494899000170,OU=videoconferencia,OU=34345592000103,OU=RFB e-CNPJ A1,OU=Secretaria da Receita Federal do Brasil - RFB,L=RIO DE JANEIRO,ST=RJ,O=ICP-Brasil,C=BR
+issuer:  CN=AC SAFEWEB RFB v5,OU=Secretaria da Receita Federal do Brasil - RFB,O=ICP-Brasil,C=BR
+serial:  8474998685299976591
+validade_inicio: 2025-08-12T16:06:53-03:00
+validade_fim:    2026-08-12T16:06:53-03:00
+expirado: False
+CNPJ: 31494899000170
+key_usage: digitalSignature, nonRepudiation, keyEncipherment
+extended_key_usage: clientAuth, emailProtection
+sha256_fingerprint: 296eda155cab1a211063d3ec3d9dea9d92720affde2d538af11f3453d4ab5808
+
+=== CADEIA NO PFX ===
+chain_len: 0
+intermediarios: (nenhum — PFX contém apenas certificado final)
+
+=== XML ASSINADO (X509Data) ===
+arquivo_analisado: C:\Users\Ezequiel.Sousa\Dropbox\PC\Desktop\SISTEMAS\APP ESSÊNCIA DA RUA\sistema-reboque-v39-dev\debug\nfse_payload_descompactado.xml
+X509Certificate_count: 1
+  cert[1] subject: CN=EZ LOGISTICA LTDA:31494899000170,OU=videoconferencia,OU=34345592000103,OU=RFB e-CNPJ A1,OU=Secretaria da Receita Federal do Brasil - RFB,L=RIO DE JANEIRO,ST=RJ,O=ICP-Brasil,C=BR
+  cert[1] issuer:  CN=AC SAFEWEB RFB v5,OU=Secretaria da Receita Federal do Brasil - RFB,O=ICP-Brasil,C=BR
+  cert[1] serial:  8474998685299976591
+
+=== COMPARACAO PFX x XML ===
+serial_pfx:  8474998685299976591
+serial_xml:  8474998685299976591
+serial_coincide: True
+
+=== RECOMENDAÇÕES ===
+- Possível causa do E0714: XML assinado contém apenas certificado final sem cadeia intermediária.
+- O PFX não inclui certificados intermediários (chain_len=0). Verifique se o arquivo exportado inclui a cadeia completa ICP-Brasil (AC SAFEWEB RFB v5 ate ICP-Brasil).
+- O XMLDSIG contém exatamente 1 elemento X509Certificate (padrão EndCertOnly exigido pelo manual NFS-e).
+- Com EndCertOnly, a SEFIN deve montar a cadeia a partir dos repositórios ICP-Brasil do servidor. Se o validador SEFIN não tiver os intermediários, a assinatura pode falhar com E0714.
+
+=== RESULTADO ===
+PFX com cadeia intermediária: Não
+XML EndCertOnly (1 X509Certificate): Sim

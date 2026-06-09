@@ -1,0 +1,655 @@
+{
+  "gerado_em": "2026-06-09T15:55:48-03:00",
+  "bling_arquivo": "C:\\Users\\Ezequiel.Sousa\\Dropbox\\PC\\Downloads\\33045572231494899000170000000000058926069771313560.xml",
+  "sistema_arquivo": "C:\\Users\\Ezequiel.Sousa\\Dropbox\\PC\\Desktop\\SISTEMAS\\APP ESSÊNCIA DA RUA\\sistema-reboque-v39-dev\\debug\\nfse_payload_descompactado.xml",
+  "bling": {
+    "rotulo": "bling",
+    "arquivo": "C:\\Users\\Ezequiel.Sousa\\Dropbox\\PC\\Downloads\\33045572231494899000170000000000058926069771313560.xml",
+    "root_tag": "NFSe",
+    "campos": {
+      "tpAmb": "1",
+      "nDPS": "8009",
+      "serie": "1",
+      "tribISSQN": "4",
+      "IBSCBS": "presente",
+      "totTrib": "vTotTrib",
+      "totTrib_detalhe": {
+        "vTotTribFed": "0.00",
+        "vTotTribEst": "0.00",
+        "vTotTribMun": "0.00"
+      },
+      "cTribNac": "141401",
+      "cTribMun": null,
+      "regTrib": {
+        "opSimpNac": "1",
+        "regApTribSN": null,
+        "regEspTrib": "0"
+      },
+      "opSimpNac": "1",
+      "indFinal": "1",
+      "finNFSe": "0",
+      "CST": "000",
+      "cClassTrib": "000001",
+      "cIndOp": "050104"
+    },
+    "meta": {
+      "infDPS_Id": "DPS330455723149489900017000001000000000008009",
+      "nDPS_no_Id_15": "000000000008009",
+      "nDPS_pad_no_Id": "8009",
+      "nDPS_sequencial_bling_like": true,
+      "nDPS_hash_like": false
+    }
+  },
+  "sistema": {
+    "rotulo": "sistema",
+    "arquivo": "C:\\Users\\Ezequiel.Sousa\\Dropbox\\PC\\Desktop\\SISTEMAS\\APP ESSÊNCIA DA RUA\\sistema-reboque-v39-dev\\debug\\nfse_payload_descompactado.xml",
+    "root_tag": "DPS",
+    "campos": {
+      "tpAmb": "2",
+      "nDPS": "64509929799255",
+      "serie": "00001",
+      "tribISSQN": "1",
+      "IBSCBS": null,
+      "totTrib": "indTotTrib",
+      "totTrib_detalhe": "0",
+      "cTribNac": "141401",
+      "cTribMun": null,
+      "regTrib": {
+        "opSimpNac": "1",
+        "regApTribSN": null,
+        "regEspTrib": "0"
+      },
+      "opSimpNac": "1",
+      "indFinal": null,
+      "finNFSe": null,
+      "CST": null,
+      "cClassTrib": null,
+      "cIndOp": null
+    },
+    "meta": {
+      "infDPS_Id": "DPS330455723149489900017000001064509929799255",
+      "nDPS_no_Id_15": "064509929799255",
+      "nDPS_pad_no_Id": "64509929799255",
+      "nDPS_sequencial_bling_like": true,
+      "nDPS_hash_like": true
+    }
+  },
+  "comparacoes": [
+    {
+      "campo": "tpAmb",
+      "bling": "1",
+      "sistema": "2",
+      "status": "diverge",
+      "xsd_nota": "TSTipoAmbiente: 1=produção, 2=homologação — deve coincidir com endpoint",
+      "afeta_validacao_sefin": true,
+      "tipo": "validacao_ambiente",
+      "prob_e0714": 35,
+      "motivo": "tpAmb deve corresponder ao endpoint (1=produção, 2=homologação). Divergência pode causar rejeição, mas código típico não é E0714."
+    },
+    {
+      "campo": "nDPS",
+      "bling": "8009",
+      "sistema": "64509929799255",
+      "status": "diverge",
+      "xsd_nota": "TSNumDPS pattern [1-9][0-9]{0,14} — numérico 1-15 dígitos, sem exigir sequencial",
+      "afeta_validacao_sefin": true,
+      "tipo": "validacao_formato",
+      "prob_e0714": 5,
+      "motivo": "TSNumDPS aceita qualquer número 1-15 dígitos iniciando em 1-9. Hash de 15 dígitos válido no XSD; Id DPS bate com nDPS padded. Improvável rejeição por hash vs sequencial; se houver, código não seria E0714."
+    },
+    {
+      "campo": "serie",
+      "bling": "1",
+      "sistema": "00001",
+      "status": "diverge",
+      "xsd_nota": "",
+      "afeta_validacao_sefin": false,
+      "tipo": "informativo",
+      "prob_e0714": 3,
+      "motivo": "1 e 00001 equivalentes para Id DPS (serie padded 5 pos). Informativo."
+    },
+    {
+      "campo": "tribISSQN",
+      "bling": "4",
+      "sistema": "1",
+      "status": "diverge",
+      "xsd_nota": "TSTribISSQN enum: 1=tributável, 2=imunidade, 3=exportação, 4=não incidência",
+      "afeta_validacao_sefin": true,
+      "tipo": "validacao_fiscal",
+      "prob_e0714": 8,
+      "motivo": "Valores 1 e 4 são válidos no XSD (TSTribISSQN). tribISSQN=1 é aceito em homologação pelo schema. Divergência reflete natureza tributária da nota, não invalidade de 1."
+    },
+    {
+      "campo": "IBSCBS",
+      "bling": "presente",
+      "sistema": null,
+      "status": "so_bling",
+      "xsd_nota": "TCInfDPS/IBSCBS minOccurs=0 — opcional no schema DPS v1.01",
+      "afeta_validacao_sefin": true,
+      "tipo": "validacao_regra_negocio",
+      "prob_e0714": 25,
+      "motivo": "Opcional no XSD v1.01 (minOccurs=0). Sistema passou XSD local sem IBSCBS. Regra de negócio SEFIN pós-2026 pode exigir para alguns contribuintes — rejeição esperada seria código fiscal, não E0714."
+    },
+    {
+      "campo": "totTrib",
+      "bling": "vTotTrib",
+      "sistema": "indTotTrib",
+      "status": "diverge",
+      "xsd_nota": "TCTribTotal choice: vTotTrib | pTotTrib | indTotTrib | pTotTribSN (mutuamente exclusivos)",
+      "afeta_validacao_sefin": true,
+      "tipo": "validacao_fiscal",
+      "prob_e0714": 10,
+      "motivo": "Ambos modos (vTotTrib vs indTotTrib) são válidos no XSD (choice). Diferença de estratégia tributária, não erro de schema."
+    },
+    {
+      "campo": "cTribNac",
+      "bling": "141401",
+      "sistema": "141401",
+      "status": "igual",
+      "xsd_nota": "",
+      "afeta_validacao_sefin": false,
+      "tipo": "informativo",
+      "prob_e0714": 0,
+      "motivo": "Sem diferença fiscal"
+    },
+    {
+      "campo": "cTribMun",
+      "bling": null,
+      "sistema": null,
+      "status": "ambos_ausentes",
+      "xsd_nota": "",
+      "afeta_validacao_sefin": false,
+      "tipo": "informativo",
+      "prob_e0714": 0,
+      "motivo": "Sem diferença fiscal"
+    },
+    {
+      "campo": "regTrib",
+      "bling": {
+        "opSimpNac": "1",
+        "regApTribSN": null,
+        "regEspTrib": "0"
+      },
+      "sistema": {
+        "opSimpNac": "1",
+        "regApTribSN": null,
+        "regEspTrib": "0"
+      },
+      "status": "igual",
+      "xsd_nota": "",
+      "afeta_validacao_sefin": false,
+      "tipo": "informativo",
+      "prob_e0714": 0,
+      "motivo": "Sem diferença fiscal"
+    },
+    {
+      "campo": "opSimpNac",
+      "bling": "1",
+      "sistema": "1",
+      "status": "igual",
+      "xsd_nota": "",
+      "afeta_validacao_sefin": false,
+      "tipo": "informativo",
+      "prob_e0714": 0,
+      "motivo": "Sem diferença fiscal"
+    },
+    {
+      "campo": "indFinal",
+      "bling": "1",
+      "sistema": null,
+      "status": "so_bling",
+      "xsd_nota": "",
+      "afeta_validacao_sefin": true,
+      "tipo": "validacao_regra_negocio",
+      "prob_e0714": 20,
+      "motivo": "Subcampos de IBSCBS ausentes no sistema; só relevantes se IBSCBS for exigido."
+    },
+    {
+      "campo": "finNFSe",
+      "bling": "0",
+      "sistema": null,
+      "status": "so_bling",
+      "xsd_nota": "",
+      "afeta_validacao_sefin": true,
+      "tipo": "validacao_regra_negocio",
+      "prob_e0714": 20,
+      "motivo": "Subcampos de IBSCBS ausentes no sistema; só relevantes se IBSCBS for exigido."
+    },
+    {
+      "campo": "CST",
+      "bling": "000",
+      "sistema": null,
+      "status": "so_bling",
+      "xsd_nota": "",
+      "afeta_validacao_sefin": true,
+      "tipo": "validacao_regra_negocio",
+      "prob_e0714": 20,
+      "motivo": "Subcampos de IBSCBS ausentes no sistema; só relevantes se IBSCBS for exigido."
+    },
+    {
+      "campo": "cClassTrib",
+      "bling": "000001",
+      "sistema": null,
+      "status": "so_bling",
+      "xsd_nota": "",
+      "afeta_validacao_sefin": true,
+      "tipo": "validacao_regra_negocio",
+      "prob_e0714": 20,
+      "motivo": "Subcampos de IBSCBS ausentes no sistema; só relevantes se IBSCBS for exigido."
+    },
+    {
+      "campo": "cIndOp",
+      "bling": "050104",
+      "sistema": null,
+      "status": "so_bling",
+      "xsd_nota": "",
+      "afeta_validacao_sefin": true,
+      "tipo": "validacao_regra_negocio",
+      "prob_e0714": 20,
+      "motivo": "Subcampos de IBSCBS ausentes no sistema; só relevantes se IBSCBS for exigido."
+    }
+  ],
+  "ranking_prob_e0714_fiscal": [
+    {
+      "campo": "tpAmb",
+      "bling": "1",
+      "sistema": "2",
+      "status": "diverge",
+      "xsd_nota": "TSTipoAmbiente: 1=produção, 2=homologação — deve coincidir com endpoint",
+      "afeta_validacao_sefin": true,
+      "tipo": "validacao_ambiente",
+      "prob_e0714": 35,
+      "motivo": "tpAmb deve corresponder ao endpoint (1=produção, 2=homologação). Divergência pode causar rejeição, mas código típico não é E0714."
+    },
+    {
+      "campo": "IBSCBS",
+      "bling": "presente",
+      "sistema": null,
+      "status": "so_bling",
+      "xsd_nota": "TCInfDPS/IBSCBS minOccurs=0 — opcional no schema DPS v1.01",
+      "afeta_validacao_sefin": true,
+      "tipo": "validacao_regra_negocio",
+      "prob_e0714": 25,
+      "motivo": "Opcional no XSD v1.01 (minOccurs=0). Sistema passou XSD local sem IBSCBS. Regra de negócio SEFIN pós-2026 pode exigir para alguns contribuintes — rejeição esperada seria código fiscal, não E0714."
+    },
+    {
+      "campo": "CST",
+      "bling": "000",
+      "sistema": null,
+      "status": "so_bling",
+      "xsd_nota": "",
+      "afeta_validacao_sefin": true,
+      "tipo": "validacao_regra_negocio",
+      "prob_e0714": 20,
+      "motivo": "Subcampos de IBSCBS ausentes no sistema; só relevantes se IBSCBS for exigido."
+    },
+    {
+      "campo": "cClassTrib",
+      "bling": "000001",
+      "sistema": null,
+      "status": "so_bling",
+      "xsd_nota": "",
+      "afeta_validacao_sefin": true,
+      "tipo": "validacao_regra_negocio",
+      "prob_e0714": 20,
+      "motivo": "Subcampos de IBSCBS ausentes no sistema; só relevantes se IBSCBS for exigido."
+    },
+    {
+      "campo": "cIndOp",
+      "bling": "050104",
+      "sistema": null,
+      "status": "so_bling",
+      "xsd_nota": "",
+      "afeta_validacao_sefin": true,
+      "tipo": "validacao_regra_negocio",
+      "prob_e0714": 20,
+      "motivo": "Subcampos de IBSCBS ausentes no sistema; só relevantes se IBSCBS for exigido."
+    },
+    {
+      "campo": "finNFSe",
+      "bling": "0",
+      "sistema": null,
+      "status": "so_bling",
+      "xsd_nota": "",
+      "afeta_validacao_sefin": true,
+      "tipo": "validacao_regra_negocio",
+      "prob_e0714": 20,
+      "motivo": "Subcampos de IBSCBS ausentes no sistema; só relevantes se IBSCBS for exigido."
+    },
+    {
+      "campo": "indFinal",
+      "bling": "1",
+      "sistema": null,
+      "status": "so_bling",
+      "xsd_nota": "",
+      "afeta_validacao_sefin": true,
+      "tipo": "validacao_regra_negocio",
+      "prob_e0714": 20,
+      "motivo": "Subcampos de IBSCBS ausentes no sistema; só relevantes se IBSCBS for exigido."
+    },
+    {
+      "campo": "totTrib",
+      "bling": "vTotTrib",
+      "sistema": "indTotTrib",
+      "status": "diverge",
+      "xsd_nota": "TCTribTotal choice: vTotTrib | pTotTrib | indTotTrib | pTotTribSN (mutuamente exclusivos)",
+      "afeta_validacao_sefin": true,
+      "tipo": "validacao_fiscal",
+      "prob_e0714": 10,
+      "motivo": "Ambos modos (vTotTrib vs indTotTrib) são válidos no XSD (choice). Diferença de estratégia tributária, não erro de schema."
+    },
+    {
+      "campo": "tribISSQN",
+      "bling": "4",
+      "sistema": "1",
+      "status": "diverge",
+      "xsd_nota": "TSTribISSQN enum: 1=tributável, 2=imunidade, 3=exportação, 4=não incidência",
+      "afeta_validacao_sefin": true,
+      "tipo": "validacao_fiscal",
+      "prob_e0714": 8,
+      "motivo": "Valores 1 e 4 são válidos no XSD (TSTribISSQN). tribISSQN=1 é aceito em homologação pelo schema. Divergência reflete natureza tributária da nota, não invalidade de 1."
+    },
+    {
+      "campo": "nDPS",
+      "bling": "8009",
+      "sistema": "64509929799255",
+      "status": "diverge",
+      "xsd_nota": "TSNumDPS pattern [1-9][0-9]{0,14} — numérico 1-15 dígitos, sem exigir sequencial",
+      "afeta_validacao_sefin": true,
+      "tipo": "validacao_formato",
+      "prob_e0714": 5,
+      "motivo": "TSNumDPS aceita qualquer número 1-15 dígitos iniciando em 1-9. Hash de 15 dígitos válido no XSD; Id DPS bate com nDPS padded. Improvável rejeição por hash vs sequencial; se houver, código não seria E0714."
+    },
+    {
+      "campo": "serie",
+      "bling": "1",
+      "sistema": "00001",
+      "status": "diverge",
+      "xsd_nota": "",
+      "afeta_validacao_sefin": false,
+      "tipo": "informativo",
+      "prob_e0714": 3,
+      "motivo": "1 e 00001 equivalentes para Id DPS (serie padded 5 pos). Informativo."
+    }
+  ],
+  "so_bling_ausente_no_sistema": [
+    {
+      "campo": "IBSCBS",
+      "bling": "presente",
+      "sistema": null,
+      "status": "so_bling",
+      "xsd_nota": "TCInfDPS/IBSCBS minOccurs=0 — opcional no schema DPS v1.01",
+      "afeta_validacao_sefin": true,
+      "tipo": "validacao_regra_negocio",
+      "prob_e0714": 25,
+      "motivo": "Opcional no XSD v1.01 (minOccurs=0). Sistema passou XSD local sem IBSCBS. Regra de negócio SEFIN pós-2026 pode exigir para alguns contribuintes — rejeição esperada seria código fiscal, não E0714."
+    },
+    {
+      "campo": "indFinal",
+      "bling": "1",
+      "sistema": null,
+      "status": "so_bling",
+      "xsd_nota": "",
+      "afeta_validacao_sefin": true,
+      "tipo": "validacao_regra_negocio",
+      "prob_e0714": 20,
+      "motivo": "Subcampos de IBSCBS ausentes no sistema; só relevantes se IBSCBS for exigido."
+    },
+    {
+      "campo": "finNFSe",
+      "bling": "0",
+      "sistema": null,
+      "status": "so_bling",
+      "xsd_nota": "",
+      "afeta_validacao_sefin": true,
+      "tipo": "validacao_regra_negocio",
+      "prob_e0714": 20,
+      "motivo": "Subcampos de IBSCBS ausentes no sistema; só relevantes se IBSCBS for exigido."
+    },
+    {
+      "campo": "CST",
+      "bling": "000",
+      "sistema": null,
+      "status": "so_bling",
+      "xsd_nota": "",
+      "afeta_validacao_sefin": true,
+      "tipo": "validacao_regra_negocio",
+      "prob_e0714": 20,
+      "motivo": "Subcampos de IBSCBS ausentes no sistema; só relevantes se IBSCBS for exigido."
+    },
+    {
+      "campo": "cClassTrib",
+      "bling": "000001",
+      "sistema": null,
+      "status": "so_bling",
+      "xsd_nota": "",
+      "afeta_validacao_sefin": true,
+      "tipo": "validacao_regra_negocio",
+      "prob_e0714": 20,
+      "motivo": "Subcampos de IBSCBS ausentes no sistema; só relevantes se IBSCBS for exigido."
+    },
+    {
+      "campo": "cIndOp",
+      "bling": "050104",
+      "sistema": null,
+      "status": "so_bling",
+      "xsd_nota": "",
+      "afeta_validacao_sefin": true,
+      "tipo": "validacao_regra_negocio",
+      "prob_e0714": 20,
+      "motivo": "Subcampos de IBSCBS ausentes no sistema; só relevantes se IBSCBS for exigido."
+    }
+  ],
+  "so_sistema_ausente_no_bling": [],
+  "divergencias": [
+    {
+      "campo": "tpAmb",
+      "bling": "1",
+      "sistema": "2",
+      "status": "diverge",
+      "xsd_nota": "TSTipoAmbiente: 1=produção, 2=homologação — deve coincidir com endpoint",
+      "afeta_validacao_sefin": true,
+      "tipo": "validacao_ambiente",
+      "prob_e0714": 35,
+      "motivo": "tpAmb deve corresponder ao endpoint (1=produção, 2=homologação). Divergência pode causar rejeição, mas código típico não é E0714."
+    },
+    {
+      "campo": "nDPS",
+      "bling": "8009",
+      "sistema": "64509929799255",
+      "status": "diverge",
+      "xsd_nota": "TSNumDPS pattern [1-9][0-9]{0,14} — numérico 1-15 dígitos, sem exigir sequencial",
+      "afeta_validacao_sefin": true,
+      "tipo": "validacao_formato",
+      "prob_e0714": 5,
+      "motivo": "TSNumDPS aceita qualquer número 1-15 dígitos iniciando em 1-9. Hash de 15 dígitos válido no XSD; Id DPS bate com nDPS padded. Improvável rejeição por hash vs sequencial; se houver, código não seria E0714."
+    },
+    {
+      "campo": "serie",
+      "bling": "1",
+      "sistema": "00001",
+      "status": "diverge",
+      "xsd_nota": "",
+      "afeta_validacao_sefin": false,
+      "tipo": "informativo",
+      "prob_e0714": 3,
+      "motivo": "1 e 00001 equivalentes para Id DPS (serie padded 5 pos). Informativo."
+    },
+    {
+      "campo": "tribISSQN",
+      "bling": "4",
+      "sistema": "1",
+      "status": "diverge",
+      "xsd_nota": "TSTribISSQN enum: 1=tributável, 2=imunidade, 3=exportação, 4=não incidência",
+      "afeta_validacao_sefin": true,
+      "tipo": "validacao_fiscal",
+      "prob_e0714": 8,
+      "motivo": "Valores 1 e 4 são válidos no XSD (TSTribISSQN). tribISSQN=1 é aceito em homologação pelo schema. Divergência reflete natureza tributária da nota, não invalidade de 1."
+    },
+    {
+      "campo": "totTrib",
+      "bling": "vTotTrib",
+      "sistema": "indTotTrib",
+      "status": "diverge",
+      "xsd_nota": "TCTribTotal choice: vTotTrib | pTotTrib | indTotTrib | pTotTribSN (mutuamente exclusivos)",
+      "afeta_validacao_sefin": true,
+      "tipo": "validacao_fiscal",
+      "prob_e0714": 10,
+      "motivo": "Ambos modos (vTotTrib vs indTotTrib) são válidos no XSD (choice). Diferença de estratégia tributária, não erro de schema."
+    }
+  ],
+  "afeta_validacao_sefin": [
+    {
+      "campo": "tpAmb",
+      "bling": "1",
+      "sistema": "2",
+      "status": "diverge",
+      "xsd_nota": "TSTipoAmbiente: 1=produção, 2=homologação — deve coincidir com endpoint",
+      "afeta_validacao_sefin": true,
+      "tipo": "validacao_ambiente",
+      "prob_e0714": 35,
+      "motivo": "tpAmb deve corresponder ao endpoint (1=produção, 2=homologação). Divergência pode causar rejeição, mas código típico não é E0714."
+    },
+    {
+      "campo": "nDPS",
+      "bling": "8009",
+      "sistema": "64509929799255",
+      "status": "diverge",
+      "xsd_nota": "TSNumDPS pattern [1-9][0-9]{0,14} — numérico 1-15 dígitos, sem exigir sequencial",
+      "afeta_validacao_sefin": true,
+      "tipo": "validacao_formato",
+      "prob_e0714": 5,
+      "motivo": "TSNumDPS aceita qualquer número 1-15 dígitos iniciando em 1-9. Hash de 15 dígitos válido no XSD; Id DPS bate com nDPS padded. Improvável rejeição por hash vs sequencial; se houver, código não seria E0714."
+    },
+    {
+      "campo": "tribISSQN",
+      "bling": "4",
+      "sistema": "1",
+      "status": "diverge",
+      "xsd_nota": "TSTribISSQN enum: 1=tributável, 2=imunidade, 3=exportação, 4=não incidência",
+      "afeta_validacao_sefin": true,
+      "tipo": "validacao_fiscal",
+      "prob_e0714": 8,
+      "motivo": "Valores 1 e 4 são válidos no XSD (TSTribISSQN). tribISSQN=1 é aceito em homologação pelo schema. Divergência reflete natureza tributária da nota, não invalidade de 1."
+    },
+    {
+      "campo": "IBSCBS",
+      "bling": "presente",
+      "sistema": null,
+      "status": "so_bling",
+      "xsd_nota": "TCInfDPS/IBSCBS minOccurs=0 — opcional no schema DPS v1.01",
+      "afeta_validacao_sefin": true,
+      "tipo": "validacao_regra_negocio",
+      "prob_e0714": 25,
+      "motivo": "Opcional no XSD v1.01 (minOccurs=0). Sistema passou XSD local sem IBSCBS. Regra de negócio SEFIN pós-2026 pode exigir para alguns contribuintes — rejeição esperada seria código fiscal, não E0714."
+    },
+    {
+      "campo": "totTrib",
+      "bling": "vTotTrib",
+      "sistema": "indTotTrib",
+      "status": "diverge",
+      "xsd_nota": "TCTribTotal choice: vTotTrib | pTotTrib | indTotTrib | pTotTribSN (mutuamente exclusivos)",
+      "afeta_validacao_sefin": true,
+      "tipo": "validacao_fiscal",
+      "prob_e0714": 10,
+      "motivo": "Ambos modos (vTotTrib vs indTotTrib) são válidos no XSD (choice). Diferença de estratégia tributária, não erro de schema."
+    },
+    {
+      "campo": "indFinal",
+      "bling": "1",
+      "sistema": null,
+      "status": "so_bling",
+      "xsd_nota": "",
+      "afeta_validacao_sefin": true,
+      "tipo": "validacao_regra_negocio",
+      "prob_e0714": 20,
+      "motivo": "Subcampos de IBSCBS ausentes no sistema; só relevantes se IBSCBS for exigido."
+    },
+    {
+      "campo": "finNFSe",
+      "bling": "0",
+      "sistema": null,
+      "status": "so_bling",
+      "xsd_nota": "",
+      "afeta_validacao_sefin": true,
+      "tipo": "validacao_regra_negocio",
+      "prob_e0714": 20,
+      "motivo": "Subcampos de IBSCBS ausentes no sistema; só relevantes se IBSCBS for exigido."
+    },
+    {
+      "campo": "CST",
+      "bling": "000",
+      "sistema": null,
+      "status": "so_bling",
+      "xsd_nota": "",
+      "afeta_validacao_sefin": true,
+      "tipo": "validacao_regra_negocio",
+      "prob_e0714": 20,
+      "motivo": "Subcampos de IBSCBS ausentes no sistema; só relevantes se IBSCBS for exigido."
+    },
+    {
+      "campo": "cClassTrib",
+      "bling": "000001",
+      "sistema": null,
+      "status": "so_bling",
+      "xsd_nota": "",
+      "afeta_validacao_sefin": true,
+      "tipo": "validacao_regra_negocio",
+      "prob_e0714": 20,
+      "motivo": "Subcampos de IBSCBS ausentes no sistema; só relevantes se IBSCBS for exigido."
+    },
+    {
+      "campo": "cIndOp",
+      "bling": "050104",
+      "sistema": null,
+      "status": "so_bling",
+      "xsd_nota": "",
+      "afeta_validacao_sefin": true,
+      "tipo": "validacao_regra_negocio",
+      "prob_e0714": 20,
+      "motivo": "Subcampos de IBSCBS ausentes no sistema; só relevantes se IBSCBS for exigido."
+    }
+  ],
+  "apenas_informativo": [
+    {
+      "campo": "serie",
+      "bling": "1",
+      "sistema": "00001",
+      "status": "diverge",
+      "xsd_nota": "",
+      "afeta_validacao_sefin": false,
+      "tipo": "informativo",
+      "prob_e0714": 3,
+      "motivo": "1 e 00001 equivalentes para Id DPS (serie padded 5 pos). Informativo."
+    }
+  ],
+  "verificacoes_especificas": {
+    "ibscbs_obrigatorio_homolog_xsd": {
+      "resposta": "NAO",
+      "evidencia": "TCInfDPS/IBSCBS minOccurs=0 — opcional no schema DPS v1.01",
+      "bling_tem": true,
+      "sistema_tem": false,
+      "sistema_xsd_local_passou_sem_ibscbs": true,
+      "conclusao": "Homologação SEFIN, pelo XSD v1.01, NÃO exige IBSCBS obrigatoriamente. Bling inclui por regra de negócio/reforma; ausência no sistema não invalida o schema."
+    },
+    "tribISSQN_1_homologacao": {
+      "resposta": "SIM (aceito pelo XSD)",
+      "valor_sistema": "1",
+      "valor_bling": "4",
+      "evidencia": "TSTribISSQN enum: 1=tributável, 2=imunidade, 3=exportação, 4=não incidência",
+      "conclusao": "tribISSQN=1 (operação tributável) é valor enum válido. Bling usa 4 (não incidência) em nota diferente — não prova que 1 seja rejeitado."
+    },
+    "nDPS_hash_15_digitos": {
+      "resposta": "NAO deve ser rejeitado por formato",
+      "valor_sistema": "64509929799255",
+      "valor_bling": "8009",
+      "pattern_xsd_ok": true,
+      "id_dps_coerente": true,
+      "evidencia": "TSNumDPS pattern [1-9][0-9]{0,14} — numérico 1-15 dígitos, sem exigir sequencial",
+      "conclusao": "nDPS hash 64509929799255 respeita TSNumDPS. Validador XSD não exige sequência; rejeição por hash seria regra de negócio e provavelmente outro código de erro, não E0714."
+    },
+    "e0714_vs_fiscal": {
+      "conclusao": "E0714 = 'erro na assinatura'. Diferenças fiscais listadas, isoladamente, tendem a gerar rejeições de regra/schema (outros códigos), não E0714. Exceção parcial: tpAmb incoerente com certificado/endpoint pode mascarar problemas no processamento server-side."
+    }
+  }
+}

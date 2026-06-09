@@ -1,0 +1,29 @@
+=== LOG ANTES DO POST SEFIN ===
+Gerado em: 2026-06-09T15:23:25-03:00
+
+caminho_certificado_ativo: C:\Users\Ezequiel.Sousa\Dropbox\PC\Desktop\SISTEMAS\APP ESSÊNCIA DA RUA\sistema-reboque-v39-dev\static\uploads\financeiro\config_fiscal\certificados\cert_beeb0a5ceb3846f281cf170bec387a86.pfx
+nome_arquivo_pfx: cert_beeb0a5ceb3846f281cf170bec387a86.pfx
+certificado_esperado: cert_beeb0a5ceb3846f281cf170bec387a86.pfx
+usando_certificado_esperado: True
+certificado_id: acbc4473-9561-4140-80b0-43bb252b6fca
+chain_len_pfx_ativo: 3
+intermediarios_pfx: ['Autoridade Certificadora Raiz Brasileira v5', 'AC Secretaria da Receita Federal do Brasil v4', 'AC SAFEWEB RFB v5']
+AC SAFEWEB RFB v5 no PFX: True
+serial_certificado: 8474998685299976591
+CNPJ_certificado: 31494899000170
+subject: CN=EZ LOGISTICA LTDA:31494899000170,OU=videoconferencia,OU=34345592000103,OU=RFB e-CNPJ A1,OU=Secretaria da Receita Federal do Brasil - RFB,L=RIO DE JANEIRO,ST=RJ,O=ICP-Brasil,C=BR
+validade: 2026-08-12
+
+=== AMBIENTE / CREDENCIAMENTO ===
+ambiente_configurado: homologacao
+ambiente_label: Homologação
+tpAmb_xml: 2
+url_sefin_base: https://sefin.producaorestrita.nfse.gov.br/SefinNacional
+url_sefin_post: https://sefin.producaorestrita.nfse.gov.br/SefinNacional/nfse
+
+razao_social: EZ LOGISTICA EIRELI
+cnpj_empresa: 31494899000170
+inscricao_municipal: 1.132.123-2
+codigo_ibge_municipio: 3304557
+regime_tributario: Regime Normal
+

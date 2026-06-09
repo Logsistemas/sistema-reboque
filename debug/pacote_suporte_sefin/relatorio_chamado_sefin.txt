@@ -1,0 +1,78 @@
+================================================================
+RELATÓRIO CHAMADO SUPORTE — NFS-e NACIONAL / SEFIN (E0714)
+Gerado em: 2026-06-09T15:23:29-03:00
+================================================================
+
+1. CONTEXTO EMPRESA
+   Razão social: EZ LOGISTICA EIRELI
+   CNPJ: 31494899000170
+   Inscrição Municipal: 1.132.123-2
+   Município IBGE: 3304557 (Rio de Janeiro)
+   Regime: Regime Normal
+
+2. CERTIFICADO ATIVO (confirmação)
+   Arquivo: cert_beeb0a5ceb3846f281cf170bec387a86.pfx
+   Caminho: C:\Users\Ezequiel.Sousa\Dropbox\PC\Desktop\SISTEMAS\APP ESSÊNCIA DA RUA\sistema-reboque-v39-dev\static\uploads\financeiro\config_fiscal\certificados\cert_beeb0a5ceb3846f281cf170bec387a86.pfx
+   Usando PFX esperado (cert_beeb0a5ceb3846f281cf170bec387a86.pfx): SIM
+   chain_len: 3
+   Intermediários: Autoridade Certificadora Raiz Brasileira v5, AC Secretaria da Receita Federal do Brasil v4, AC SAFEWEB RFB v5
+   AC SAFEWEB RFB v5 presente: SIM
+   Serial: 8474998685299976591
+   CNPJ certificado: 31494899000170
+
+3. AMBIENTE SEFIN
+   Ambiente configurado: Homologação (homologacao)
+   tpAmb no XML: 2
+   URL base SEFIN: https://sefin.producaorestrita.nfse.gov.br/SefinNacional
+   URL POST emissão: https://sefin.producaorestrita.nfse.gov.br/SefinNacional/nfse
+
+4. LOG ANTES DO POST
+   Ver: debug/log_pre_post_sefin.txt
+
+5. AUDITORIAS LOCAIS
+   XSD layout v1.01: VÁLIDO
+   Assinatura local (XMLVerifier/Digest/RSA): OK nos 3 estágios
+   Payload gzip/base64 íntegro (hashes iguais): True
+   Prefixos namespace proibidos: 0
+   Algoritmos homologação: rsa-sha1 / sha1
+
+6. RESPOSTA SEFIN
+   HTTP: 400
+   Códigos: E0714
+   Mensagem: E0714: Arquivo enviado com erro na assinatura.
+
+7. EMISSÃO TESTE
+   Nota ID: 32f5ebe2-225b-45b4-b83d-fbae07d88cc0
+   POST executado: sim
+
+8. PACOTE DE SUPORTE
+   Pasta: debug/pacote_suporte_sefin/
+   Arquivos:
+     - nfse_post_final.xml
+     - nfse_payload_descompactado.xml
+     - auditoria_envio_sefin_final.txt
+     - auditoria_cadeia_icp.txt
+     - auditoria_xsd_completa.txt
+     - nfse_assinatura.json
+
+================================================================
+CONCLUSÃO
+================================================================
+
+XML válido contra XSD v1.01.
+Assinatura XMLDSIG válida localmente (XMLVerifier, DigestValue, RSA).
+Payload gzip/base64 comprovadamente idêntico ao XML assinado.
+Certificado A1 com cadeia ICP-Brasil completa (chain_len=3).
+Ambiente de homologação (producaorestrita) com URL correta.
+
+Apesar de todas as validações locais passarem, a SEFIN retorna:
+  E0714: E0714: Arquivo enviado com erro na assinatura.
+
+Hipóteses para suporte SEFIN/NFS-e Nacional:
+  - Certificado e-CNPJ não credenciado/habilitado no ambiente de homologação nacional
+  - CNPJ/município (3304557) sem adesão ativa ao emissor nacional
+  - Validador SEFIN com divergência de política de assinatura ou cadeia
+  - Restrição no cadastro do contribuinte na Receita/SEFIN Nacional
+
+Não há evidência de corrupção de bytes, prefixo ds:, ou PFX sem cadeia.
+================================================================

@@ -14,3 +14,18 @@ DANFSE_BASE = {
 }
 
 TP_AMB = {"homologacao": 2, "producao": 1}
+
+# Teste E0714 — homologação (Manual Integrado v1.01: rsa-sha1 / sha1)
+NFSE_SIGNATURE_ALGORITHM = "rsa-sha1"
+NFSE_DIGEST_ALGORITHM = "sha1"
+
+NFSE_SIGNATURE_ALGORITHM_PRODUCAO = "rsa-sha256"
+NFSE_DIGEST_ALGORITHM_PRODUCAO = "sha256"
+
+
+def algoritmos_assinatura_nfse(ambiente=None):
+    """Homologação usa SHA-1 (teste E0714); produção mantém SHA-256."""
+    amb = (ambiente or "homologacao").lower()
+    if amb == "producao":
+        return NFSE_SIGNATURE_ALGORITHM_PRODUCAO, NFSE_DIGEST_ALGORITHM_PRODUCAO
+    return NFSE_SIGNATURE_ALGORITHM, NFSE_DIGEST_ALGORITHM

@@ -1,0 +1,108 @@
+================================================================
+AUDITORIA FISCAL — BLING vs SISTEMA (NFS-e Nacional)
+Gerado em: 2026-06-09T15:55:48-03:00
+Escopo: campos fiscais/tributários apenas (sem XMLDSIG)
+================================================================
+
+Bling:   C:\Users\Ezequiel.Sousa\Dropbox\PC\Downloads\33045572231494899000170000000000058926069771313560.xml
+Sistema: C:\Users\Ezequiel.Sousa\Dropbox\PC\Desktop\SISTEMAS\APP ESSÊNCIA DA RUA\sistema-reboque-v39-dev\debug\nfse_payload_descompactado.xml
+
+=== RESPOSTAS DIRETAS ===
+
+--- ibscbs_obrigatorio_homolog_xsd ---
+  resposta: NAO
+  evidencia: TCInfDPS/IBSCBS minOccurs=0 — opcional no schema DPS v1.01
+  bling_tem: True
+  sistema_tem: False
+  sistema_xsd_local_passou_sem_ibscbs: True
+  conclusao: Homologação SEFIN, pelo XSD v1.01, NÃO exige IBSCBS obrigatoriamente. Bling inclui por regra de negócio/reforma; ausência no sistema não invalida o schema.
+
+--- tribISSQN_1_homologacao ---
+  resposta: SIM (aceito pelo XSD)
+  valor_sistema: 1
+  valor_bling: 4
+  evidencia: TSTribISSQN enum: 1=tributável, 2=imunidade, 3=exportação, 4=não incidência
+  conclusao: tribISSQN=1 (operação tributável) é valor enum válido. Bling usa 4 (não incidência) em nota diferente — não prova que 1 seja rejeitado.
+
+--- nDPS_hash_15_digitos ---
+  resposta: NAO deve ser rejeitado por formato
+  valor_sistema: 64509929799255
+  valor_bling: 8009
+  pattern_xsd_ok: True
+  id_dps_coerente: True
+  evidencia: TSNumDPS pattern [1-9][0-9]{0,14} — numérico 1-15 dígitos, sem exigir sequencial
+  conclusao: nDPS hash 64509929799255 respeita TSNumDPS. Validador XSD não exige sequência; rejeição por hash seria regra de negócio e provavelmente outro código de erro, não E0714.
+
+--- e0714_vs_fiscal ---
+  conclusao: E0714 = 'erro na assinatura'. Diferenças fiscais listadas, isoladamente, tendem a gerar rejeições de regra/schema (outros códigos), não E0714. Exceção parcial: tpAmb incoerente com certificado/endpoint pode mascarar problemas no processamento server-side.
+
+=== CAMPOS DO BLING AUSENTES NO SISTEMA ===
+  - IBSCBS: Bling='presente'
+  - indFinal: Bling='1'
+  - finNFSe: Bling='0'
+  - CST: Bling='000'
+  - cClassTrib: Bling='000001'
+  - cIndOp: Bling='050104'
+
+=== CAMPOS DO SISTEMA AUSENTES NO BLING ===
+  (nenhum)
+
+=== DIVERGÊNCIAS (valores diferentes) ===
+  - tpAmb: Bling='1' | Sistema='2'
+  - nDPS: Bling='8009' | Sistema='64509929799255'
+  - serie: Bling='1' | Sistema='00001'
+  - tribISSQN: Bling='4' | Sistema='1'
+  - totTrib: Bling='vTotTrib' | Sistema='indTotTrib'
+
+=== COMPARATIVO CAMPO A CAMPO ===
+  tpAmb        [diverge       ] Bling='1' | Sistema='2'
+  nDPS         [diverge       ] Bling='8009' | Sistema='64509929799255'
+  serie        [diverge       ] Bling='1' | Sistema='00001'
+  tribISSQN    [diverge       ] Bling='4' | Sistema='1'
+  IBSCBS       [so_bling      ] Bling='presente' | Sistema=None
+  totTrib      [diverge       ] Bling='vTotTrib' | Sistema='indTotTrib'
+  cTribNac     [igual         ] Bling='141401' | Sistema='141401'
+  cTribMun     [ambos_ausentes] Bling=None | Sistema=None
+  regTrib      [igual         ] Bling={'opSimpNac': '1', 'regApTribSN': None, 'regEspTrib': '0'} | Sistema={'opSimpNac': '1', 'regApTribSN': None, 'regEspTrib': '0'}
+  opSimpNac    [igual         ] Bling='1' | Sistema='1'
+  indFinal     [so_bling      ] Bling='1' | Sistema=None
+  finNFSe      [so_bling      ] Bling='0' | Sistema=None
+  CST          [so_bling      ] Bling='000' | Sistema=None
+  cClassTrib   [so_bling      ] Bling='000001' | Sistema=None
+  cIndOp       [so_bling      ] Bling='050104' | Sistema=None
+
+=== RANKING PROB. E0714 (perspectiva fiscal) ===
+   1. [35%] tpAmb — validacao_ambiente — tpAmb deve corresponder ao endpoint (1=produção, 2=homologação). Divergência pode causar rejeição, mas código típico não é E0714.
+   2. [25%] IBSCBS — validacao_regra_negocio — Opcional no XSD v1.01 (minOccurs=0). Sistema passou XSD local sem IBSCBS. Regra de negócio SEFIN pós-2026 pode exigir para alguns contribuintes — rejeição esperada seria código fiscal, não E0714.
+   3. [20%] CST — validacao_regra_negocio — Subcampos de IBSCBS ausentes no sistema; só relevantes se IBSCBS for exigido.
+   4. [20%] cClassTrib — validacao_regra_negocio — Subcampos de IBSCBS ausentes no sistema; só relevantes se IBSCBS for exigido.
+   5. [20%] cIndOp — validacao_regra_negocio — Subcampos de IBSCBS ausentes no sistema; só relevantes se IBSCBS for exigido.
+   6. [20%] finNFSe — validacao_regra_negocio — Subcampos de IBSCBS ausentes no sistema; só relevantes se IBSCBS for exigido.
+   7. [20%] indFinal — validacao_regra_negocio — Subcampos de IBSCBS ausentes no sistema; só relevantes se IBSCBS for exigido.
+   8. [10%] totTrib — validacao_fiscal — Ambos modos (vTotTrib vs indTotTrib) são válidos no XSD (choice). Diferença de estratégia tributária, não erro de schema.
+   9. [ 8%] tribISSQN — validacao_fiscal — Valores 1 e 4 são válidos no XSD (TSTribISSQN). tribISSQN=1 é aceito em homologação pelo schema. Divergência reflete natureza tributária da nota, não invalidade de 1.
+  10. [ 5%] nDPS — validacao_formato — TSNumDPS aceita qualquer número 1-15 dígitos iniciando em 1-9. Hash de 15 dígitos válido no XSD; Id DPS bate com nDPS padded. Improvável rejeição por hash vs sequencial; se houver, código não seria E0714.
+  11. [ 3%] serie — informativo — 1 e 00001 equivalentes para Id DPS (serie padded 5 pos). Informativo.
+
+=== AFETAM VALIDAÇÃO SEFIN ===
+  - tpAmb: tpAmb deve corresponder ao endpoint (1=produção, 2=homologação). Divergência pode causar rejeição, mas código típico não é E0714.
+  - nDPS: TSNumDPS aceita qualquer número 1-15 dígitos iniciando em 1-9. Hash de 15 dígitos válido no XSD; Id DPS bate com nDPS padded. Improvável rejeição por hash vs sequencial; se houver, código não seria E0714.
+  - tribISSQN: Valores 1 e 4 são válidos no XSD (TSTribISSQN). tribISSQN=1 é aceito em homologação pelo schema. Divergência reflete natureza tributária da nota, não invalidade de 1.
+  - IBSCBS: Opcional no XSD v1.01 (minOccurs=0). Sistema passou XSD local sem IBSCBS. Regra de negócio SEFIN pós-2026 pode exigir para alguns contribuintes — rejeição esperada seria código fiscal, não E0714.
+  - totTrib: Ambos modos (vTotTrib vs indTotTrib) são válidos no XSD (choice). Diferença de estratégia tributária, não erro de schema.
+  - indFinal: Subcampos de IBSCBS ausentes no sistema; só relevantes se IBSCBS for exigido.
+  - finNFSe: Subcampos de IBSCBS ausentes no sistema; só relevantes se IBSCBS for exigido.
+  - CST: Subcampos de IBSCBS ausentes no sistema; só relevantes se IBSCBS for exigido.
+  - cClassTrib: Subcampos de IBSCBS ausentes no sistema; só relevantes se IBSCBS for exigido.
+  - cIndOp: Subcampos de IBSCBS ausentes no sistema; só relevantes se IBSCBS for exigido.
+
+=== APENAS INFORMATIVO ===
+  - serie: Bling='1' vs Sistema='00001'
+
+=== CONCLUSÃO ===
+Nenhuma diferença fiscal isolada explica E0714 de forma forte.
+IBSCBS não é obrigatório no XSD; tribISSQN=1 é válido; nDPS hash é válido.
+Principal diferença fiscal material: tpAmb (Bling=1 vs Sistema=2) e bloco IBSCBS presente só no Bling.
+E0714 permanece mais compatível com validação de assinatura/credenciamento server-side,
+não com rejeição de campo fiscal do schema.
+================================================================

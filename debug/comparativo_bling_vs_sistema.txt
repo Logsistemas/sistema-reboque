@@ -1,0 +1,171 @@
+================================================================
+COMPARATIVO DEFINITIVO — XML BLING vs SISTEMA (NFS-e Nacional)
+Gerado em: 2026-06-09T15:50:37-03:00
+================================================================
+
+=== ARQUIVOS ===
+Bling:   C:\Users\Ezequiel.Sousa\Dropbox\PC\Downloads\33045572231494899000170000000000058926069771313560.xml
+         tipo=NFSe_autorizada | root=NFSe | 10349 bytes
+Sistema: C:\Users\Ezequiel.Sousa\Dropbox\PC\Desktop\SISTEMAS\APP ESSÊNCIA DA RUA\sistema-reboque-v39-dev\debug\nfse_payload_descompactado.xml
+         tipo=DPS_envio | root=DPS | 4772 bytes
+
+=== 1. AMBIENTE ===
+tpAmb Bling:    1 (producao)
+tpAmb Sistema:  2 (homologacao)
+ambGer (NFSe):  Bling=2 | Sistema=—
+Endpoint Bling:    https://sefin.nfse.gov.br/SefinNacional/nfse
+Endpoint Sistema:  https://sefin.producaorestrita.nfse.gov.br/SefinNacional/nfse
+
+=== 2. ID DPS (infDPS.Id) ===
+--- Bling ---
+  infDPS.Id:     DPS330455723149489900017000001000000000008009
+  tamanho:       45 (esperado 45)
+  valido_formato:True
+  cMun:          3304557
+  tpInsc:        2
+  CNPJ:          31494899000170
+  serie (Id):    00001
+  nDPS (Id):     000000000008009
+  serie (XML):   1
+  nDPS (XML):    8009
+  id_recomposto: DPS330455723149489900017000001000000000008009
+  bate gerar_id_dps: True
+
+--- Sistema ---
+  infDPS.Id:     DPS330455723149489900017000001064509929799255
+  tamanho:       45 (esperado 45)
+  valido_formato:True
+  cMun:          3304557
+  tpInsc:        2
+  CNPJ:          31494899000170
+  serie (Id):    00001
+  nDPS (Id):     064509929799255
+  serie (XML):   00001
+  nDPS (XML):    64509929799255
+  id_recomposto: DPS330455723149489900017000001064509929799255
+  bate gerar_id_dps: True
+
+Padrao TSIdDPS Bling:   SIM
+Padrao TSIdDPS Sistema: SIM
+
+=== 3. NUMERACAO ===
+  serie: != Bling='1' | Sistema='00001'
+  nDPS: != Bling='8009' | Sistema='64509929799255'
+  dCompet: != Bling='2026-06-05' | Sistema='2026-06-09'
+  dhEmi: != Bling='2026-06-05T08:17:14-03:00' | Sistema='2026-06-09T15:23:26-03:00'
+  verAplic: != Bling='Bling 1.00' | Sistema='1.00'
+
+=== 4. PRESTADOR ===
+  CNPJ: = Bling='31494899000170' | Sistema='31494899000170'
+  IM: != Bling='' | Sistema='11321232'
+  fone: != Bling='21964395890' | Sistema=''
+  email: != Bling='ezequiel.souza@ezlogistica.com.br' | Sistema=''
+  opSimpNac: = Bling='1' | Sistema='1'
+  regEspTrib: = Bling='0' | Sistema='0'
+
+=== 5. TOMADOR ===
+  CNPJ: != Bling='61550141000172' | Sistema='52910023000137'
+  xNome: != Bling='YELUM SEGUROS S.A' | Sistema='AWP SERVICE BRASIL LTDA'
+  fone: = Bling='' | Sistema=''
+  email: = Bling='' | Sistema=''
+  cMun: != Bling='3550308' | Sistema=''
+  CEP: != Bling='04571020' | Sistema=''
+
+=== 6. SERVICO ===
+  cLocPrestacao: = Bling='3304557' | Sistema='3304557'
+  cTribNac: = Bling='141401' | Sistema='141401'
+  cTribMun: = Bling='' | Sistema=''
+  xDescServ: != Bling='REFERENTE AOS SERVIÇOS PRESTADOS DE REBOQUE.    DADOS BANCÁRIOS:  ITAÚ  AG: 5813   C/C: 05342-7' | Sistema='TESTE'
+  cNBS: = Bling='106044000' | Sistema='106044000'
+
+=== 7. VALORES ===
+  vServ: != Bling='35160.87' | Sistema='1.00'
+  tribISSQN: != Bling='4' | Sistema='1'
+  tpRetISSQN: = Bling='1' | Sistema='1'
+  pAliq: != Bling='' | Sistema='5.00'
+  indTotTrib: != Bling='' | Sistema='0'
+  vTotTrib: = Bling='' | Sistema=''
+
+=== 8. IBSCBS ===
+  Bling presente:   True
+  Sistema presente: False
+  finNFSe Bling:    0
+  finNFSe Sistema:  —
+
+=== 9. ASSINATURA DPS ===
+--- Bling ---
+  parent:              DPS
+  prefixos:            0
+  Canonicalization:    http://www.w3.org/TR/2001/REC-xml-c14n-20010315
+  SignatureMethod:     http://www.w3.org/2000/09/xmldsig#rsa-sha1
+  DigestMethod:        http://www.w3.org/2000/09/xmldsig#sha1
+  Reference.URI:       #DPS330455723149489900017000001000000000008009
+  Transforms:          ['http://www.w3.org/2000/09/xmldsig#enveloped-signature', 'http://www.w3.org/TR/2001/REC-xml-c14n-20010315']
+  X509Certificate qty: 1
+  X509 sizes (chars):  [2700]
+
+--- Sistema ---
+  parent:              DPS
+  prefixos:            0
+  Canonicalization:    http://www.w3.org/TR/2001/REC-xml-c14n-20010315
+  SignatureMethod:     http://www.w3.org/2000/09/xmldsig#rsa-sha1
+  DigestMethod:        http://www.w3.org/2000/09/xmldsig#sha1
+  Reference.URI:       #DPS330455723149489900017000001064509929799255
+  Transforms:          ['http://www.w3.org/2000/09/xmldsig#enveloped-signature', 'http://www.w3.org/TR/2001/REC-xml-c14n-20010315']
+  X509Certificate qty: 1
+  X509 sizes (chars):  [2700]
+
+=== 10. DIFERENÇAS (todas) ===
+  [90] ambiente.tpAmb: Bling='1' | Sistema='2'
+  [90] assinatura_dps.Reference_URI: Bling='#DPS330455723149489900017000001000000000008009' | Sistema='#DPS330455723149489900017000001064509929799255'
+  [90] meta.tipo_documento: Bling='NFSe_autorizada' | Sistema='DPS_envio'
+  [55] id_dps.nDPS_id: Bling='000000000008009' | Sistema='064509929799255'
+  [55] numeracao.serie: Bling='1' | Sistema='00001'
+  [55] numeracao.nDPS: Bling='8009' | Sistema='64509929799255'
+  [55] numeracao.verAplic: Bling='Bling 1.00' | Sistema='1.00'
+  [55] prestador.IM: Bling='' | Sistema='11321232'
+  [55] prestador.fone: Bling='21964395890' | Sistema=''
+  [55] prestador.email: Bling='ezequiel.souza@ezlogistica.com.br' | Sistema=''
+  [55] valores.indTotTrib: Bling='' | Sistema='0'
+  [55] ibscbs.presente: Bling=True | Sistema=False
+  [40] ambiente.label: Bling='producao' | Sistema='homologacao'
+  [40] ambiente.endpoint_esperado: Bling='https://sefin.nfse.gov.br/SefinNacional/nfse' | Sistema='https://sefin.producaorestrita.nfse.gov.br/SefinNacional/nfse'
+  [40] ambiente.ambGer_nfse: Bling='2' | Sistema=''
+  [40] id_dps.valor: Bling='DPS330455723149489900017000001000000000008009' | Sistema='DPS330455723149489900017000001064509929799255'
+  [40] id_dps.nDPS_elemento: Bling='8009' | Sistema='64509929799255'
+  [40] id_dps.serie_elemento: Bling='1' | Sistema='00001'
+  [40] tomador.CNPJ: Bling='61550141000172' | Sistema='52910023000137'
+  [40] tomador.xNome: Bling='YELUM SEGUROS S.A' | Sistema='AWP SERVICE BRASIL LTDA'
+  [40] tomador.cMun: Bling='3550308' | Sistema=''
+  [40] tomador.CEP: Bling='04571020' | Sistema=''
+  [40] valores.tribISSQN: Bling='4' | Sistema='1'
+  [40] valores.pAliq: Bling='' | Sistema='5.00'
+  [40] ibscbs.finNFSe: Bling='0' | Sistema=''
+  [40] ibscbs.indFinal: Bling='1' | Sistema=''
+  [40] ibscbs.cIndOp: Bling='050104' | Sistema=''
+  [40] ibscbs.indDest: Bling='0' | Sistema=''
+  [35] tags.prestador: Bling=['email', 'fone'] | Sistema=['IM']
+  [35] tags.tomador: Bling=['end'] | Sistema=[]
+  [35] tags.totTrib: Bling=['vTotTrib'] | Sistema=['indTotTrib']
+  [20] numeracao.dCompet: Bling='2026-06-05' | Sistema='2026-06-09'
+  [20] numeracao.dhEmi: Bling='2026-06-05T08:17:14-03:00' | Sistema='2026-06-09T15:23:26-03:00'
+  [20] servico.xDescServ: Bling='REFERENTE AOS SERVIÇOS PRESTADOS DE REBOQUE.    DADOS BANCÁRIOS:  ITAÚ  AG: 5813   C/C: 05342-7' | Sistema='TESTE'
+  [20] valores.vServ: Bling='35160.87' | Sistema='1.00'
+
+=== TOP 5 DIFERENÇAS MAIS IMPORTANTES ===
+  1. [90] ambiente.tpAmb: Bling='1' → Sistema='2'
+  2. [90] assinatura_dps.Reference_URI: Bling='#DPS330455723149489900017000001000000000008009' → Sistema='#DPS330455723149489900017000001064509929799255'
+  3. [90] meta.tipo_documento: Bling='NFSe_autorizada' → Sistema='DPS_envio'
+  4. [55] id_dps.nDPS_id: Bling='000000000008009' → Sistema='064509929799255'
+  5. [55] numeracao.serie: Bling='1' → Sistema='00001'
+
+=== CAUSA MAIS PROVÁVEL E0714 ===
+  ambiente.tpAmb
+
+=== RECOMENDAÇÃO ===
+Bling exporta NFSe autorizada (pós-processamento SEFIN); o sistema envia DPS. Compare principalmente o bloco infDPS embutido no XML Bling com o DPS do sistema. Prioridade: confirmar tpAmb/endpoint — emissão deve usar o mesmo ambiente em que o Bling foi autorizado.
+
+=== NOTA ===
+Diferenças de dhEmi, nDPS e conteúdo da nota são esperadas entre emissões distintas.
+Foco E0714: perfil de assinatura, tpAmb, formato infDPS.Id e campos exigidos pelo validador.
+================================================================

@@ -85,12 +85,19 @@
     </div>
     <div class="fin-side-block">
       <p class="fin-side-section-title">Emissão</p>
+      <div id="bannerProducao" class="fin-banner-producao" style="display:none" role="alert">
+        <strong>Ambiente PRODUÇÃO</strong>
+        <p>Emissão unitária com confirmação obrigatória. Lote desabilitado.</p>
+      </div>
       <div class="fin-side-actions">
         <button type="button" class="fin-action-btn fin-action-btn-accent" id="btnEmitirSel" disabled>
           <span class="fin-action-btn-icon">📤</span><span>Enviar NFS-es selecionadas</span>
         </button>
         <button type="button" class="fin-action-btn" id="btnEmitirPendentes">
           <span class="fin-action-btn-icon">⏳</span><span>Enviar NFS-es pendentes</span>
+        </button>
+        <button type="button" class="fin-action-btn fin-action-btn-danger" id="btnCancelarProdRapido" style="display:none">
+          <span class="fin-action-btn-icon">⛔</span><span>Cancelar última NFS-e (PRODUÇÃO)</span>
         </button>
         <button type="button" class="fin-action-btn" id="btnGerarTxt" disabled>
           <span class="fin-action-btn-icon">📄</span><span>Gerar TXT selecionadas</span>
@@ -120,6 +127,44 @@
 
 {% include "partials/app_shell_end.html" %}
 
+<div id="modalProducao" class="fin-modal-producao-wrap" aria-hidden="true" style="display:none!important">
+  <div class="fin-modal-producao-shell" role="dialog" aria-labelledby="prodModalTitle" aria-modal="true">
+    <header class="fin-modal-producao-head">
+      <h2 id="prodModalTitle">Emissão em PRODUÇÃO</h2>
+      <button type="button" class="fin-modal-producao-close" id="btnFecharProducao" aria-label="Fechar">×</button>
+    </header>
+    <div class="fin-modal-producao-body">
+      <p class="fin-prod-aviso" id="prodAviso">Esta nota terá validade fiscal real perante a SEFIN Nacional.</p>
+      <div id="prodErro" class="cad-erro" style="display:none"></div>
+      <div id="prodResumo" class="fin-prod-resumo"></div>
+      <div id="prodSucesso" class="fin-prod-sucesso" style="display:none"></div>
+      <div class="fin-prod-confirmacao" id="prodConfirmacaoWrap">
+        <label for="prodConfirmacao">Confirmação</label>
+        <input
+          type="text"
+          id="prodConfirmacao"
+          name="confirmacao_producao"
+          data-prod-confirmacao="1"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder="EMITIR PRODUCAO"
+        >
+        <small class="fin-prod-confirmacao-hint">Digite exatamente <code>EMITIR PRODUCAO</code> para habilitar a emissão.</small>
+      </div>
+    </div>
+    <footer class="fin-modal-producao-foot">
+      <button type="button" class="fin-btn fin-btn-danger" id="btnCancelarProdModal" style="display:none">Cancelar NFS-e emitida</button>
+      <button
+        type="button"
+        class="fin-btn fin-btn-primary"
+        id="btnConfirmarProducao"
+        data-action="confirmar-producao"
+        onclick="console.log('CLICK EMITIR PRODUCAO'); if (window.__nfseConfirmarProducao) { Promise.resolve(window.__nfseConfirmarProducao()).catch(function(e){ alert((e&amp;&amp;e.message)||String(e)); }); } else { alert('Script NFS-e não carregou. Recarregue a página (Ctrl+F5).'); } return false;"
+      >Emitir em produção</button>
+    </footer>
+  </div>
+</div>
+
 <div id="modalEmail" class="cad-modal" aria-hidden="true">
   <div class="cad-modal-shell" style="max-width:560px;grid-template-columns:1fr">
     <main class="cad-modal-main">
@@ -140,7 +185,93 @@
 
 <div id="menuContexto" class="fin-menu-ctx" style="display:none"></div>
 
+<script>
+(function () {
+  "use strict";
+  var TEXTO_CONF = "EMITIR PRODUCAO";
+
+  function modalProducao() {
+    return document.getElementById("modalProducao");
+  }
+
+  function inputConfirmacao() {
+    var m = modalProducao();
+    if (!m) return null;
+    return m.querySelector("#prodConfirmacao") || m.querySelector('[name="confirmacao_producao"]');
+  }
+
+  window.__nfseFixModalLayer = function () {
+    var m = modalProducao();
+    if (!m) return;
+    if (m.parentNode !== document.body) document.body.appendChild(m);
+    m.style.cssText =
+      "display:flex!important;position:fixed!important;top:0!important;left:0!important;" +
+      "right:0!important;bottom:0!important;width:100vw!important;height:100vh!important;" +
+      "margin:0!important;padding:20px!important;box-sizing:border-box!important;" +
+      "z-index:2147483646!important;align-items:center!important;justify-content:center!important;" +
+      "background:rgba(15,23,42,0.75)!important;";
+    m.classList.add("open");
+    m.setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
+    var shell = m.querySelector(".fin-modal-producao-shell");
+    if (shell) {
+      shell.style.cssText =
+        "position:relative!important;z-index:2147483647!important;width:min(560px,98vw)!important;" +
+        "max-height:min(92vh,720px)!important;display:flex!important;flex-direction:column!important;" +
+        "background:#fff!important;border-radius:18px!important;overflow:hidden!important;" +
+        "box-shadow:0 28px 80px rgba(15,23,42,0.35)!important;";
+    }
+  };
+
+  window.__nfseEmitirProducaoFallback = async function () {
+    var m = modalProducao();
+    var notaId = (m && m.dataset.notaId) || "";
+    var inp = inputConfirmacao();
+    var confirmacao = inp ? String(inp.value || "").trim().replace(/\s+/g, " ") : "";
+    console.log("CLICK EMITIR PRODUCAO");
+    console.log("VALOR:", confirmacao);
+    console.log("NOTA:", notaId);
+    if (!notaId) {
+      alert("Nota não identificada. Feche o modal e abra novamente.");
+      return;
+    }
+    if (confirmacao !== TEXTO_CONF) {
+      alert("Digite exatamente: " + TEXTO_CONF);
+      return;
+    }
+    console.log("ENVIANDO POST");
+    var toast = document.getElementById("finToast");
+    if (toast) {
+      toast.textContent = "Enviando NFS-e em produção...";
+      toast.style.display = "block";
+    }
+    var resp = await fetch("/api/financeiro/notas-servico/" + notaId + "/emitir", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ confirmacao: TEXTO_CONF }),
+    });
+    var data = await resp.json().catch(function () { return {}; });
+    if (!resp.ok || data.ok === false) {
+      var err = data.erro || "Erro na emissão.";
+      if (toast) toast.textContent = err;
+      alert(err);
+      throw new Error(err);
+    }
+    if (toast) toast.textContent = data.mensagem || "NFS-e autorizada em produção.";
+    location.reload();
+  };
+
+  window.__nfseConfirmarProducao = function () {
+    return window.__nfseEmitirProducaoFallback();
+  };
+
+  document.addEventListener("DOMContentLoaded", function () {
+    var m = modalProducao();
+    if (m && m.parentNode !== document.body) document.body.appendChild(m);
+  });
+})();
+</script>
 <script src="/static/financeiro_shared.js"></script>
-<script src="/static/financeiro_nfse.js"></script>
+<script src="/static/financeiro_nfse.js?v=20260529c"></script>
 </body>
 </html>

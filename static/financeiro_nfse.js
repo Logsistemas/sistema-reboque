@@ -1,15 +1,95 @@
 (function () {
+  console.log("[nfse] financeiro_nfse.js carregado");
   const API = "/api/financeiro/notas-servico";
   const S = window.FinShared;
+  if (!S) console.error("[nfse] FinShared não encontrado — toasts podem falhar");
   let itens = [];
   let selecionados = new Set();
   let emailNotaId = null;
   let emissaoEmpresaPronta = false;
   let emissaoAmbiente = "homologacao";
   let emissaoPendenciasEmpresa = [];
+  let emissaoLotePermitida = true;
+  let emissaoProducaoConfirmacao = "EMITIR PRODUCAO";
+  let emissaoProducaoRequerConfirmacao = false;
+  let emissaoMetaPronta = false;
+  let producaoNotaId = null;
+  let ultimaNotaEmitidaProdId = null;
+  let emitindoProducao = false;
+
+  const ENDPOINT_SEFIN_PRODUCAO = "https://sefin.nfse.gov.br/SefinNacional/nfse";
+  const CONFIRMACAO_PRODUCAO = "EMITIR PRODUCAO";
 
   function el(id) {
     return document.getElementById(id);
+  }
+
+  function notaPorId(id) {
+    return itens.find((i) => String(i.id) === String(id));
+  }
+
+  function isProducao() {
+    return emissaoAmbiente === "producao" || emissaoProducaoRequerConfirmacao;
+  }
+
+  function erroExigeModalProducao(msg) {
+    const m = String(msg || "");
+    return (
+      m.includes("EMITIR PRODUCAO") ||
+      m.includes("PRODUÇÃO bloqueada") ||
+      m.includes("PRODUCAO bloqueada")
+    );
+  }
+
+  function modalProducaoEl() {
+    return document.getElementById("modalProducao");
+  }
+
+  function inputConfirmacaoProducao() {
+    const modal = modalProducaoEl();
+    if (!modal) return null;
+    return (
+      modal.querySelector("#prodConfirmacao") ||
+      modal.querySelector('input[name="confirmacao_producao"]') ||
+      modal.querySelector("[data-prod-confirmacao]")
+    );
+  }
+
+  function lerConfirmacaoDigitada() {
+    const elemento = inputConfirmacaoProducao();
+    const bruto = elemento?.value ?? "";
+    const valor = String(bruto).normalize("NFKC").trim().replace(/\s+/g, " ");
+    return { elemento, valor, bruto };
+  }
+
+  function confirmacaoProducaoValida(valor) {
+    return valor === CONFIRMACAO_PRODUCAO;
+  }
+
+  function toastNfse(msg, isError) {
+    if (S && S.toast) S.toast(msg, isError === true);
+    else if (isError) alert(msg);
+    else console.log(msg);
+  }
+
+  function mostrarModalProducao() {
+    if (typeof window.__nfseFixModalLayer === "function") {
+      window.__nfseFixModalLayer();
+      window.setTimeout(() => inputConfirmacaoProducao()?.focus(), 0);
+      return;
+    }
+    const modal = modalProducaoEl();
+    if (!modal) return;
+    ancorarModalProducao();
+    modal.style.cssText =
+      "display:flex!important;position:fixed!important;top:0!important;left:0!important;" +
+      "right:0!important;bottom:0!important;width:100vw!important;height:100vh!important;" +
+      "margin:0!important;z-index:99999!important;align-items:center;justify-content:center;" +
+      "padding:20px;box-sizing:border-box;background:rgba(15,23,42,0.72);backdrop-filter:blur(6px);";
+    modal.classList.add("open");
+    modal.setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
+    window.setTimeout(() => inputConfirmacaoProducao()?.focus(), 0);
   }
 
   function postJson(url, method, body) {
@@ -78,8 +158,289 @@
     ["btnImprimirSel", "btnExcluirSel", "btnGerarTxt"].forEach((id) => {
       if (el(id)) el(id).disabled = !tem;
     });
-    if (el("btnEmitirSel")) el("btnEmitirSel").disabled = !tem || !emissaoEmpresaPronta;
-    if (el("btnEmitirPendentes")) el("btnEmitirPendentes").disabled = !emissaoEmpresaPronta;
+    if (el("btnEmitirSel")) el("btnEmitirSel").disabled = !tem || !emissaoEmpresaPronta || !emissaoLotePermitida;
+    if (el("btnEmitirPendentes")) el("btnEmitirPendentes").disabled = !emissaoEmpresaPronta || !emissaoLotePermitida;
+    const ultimaEmitida = itens.find((n) => n.id === ultimaNotaEmitidaProdId && n.situacao === "emitida");
+    if (el("btnCancelarProdRapido")) {
+      el("btnCancelarProdRapido").style.display =
+        isProducao() && ultimaEmitida ? "flex" : "none";
+    }
+  }
+
+  function fecharModalProducao() {
+    producaoNotaId = null;
+    const modal = modalProducaoEl();
+    if (modal) {
+      modal.classList.remove("open");
+      modal.setAttribute("aria-hidden", "true");
+      modal.style.cssText = "display:none!important;";
+    }
+    document.body.style.overflow = "";
+    const inputConf = inputConfirmacaoProducao();
+    if (inputConf) inputConf.value = "";
+    if (el("prodErro")) el("prodErro").style.display = "none";
+    if (el("prodSucesso")) el("prodSucesso").style.display = "none";
+    if (el("prodConfirmacaoWrap")) el("prodConfirmacaoWrap").style.display = "";
+    if (el("btnConfirmarProducao")) el("btnConfirmarProducao").style.display = "";
+    if (el("btnCancelarProdModal")) el("btnCancelarProdModal").style.display = "none";
+  }
+
+  function montarResumoLocal(nota) {
+    const valor = Number(nota?.total_nota ?? nota?.total_servicos ?? 0);
+    return {
+      cnpj_prestador: "Carregando…",
+      tomador_nome: nota?.cliente_nome || "—",
+      tomador_doc: nota?.cliente_cnpj_cpf || "",
+      valor_nota: Number.isFinite(valor) ? valor : 0,
+      serie_rps: nota?.serie_rps || "1",
+      nDPS: "Carregando…",
+      endpoint_sefin: ENDPOINT_SEFIN_PRODUCAO,
+    };
+  }
+
+  function renderResumoProducao(r) {
+    const box = el("prodResumo");
+    if (!box || !r) return;
+    const fmt = (v) => (v != null && v !== "" ? v : "—");
+    const cliente = r.tomador_doc
+      ? `${fmt(r.tomador_nome)} (${fmt(r.tomador_doc)})`
+      : fmt(r.tomador_nome);
+    box.innerHTML = `
+      <dl class="fin-prod-resumo">
+        <dt>CNPJ</dt><dd>${fmt(r.cnpj_prestador)}</dd>
+        <dt>Cliente</dt><dd>${cliente}</dd>
+        <dt>Valor</dt><dd>R$ ${Number(r.valor_nota || 0).toFixed(2)}</dd>
+        <dt>Série</dt><dd>${fmt(r.serie_rps)}</dd>
+        <dt>nDPS</dt><dd>${fmt(r.nDPS)}</dd>
+        <dt>Ambiente</dt><dd><strong>PRODUÇÃO</strong></dd>
+        <dt>Endpoint</dt><dd style="font-size:11px;word-break:break-all">${fmt(r.endpoint_sefin)}</dd>
+      </dl>`;
+  }
+
+  async function carregarResumoProducao(id) {
+    try {
+      const j = await S.apiJson(`${API}/${id}/resumo-emissao-producao`);
+      renderResumoProducao(j.resumo);
+      emissaoAmbiente = "producao";
+      emissaoProducaoRequerConfirmacao = true;
+      if (el("bannerProducao")) el("bannerProducao").style.display = "block";
+      return true;
+    } catch (err) {
+      const nota = notaPorId(id);
+      if (nota) renderResumoProducao(montarResumoLocal(nota));
+      if (el("prodErro")) {
+        el("prodErro").textContent =
+          err.message || "Não foi possível carregar o resumo completo. Confirme os dados antes de emitir.";
+        el("prodErro").style.display = "block";
+      }
+      return false;
+    }
+  }
+
+  function ancorarModalProducao() {
+    const modal = el("modalProducao");
+    if (!modal) return;
+    if (modal.parentElement !== document.body) {
+      document.body.appendChild(modal);
+    }
+  }
+
+  function initModalProducao() {
+    ancorarModalProducao();
+    const modal = modalProducaoEl();
+    if (modal && !modal.classList.contains("open")) {
+      modal.style.display = "none";
+      modal.classList.remove("open");
+    }
+
+    el("btnFecharProducao")?.addEventListener("click", fecharModalProducao);
+
+    el("modalProducao")?.addEventListener("click", (e) => {
+      if (e.target === modalProducaoEl()) fecharModalProducao();
+    });
+
+    inputConfirmacaoProducao()?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        confirmarEmissaoProducao().catch((err) => {
+          console.error("[nfse] Erro Enter confirmar:", err);
+          toastNfse(err?.message || "Erro inesperado ao emitir em produção.", true);
+        });
+      }
+    });
+
+    el("btnCancelarProdModal")?.addEventListener("click", () => {
+      if (producaoNotaId) cancelarNfseProducao(producaoNotaId, "modal");
+    });
+
+    window.__nfseConfirmarProducao = () => confirmarEmissaoProducao();
+    const btnConfirmar = el("btnConfirmarProducao");
+    console.log("[nfse] modal produção inicializado", { btnConfirmar: !!btnConfirmar, input: !!inputConfirmacaoProducao() });
+  }
+
+  async function confirmarEmissaoProducao() {
+    if (emitindoProducao) return;
+    const notaId = producaoNotaId || modalProducaoEl()?.dataset?.notaId;
+    const { elemento, valor } = lerConfirmacaoDigitada();
+    const confirmacao = valor;
+    const payload = { confirmacao: CONFIRMACAO_PRODUCAO };
+
+    console.log("CLICK EMITIR PRODUCAO");
+    console.log("VALOR:", confirmacao);
+    console.log("NOTA:", notaId);
+    console.log("INPUT ENCONTRADO", elemento);
+
+    if (!elemento) {
+      toastNfse("Campo de confirmação não encontrado no modal.", true);
+      return;
+    }
+
+    if (!notaId) {
+      toastNfse("Nota não identificada. Feche o modal e tente emitir novamente.", true);
+      return;
+    }
+
+    if (!confirmacaoProducaoValida(confirmacao)) {
+      const msg = `Digite exatamente: ${CONFIRMACAO_PRODUCAO}`;
+      if (el("prodErro")) {
+        el("prodErro").textContent = msg;
+        el("prodErro").style.display = "block";
+      }
+      toastNfse(msg, true);
+      return;
+    }
+
+    console.log("CONFIRMACAO OK");
+    console.log("ENVIANDO POST");
+
+    if (el("prodErro")) el("prodErro").style.display = "none";
+    const btn = el("btnConfirmarProducao");
+    if (btn) btn.disabled = true;
+
+    toastNfse("Enviando NFS-e em produção...");
+
+    emitindoProducao = true;
+    try {
+      const j = await postJson(`${API}/${notaId}/emitir`, "POST", payload);
+      console.log("[nfse] POST /emitir resposta:", j);
+
+      ultimaNotaEmitidaProdId = notaId;
+      const em = j.emissao || {};
+      if (el("prodSucesso")) {
+        el("prodSucesso").innerHTML =
+          `<strong>NFS-e autorizada em PRODUÇÃO</strong><br>` +
+          `Número: ${em.numero_nfse || "—"}<br>` +
+          `Chave: ${em.chave_acesso || "—"}<br>` +
+          `Protocolo: ${em.protocolo || "—"}<br>` +
+          (em.link_nfse ? `<a href="${em.link_nfse}" target="_blank" rel="noopener">Abrir DANFSe</a>` : "");
+        el("prodSucesso").style.display = "block";
+      }
+      if (el("prodConfirmacaoWrap")) el("prodConfirmacaoWrap").style.display = "none";
+      if (btn) btn.style.display = "none";
+      if (el("btnCancelarProdModal")) el("btnCancelarProdModal").style.display = "";
+      toastNfse(j.mensagem || "NFS-e autorizada em produção.");
+      await carregar();
+    } catch (err) {
+      console.error("[nfse] Erro POST /emitir:", err);
+      const msg = err?.message || "Erro na emissão.";
+      if (el("prodErro")) {
+        el("prodErro").textContent = msg;
+        el("prodErro").style.display = "block";
+      }
+      toastNfse(msg, true);
+    } finally {
+      emitindoProducao = false;
+      if (btn) btn.disabled = false;
+    }
+  }
+  async function abrirModalProducao(id) {
+    producaoNotaId = String(id);
+    if (el("modalProducao")) el("modalProducao").dataset.notaId = String(id);
+    if (el("prodErro")) el("prodErro").style.display = "none";
+    if (el("prodSucesso")) el("prodSucesso").style.display = "none";
+    if (el("prodConfirmacaoWrap")) el("prodConfirmacaoWrap").style.display = "";
+    if (el("btnConfirmarProducao")) {
+      el("btnConfirmarProducao").style.display = "";
+      el("btnConfirmarProducao").disabled = false;
+    }
+    if (el("btnCancelarProdModal")) el("btnCancelarProdModal").style.display = "none";
+    const inputConf = inputConfirmacaoProducao();
+    if (inputConf) inputConf.value = "";
+    renderResumoProducao(montarResumoLocal(notaPorId(id)));
+    mostrarModalProducao();
+    await carregarResumoProducao(id);
+  }
+
+  async function emitirNota(id, confirmacao) {
+    if (isProducao() && !confirmacao) {
+      await abrirModalProducao(id);
+      return { ok: false, modal: true };
+    }
+    const body = confirmacao ? { confirmacao } : {};
+    try {
+      return await postJson(`${API}/${id}/emitir`, "POST", body);
+    } catch (err) {
+      if (!confirmacao && erroExigeModalProducao(err.message)) {
+        emissaoAmbiente = "producao";
+        emissaoProducaoRequerConfirmacao = true;
+        if (el("bannerProducao")) el("bannerProducao").style.display = "block";
+        await abrirModalProducao(id);
+        return { ok: false, modal: true };
+      }
+      throw err;
+    }
+  }
+
+  async function solicitarEmissao(id) {
+    if (!emissaoMetaPronta) {
+      S.toast("Aguarde o carregamento das configurações de emissão.", true);
+      return;
+    }
+    const nota = notaPorId(id);
+    if (!podeEmitirNota(nota)) {
+      S.toast("Emissão bloqueada — verifique Configuração Fiscal e dados da nota.", true);
+      return;
+    }
+    if (isProducao()) {
+      await abrirModalProducao(id);
+      return;
+    }
+    if (!confirm("Emitir NFS-e em homologação para esta nota?")) return;
+    try {
+      const j = await emitirNota(id);
+      if (j?.modal) return;
+      S.toast(j.mensagem || "NFS-e autorizada com sucesso.");
+      await carregar();
+    } catch (err) {
+      if (erroExigeModalProducao(err.message)) {
+        await abrirModalProducao(id);
+        return;
+      }
+      S.toast(err.message || "Erro na emissão.", true);
+    }
+  }
+
+  async function cancelarNfseProducao(id, origem) {
+    const nota = notaPorId(id);
+    const chave = nota?.chave_acesso || "";
+    const msg =
+      "CANCELAMENTO EM PRODUÇÃO\n\n" +
+      `NFS-e: ${nota?.numero_nfse || "—"}\nChave: ${chave}\n\n` +
+      "Esta ação cancela a nota na SEFIN Nacional. Deseja continuar?";
+    if (!confirm(msg)) return;
+    const motivo = prompt(
+      "Motivo do cancelamento (mín. 15 caracteres):",
+      "Cancelamento de teste em produção solicitado pelo emitente"
+    );
+    if (!motivo) return;
+    try {
+      await postJson(`${API}/${id}/cancelar-nfse`, "POST", { motivo });
+      S.toast("NFS-e cancelada em produção.");
+      if (origem === "modal") fecharModalProducao();
+      await carregar();
+    } catch (err) {
+      S.toast(err.message || "Erro ao cancelar.", true);
+    }
   }
 
   function fecharMenu() {
@@ -97,7 +458,7 @@
       <button type="button" data-act="boleto" data-id="${id}">Emitir boletos</button>
       <button type="button" data-act="email" data-id="${id}">Enviar por e-mail</button>
       ${nota.situacao === "emitida" && nota.chave_acesso ? `<button type="button" data-act="consultar-nfse" data-id="${id}">Consultar NFS-e</button>` : ""}
-      ${nota.situacao === "emitida" ? `<button type="button" data-act="cancelar-nfse" data-id="${id}">Cancelar NFS-e (SEFIN)</button>` : ""}
+      ${nota.situacao === "emitida" ? `<button type="button" data-act="cancelar-nfse" data-id="${id}" class="${isProducao() ? "danger" : ""}">${isProducao() ? "Cancelar NFS-e (PRODUÇÃO)" : "Cancelar NFS-e (SEFIN)"}</button>` : ""}
       ${!cancelada && nota.situacao !== "emitida" ? `<button type="button" data-act="cancelar" data-id="${id}">Marcar cancelada</button>` : ""}
       <button type="button" data-act="imprimir" data-id="${id}">Imprimir NFS-e</button>
       <button type="button" data-act="sit-pendente" data-id="${id}">Alterar para Pendente</button>
@@ -157,7 +518,7 @@
         return;
       }
       if (act === "email") {
-        const nota = itens.find((i) => i.id === id);
+        const nota = notaPorId(id);
         emailNotaId = id;
         if (el("emailDestino")) el("emailDestino").value = nota?.cliente_email || "";
         if (el("modalEmail")) {
@@ -167,13 +528,7 @@
         return;
       }
       if (act === "emitir") {
-        if (!podeEmitirNota(itens.find((i) => i.id === id))) {
-          S.toast("Emissão bloqueada — verifique Configuração Fiscal e dados da nota.", true);
-          return;
-        }
-        const j = await postJson(`${API}/${id}/emitir`, "POST", {});
-        S.toast(j.mensagem || "NFS-e autorizada com sucesso.");
-        await carregar();
+        await solicitarEmissao(id);
         return;
       }
       if (act === "consultar-nfse") {
@@ -184,6 +539,10 @@
         return;
       }
       if (act === "cancelar-nfse") {
+        if (isProducao()) {
+          await cancelarNfseProducao(id, "menu");
+          return;
+        }
         const motivo = prompt("Motivo do cancelamento (mín. 15 caracteres):", "Cancelamento solicitado pelo emitente");
         if (!motivo) return;
         await postJson(`${API}/${id}/cancelar-nfse`, "POST", { motivo });
@@ -257,12 +616,21 @@
       emissaoEmpresaPronta = !!j.emissao?.empresa_pronta;
       emissaoAmbiente = j.emissao?.ambiente || "homologacao";
       emissaoPendenciasEmpresa = j.emissao?.pendencias_empresa || [];
+      emissaoLotePermitida = j.emissao?.emissao_lote_permitida !== false;
+      emissaoProducaoConfirmacao = j.emissao?.confirmacao_producao_texto || "EMITIR PRODUCAO";
+      emissaoProducaoRequerConfirmacao = j.emissao?.producao_requer_confirmacao === true;
+      emissaoMetaPronta = true;
+      if (el("bannerProducao")) {
+        el("bannerProducao").style.display = emissaoAmbiente === "producao" ? "block" : "none";
+      }
       atualizarPainel(j.painel);
       render();
     } catch (err) {
       S.toast(err.message || "Erro ao processar a ação.", true);
     }
   }
+
+  initModalProducao();
 
   el("btnFiltrar")?.addEventListener("click", carregar);
   el("btnLimpar")?.addEventListener("click", () => {
@@ -296,26 +664,33 @@
   });
 
   el("btnEmitirSel")?.addEventListener("click", async () => {
+    if (!emissaoLotePermitida) {
+      S.toast("Emissão em lote bloqueada em PRODUÇÃO. Emita uma nota por vez.", true);
+      return;
+    }
     if (!emissaoEmpresaPronta) {
       S.toast("Configure a Configuração Fiscal antes de emitir.", true);
       return;
     }
     for (const id of selecionados) {
-      const nota = itens.find((i) => i.id === id);
+      const nota = notaPorId(id);
       if (!podeEmitirNota(nota)) continue;
       try {
-        await postJson(`${API}/${id}/emitir`, "POST", {});
+        await solicitarEmissao(id);
       } catch (err) {
         S.toast(err.message || "Erro na emissão.", true);
       }
+      if (isProducao()) break;
     }
-    S.toast("Processamento de emissão concluído.");
-    await carregar();
+    if (!isProducao()) {
+      S.toast("Processamento de emissão concluído.");
+      await carregar();
+    }
   });
 
   el("btnEmitirPendentes")?.addEventListener("click", async () => {
-    if (!emissaoEmpresaPronta) {
-      S.toast("Configure a Configuração Fiscal antes de emitir.", true);
+    if (!emissaoLotePermitida) {
+      S.toast("Emissão em lote bloqueada em PRODUÇÃO. Emita uma nota por vez.", true);
       return;
     }
     const pends = itens.filter((i) => podeEmitirNota(i));
@@ -325,13 +700,20 @@
     }
     for (const n of pends) {
       try {
-        await S.apiJson(`${API}/${n.id}/emitir`, { method: "POST" });
+        await solicitarEmissao(n.id);
       } catch (err) {
         S.toast(err.message || "Erro na emissão.", true);
       }
+      if (isProducao()) break;
     }
-    S.toast("Pendentes processadas.");
-    await carregar();
+    if (!isProducao()) {
+      S.toast("Pendentes processadas.");
+      await carregar();
+    }
+  });
+
+  el("btnCancelarProdRapido")?.addEventListener("click", () => {
+    if (ultimaNotaEmitidaProdId) cancelarNfseProducao(ultimaNotaEmitidaProdId, "rapido");
   });
 
   el("btnGerarTxt")?.addEventListener("click", () => S.toast("Geração TXT — integração prefeitura pendente."));

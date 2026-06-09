@@ -1007,6 +1007,9 @@ def register(app, templates):
             "empresa_pronta": not emp_pend,
             "pendencias_empresa": emp_pend,
             "ambiente": (config.get("ambiente") if config else "homologacao"),
+            "producao_requer_confirmacao": (config.get("ambiente") if config else "homologacao") == "producao",
+            "emissao_lote_permitida": (config.get("ambiente") if config else "homologacao") != "producao",
+            "confirmacao_producao_texto": "EMITIR PRODUCAO",
         }
         for n in res.get("itens") or []:
             np = pendencias_emissao_nota(n, config)
@@ -1144,11 +1147,41 @@ def register(app, templates):
             (str(mensagem)[:4000], str(nid)),
         )
 
+    @app.get("/api/financeiro/notas-servico/{nid}/resumo-emissao-producao")
+    def api_resumo_emissao_producao(nid: str):
+        """Resumo obrigatório antes de emitir em produção."""
+        from nfse_nacional.producao_guard import is_producao, montar_resumo_emissao
+
+        nota = nota_por_id(nid)
+        if not nota:
+            return JSONResponse({"ok": False, "erro": "Nota não encontrada"}, 404)
+        config = _carregar_config_fiscal()
+        if not config:
+            return JSONResponse({"ok": False, "erro": "Configuração fiscal ausente"}, 400)
+        if not is_producao(config):
+            return JSONResponse(
+                {
+                    "ok": False,
+                    "erro": "Resumo de produção só se aplica com ambiente=producao na Configuração Fiscal.",
+                    "ambiente_atual": config.get("ambiente"),
+                },
+                400,
+            )
+        resumo = montar_resumo_emissao(config, nota)
+        return {"ok": True, "resumo": resumo, "item": nota}
+
     @app.post("/api/financeiro/notas-servico/{nid}/emitir")
-    def api_emitir_nfse(nid: str):
+    async def api_emitir_nfse(nid: str, request: Request):
         """Emissão NFS-e — Ambiente Nacional (SEFIN)."""
         import financeiro_config_fiscal as fcf
         from nfse_nacional.client import NfseNacionalErro
+        from nfse_nacional.producao_guard import (
+            exigir_confirmacao_producao,
+            formatar_resumo_texto,
+            is_producao,
+            montar_resumo_emissao,
+            registrar_log,
+        )
         from nfse_nacional.service import emitir_nota
 
         nota = nota_por_id(nid)
@@ -1156,6 +1189,32 @@ def register(app, templates):
             return JSONResponse({"ok": False, "erro": "Nota não encontrada"}, 404)
         config = _carregar_config_fiscal()
         cert = _carregar_cert_fiscal()
+
+        p = {}
+        if request.headers.get("content-type", "").startswith("application/json"):
+            try:
+                p = await request.json()
+            except Exception:
+                p = {}
+        confirmacao = (p.get("confirmacao") or "").strip()
+
+        try:
+            exigir_confirmacao_producao(config, confirmacao)
+        except ValueError as exc:
+            return JSONResponse({"ok": False, "erro": str(exc), "requer_confirmacao": is_producao(config)}, 400)
+
+        resumo = None
+        if is_producao(config):
+            resumo = montar_resumo_emissao(config, nota)
+            registrar_log(
+                "PRE-POST PRODUCAO — resumo antes da emissão",
+                {
+                    **resumo,
+                    "confirmacao_recebida": confirmacao,
+                    "resumo_texto": formatar_resumo_texto(resumo),
+                },
+            )
+
         try:
             dados = emitir_nota(config, cert, nota, fcf._dec_senha)
             _aplicar_emissao_sucesso(nid, dados)
@@ -1165,22 +1224,51 @@ def register(app, templates):
                 dados.get("chave_acesso"),
                 dados.get("protocolo"),
             )
+            if is_producao(config):
+                registrar_log(
+                    "POS-POST PRODUCAO — autorizada",
+                    {
+                        "nota_id": nid,
+                        "numero_nfse": dados.get("numero_nfse"),
+                        "chave_acesso": dados.get("chave_acesso"),
+                        "protocolo": dados.get("protocolo"),
+                        "codigo_verificacao": dados.get("codigo_verificacao"),
+                        "link_nfse": dados.get("link_nfse"),
+                        "id_dps": dados.get("id_dps"),
+                    },
+                )
             return {
                 "ok": True,
                 "mensagem": "NFS-e autorizada com sucesso.",
                 "emissao": dados,
                 "item": nota_por_id(nid),
+                "producao": is_producao(config),
             }
         except NfseNacionalErro as exc:
             _aplicar_emissao_erro(nid, str(exc))
             log_nfse.warning("NFS-e rejeitada | nota=%s | %s", nid, exc)
+            if is_producao(config):
+                registrar_log(
+                    "POS-POST PRODUCAO — rejeitada",
+                    {
+                        "nota_id": nid,
+                        "erro": str(exc),
+                        "codigos": exc.codigos,
+                        "status_http": exc.status_code,
+                        "detalhes": exc.detalhes,
+                    },
+                )
             return JSONResponse({"ok": False, "erro": str(exc), "detalhes": exc.detalhes}, 400)
         except ValueError as exc:
             log_nfse.info("Emissão bloqueada (validação) | nota=%s | %s", nid, exc)
+            if is_producao(config):
+                registrar_log("PRODUCAO — bloqueada (validação)", {"nota_id": nid, "erro": str(exc)})
             return JSONResponse({"ok": False, "erro": str(exc)}, 400)
         except Exception as exc:
             _aplicar_emissao_erro(nid, str(exc))
             log_nfse.warning("Falha emissão NFS-e | nota=%s | %s", nid, exc)
+            if is_producao(config):
+                registrar_log("PRODUCAO — falha", {"nota_id": nid, "erro": str(exc)})
             return JSONResponse({"ok": False, "erro": str(exc)}, 400)
 
     @app.get("/api/financeiro/notas-servico/{nid}/consultar-nfse")
@@ -1209,6 +1297,7 @@ def register(app, templates):
     async def api_cancelar_nfse(nid: str, request: Request):
         import financeiro_config_fiscal as fcf
         from nfse_nacional.client import NfseNacionalErro
+        from nfse_nacional.producao_guard import is_producao, registrar_log
         from nfse_nacional.service import cancelar_nfse
 
         nota = nota_por_id(nid)
@@ -1216,8 +1305,19 @@ def register(app, templates):
             return JSONResponse({"ok": False, "erro": "Nota não encontrada"}, 404)
         if (nota.get("situacao") or "").lower() != "emitida":
             return JSONResponse({"ok": False, "erro": "Somente NFS-e emitida pode ser cancelada"}, 400)
+        config = _carregar_config_fiscal()
         p = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
         motivo = _txt(p.get("motivo")) or "Cancelamento solicitado pelo emitente no sistema"
+        if is_producao(config):
+            registrar_log(
+                "CANCELAMENTO PRODUCAO — solicitado",
+                {
+                    "nota_id": nid,
+                    "chave_acesso": nota.get("chave_acesso"),
+                    "numero_nfse": nota.get("numero_nfse"),
+                    "motivo": motivo,
+                },
+            )
         try:
             res = cancelar_nfse(
                 _carregar_config_fiscal(),
@@ -1231,6 +1331,11 @@ def register(app, templates):
                 "update financeiro_notas_servico set situacao='cancelada', erro_emissao=null, updated_at=now() where id=%s",
                 (str(nid),),
             )
+            if is_producao(config):
+                registrar_log(
+                    "CANCELAMENTO PRODUCAO — concluído",
+                    {"nota_id": nid, "chave_acesso": nota.get("chave_acesso"), "retorno": res},
+                )
             return {"ok": True, "mensagem": "NFS-e cancelada com sucesso.", "retorno": res, "item": nota_por_id(nid)}
         except NfseNacionalErro as exc:
             return JSONResponse({"ok": False, "erro": str(exc), "detalhes": exc.detalhes}, 400)

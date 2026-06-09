@@ -1,0 +1,59 @@
+==================================
+AUDITORIA ENVIO SEFIN — DEFINITIVA
+Gerado em: 2026-06-09T16:48:40-03:00
+==================================
+
+=== HASH SHA256 (4 obrigatórios) ===
+hash_xml_final:              b1d435e7daf237f256749a7c8ae96153014d7f87bd1fa318d0bed6bd1acc8f6d
+hash_debug_file:             b1d435e7daf237f256749a7c8ae96153014d7f87bd1fa318d0bed6bd1acc8f6d
+hash_payload_gzip_raw:       e35bc92d40dbd756a780f55f85067b7985fd7b85207150c73089722a91999ca8
+hash_payload_descompactado:  b1d435e7daf237f256749a7c8ae96153014d7f87bd1fa318d0bed6bd1acc8f6d
+hashes_xml_iguais:           True
+
+=== TAMANHOS ===
+tamanho_xml_final_bytes:     4796
+tamanho_gzip_raw_bytes:      2909
+tamanho_payload_descompactado: 4796
+tamanho_dpsXmlGZipB64:       3880
+
+=== ASSINATURA ===
+SignatureMethod: http://www.w3.org/2001/04/xmldsig-more#rsa-sha256
+DigestMethod:    http://www.w3.org/2001/04/xmlenc#sha256
+Reference.URI:   #DPS330455723149489900017000001064509929799255
+infDPS.Id:       DPS330455723149489900017000001064509929799255
+
+=== PREFIXOS ===
+PREFIXOS ENCONTRADOS: 0
+
+=== XMLVerifier / Digest / RSA ===
+--- xml_final_assinado ---
+  XMLVerifier: True
+  Digest:      True
+  RSA:         True
+--- debug/nfse_post_final.xml ---
+  XMLVerifier: True
+  Digest:      True
+  RSA:         True
+--- payload_descompactado ---
+  XMLVerifier: True
+  Digest:      True
+  RSA:         True
+
+=== ARQUIVOS ===
+debug/nfse_post_final.xml:          C:\Users\Ezequiel.Sousa\Dropbox\PC\Desktop\SISTEMAS\APP ESSÊNCIA DA RUA\sistema-reboque-v39-dev\debug\nfse_post_final.xml
+debug/nfse_payload_descompactado.xml: C:\Users\Ezequiel.Sousa\Dropbox\PC\Desktop\SISTEMAS\APP ESSÊNCIA DA RUA\sistema-reboque-v39-dev\debug\nfse_payload_descompactado.xml
+
+=== RESULTADO ===
+APTO PARA POST: True
+
+=== RESPOSTA SEFIN (pós-POST) ===
+status_http: 400
+codigos: E0714
+mensagem: E0714: Arquivo enviado com erro na assinatura.
+- E0714: Arquivo enviado com erro na assinatura.
+
+=== CONCLUSÃO AUDITORIA ===
+Payload gzip/base64 comprovadamente idêntico ao XML assinado (hashes iguais).
+Roundtrip descompactado passa XMLVerifier, Digest e RSA localmente.
+E0714 neste cenário NÃO é corrupção de bytes no client.py — investigar validador SEFIN,
+cadeia ICP-Brasil no servidor, credenciamento do certificado ou divergência de ambiente.
