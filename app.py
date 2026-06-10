@@ -956,6 +956,12 @@ def init_db():
                 cur.execute(a)
             for a in controle_alters:
                 cur.execute(a)
+            viaturas_alters = [
+                "alter table cadastro_viaturas add column if not exists classificacao_original text;",
+                "alter table cadastro_viaturas add column if not exists origem text default 'propria';",
+            ]
+            for a in viaturas_alters:
+                cur.execute(a)
             cur.execute("""
             create table if not exists cadastro_viaturas (
               id uuid primary key default uuid_generate_v4(),
@@ -2721,6 +2727,21 @@ def _bool_cad(v):
     return _bool_controle(v)
 
 
+def normalizar_placa_viatura(placa):
+    import re
+    if not placa:
+        return ""
+    return re.sub(r"[\s\-.]", "", str(placa).upper().strip())
+
+
+def mapear_origem_viatura(classificacao):
+    raw = (classificacao or "").strip()
+    norm = raw.upper().replace("Ç", "C").replace("Ã", "A").replace("Õ", "O").replace("É", "E")
+    if "TERCEIRO" in norm:
+        return {"origem": "terceiro", "terceiro": True, "classificacao_original": raw or "TERCEIRO"}
+    return {"origem": "propria", "terceiro": False, "classificacao_original": raw or "LOG SOLUÇÕES"}
+
+
 def normalizar_viatura_cadastro(row, com_arquivos=False):
     if not row:
         return None
@@ -2728,7 +2749,19 @@ def normalizar_viatura_cadastro(row, com_arquivos=False):
     item["id"] = str(item.get("id"))
     item["status"] = _status_cad(item.get("status"))
     item["terceiro"] = bool(item.get("terceiro"))
+    origem = (_txt_cad(item.get("origem")) or "").lower()
+    if not origem:
+        origem = "terceiro" if item["terceiro"] else "propria"
+    item["origem"] = origem
+    item["origem_label"] = "Terceiro" if origem == "terceiro" else "Própria"
+    item["classificacao_original"] = (_txt_cad(item.get("classificacao_original")) or "").strip()
+    if not item["classificacao_original"]:
+        item["classificacao_original"] = "TERCEIRO" if origem == "terceiro" else "LOG SOLUÇÕES"
     item["exibicao"] = (item.get("exibicao") or item.get("placa") or item.get("modelo") or "-").strip()
+    item["nome_exibicao"] = item["exibicao"]
+    item["personalizacao"] = (_txt_cad(item.get("personalizacao")) or "").strip()
+    item["personalizada"] = bool(item["personalizacao"])
+    item["placa"] = normalizar_placa_viatura(item.get("placa")) or (_txt_cad(item.get("placa")) or "").upper()
     item["created_at"] = dt_str(item.get("created_at"))
     item["updated_at"] = dt_str(item.get("updated_at"))
     if com_arquivos:
@@ -2796,7 +2829,14 @@ def resumo_viaturas_cadastro():
           count(*) filter (where coalesce(status,'ativo')='inativo')::int as inativas,
           count(*) filter (where exists (
             select 1 from cadastro_viatura_arquivos a where a.viatura_id = cadastro_viaturas.id
-          ))::int as com_documentos
+          ))::int as com_documentos,
+          count(*) filter (where coalesce(trim(personalizacao),'') <> '')::int as personalizadas,
+          count(*) filter (
+            where coalesce(origem, case when coalesce(terceiro,false) then 'terceiro' else 'propria' end) = 'propria'
+          )::int as proprias,
+          count(*) filter (
+            where coalesce(origem, case when coalesce(terceiro,false) then 'terceiro' else 'propria' end) = 'terceiro'
+          )::int as terceiros
         from cadastro_viaturas
         """
     ) or {}
@@ -2805,6 +2845,9 @@ def resumo_viaturas_cadastro():
         "ativas": int(row.get("ativas") or 0),
         "inativas": int(row.get("inativas") or 0),
         "com_documentos": int(row.get("com_documentos") or 0),
+        "personalizadas": int(row.get("personalizadas") or 0),
+        "proprias": int(row.get("proprias") or 0),
+        "terceiros": int(row.get("terceiros") or 0),
     }
 
 
@@ -3128,13 +3171,39 @@ def viatura_cadastro_por_id(vid):
     return normalizar_viatura_cadastro(row, com_arquivos=True) if row else None
 
 
+def viatura_cadastro_por_placa(placa):
+    placa_n = normalizar_placa_viatura(placa)
+    if not placa_n:
+        return None
+    row = one(
+        """
+        select v.*,
+               (select count(*)::int from cadastro_viatura_arquivos a where a.viatura_id = v.id) as qtd_arquivos
+          from cadastro_viaturas v
+         where upper(replace(replace(replace(coalesce(v.placa,''), ' ', ''), '-', ''), '.', '')) = %s
+         limit 1
+        """,
+        (placa_n,),
+    )
+    return normalizar_viatura_cadastro(row) if row else None
+
+
 def salvar_viatura_cadastro(payload):
     p = payload or {}
     vid = (p.get("id") or "").strip()
-    placa = (_txt_cad(p.get("placa"), 12) or "").upper()
+    placa = normalizar_placa_viatura(p.get("placa")) or (_txt_cad(p.get("placa"), 12) or "").upper()
     if not placa:
         raise ValueError("Placa é obrigatória")
-    exibicao = _txt_cad(p.get("exibicao")) or placa
+    exibicao = _txt_cad(p.get("exibicao") or p.get("nome_exibicao")) or placa
+    origem_in = (_txt_cad(p.get("origem")) or "").lower()
+    if origem_in in ("propria", "terceiro"):
+        origem = origem_in
+        terceiro = origem == "terceiro"
+    else:
+        mapped = mapear_origem_viatura(p.get("classificacao_original"))
+        origem = mapped["origem"]
+        terceiro = mapped["terceiro"]
+    classificacao_original = _txt_cad(p.get("classificacao_original")) or mapear_origem_viatura(origem)["classificacao_original"]
     params = (
         placa,
         _txt_cad(p.get("marca")),
@@ -3156,7 +3225,9 @@ def salvar_viatura_cadastro(payload):
         _txt_cad(p.get("personalizacao")),
         _num_controle(p.get("consumo_km_l")) or None,
         _int_controle(p.get("hodometro")) or None,
-        _bool_cad(p.get("terceiro")),
+        terceiro,
+        classificacao_original,
+        origem,
     )
     if vid:
         q(
@@ -3166,20 +3237,26 @@ def salvar_viatura_cadastro(payload):
               ano_fabricacao=%s, ano_modelo=%s, combustivel=%s, capacidade_litros=%s,
               cor=%s, estado_placa=%s, tipo_viatura=%s, observacoes=%s, status=%s,
               cpf_cnpj_crlv=%s, exibicao=%s, telefone=%s, personalizacao=%s,
-              consumo_km_l=%s, hodometro=%s, terceiro=%s, updated_at=now()
+              consumo_km_l=%s, hodometro=%s, terceiro=%s, classificacao_original=%s, origem=%s,
+              updated_at=now()
             where id=%s
             """,
             params + (vid,),
         )
         return viatura_cadastro_por_id(vid)
+    existente = viatura_cadastro_por_placa(placa)
+    if existente:
+        p2 = dict(p)
+        p2["id"] = existente["id"]
+        return salvar_viatura_cadastro(p2)
     row = one(
         """
         insert into cadastro_viaturas (
           placa, marca, modelo, renavam, chassi, ano_fabricacao, ano_modelo,
           combustivel, capacidade_litros, cor, estado_placa, tipo_viatura, observacoes,
           status, cpf_cnpj_crlv, exibicao, telefone, personalizacao,
-          consumo_km_l, hodometro, terceiro, updated_at
-        ) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,now())
+          consumo_km_l, hodometro, terceiro, classificacao_original, origem, updated_at
+        ) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,now())
         returning id
         """,
         params,
@@ -3718,19 +3795,34 @@ def opcoes_motoristas_controle():
 def opcoes_viaturas_controle():
     rows = q(
         """
-        select id, placa, marca, modelo, exibicao, tipo_viatura
+        select id, placa, marca, modelo, exibicao, tipo_viatura, personalizacao, origem, terceiro, classificacao_original
           from cadastro_viaturas
          where coalesce(status, 'ativo') = 'ativo'
-         order by placa asc nulls last
+         order by coalesce(exibicao, placa) asc nulls last
         """,
         fetch=True,
     )
     out = []
     for r in rows:
-        placa = (r.get("placa") or "").strip().upper()
-        nome = (r.get("exibicao") or r.get("modelo") or r.get("tipo_viatura") or placa).strip()
-        label = f"{placa} — {nome}" if placa and nome and nome != placa else (placa or nome or "Sem identificação")
-        out.append({"id": str(r["id"]), "placa": placa, "nome": nome, "status": "ativo", "label": label})
+        item = normalizar_viatura_cadastro(r)
+        placa = item.get("placa") or ""
+        nome = item.get("nome_exibicao") or item.get("modelo") or placa
+        label = f"{nome} — {placa}" if placa and nome and nome != placa else (nome or placa or "Sem identificação")
+        if item.get("personalizacao"):
+            label += f" [{item['personalizacao']}]"
+        out.append({
+            "id": item["id"],
+            "placa": placa,
+            "nome": nome,
+            "nome_exibicao": nome,
+            "status": "ativo",
+            "label": label,
+            "origem": item.get("origem"),
+            "origem_label": item.get("origem_label"),
+            "personalizacao": item.get("personalizacao"),
+            "personalizada": item.get("personalizada"),
+            "classificacao_original": item.get("classificacao_original"),
+        })
     if out:
         return out
     rows = q(
@@ -4757,20 +4849,59 @@ def calcular_info_distancia_motorista(motorista, servico):
     }
 
 
+def _norm_seguradora(txt):
+    import re
+    t = (txt or "").upper().strip()
+    t = re.sub(r"[^A-Z0-9]", "", t.replace("Ç", "C").replace("Ã", "A").replace("Õ", "O").replace("É", "E"))
+    return t
+
+
+def _alerta_personalizacao_viatura(seguradora_servico, personalizacao_viatura):
+    seg = _norm_seguradora(seguradora_servico)
+    pers = _norm_seguradora(personalizacao_viatura)
+    if not pers or not seg:
+        return False, ""
+    if seg in pers or pers in seg:
+        return False, ""
+    return True, (
+        f"ATENÇÃO: viatura personalizada para {personalizacao_viatura.strip()} "
+        f"e o serviço é da seguradora {seguradora_servico.strip()}."
+    )
+
+
 @app.get('/api/servicos/{sid}/motoristas')
 def api_motoristas_para_servico(sid: str):
     s = servico_by_id(sid)
     ms = lista_motoristas()
+    seguradora_srv = (s.get("seguradora") or "").strip() if s else ""
 
     saida = []
     for m in ms:
         ocupado = motorista_ocupado(m.get("id"))
         info = calcular_info_distancia_motorista(m, s)
+        placa_trab = (m.get("placa_atual") or m.get("placa") or "").strip()
+        viatura = viatura_cadastro_por_placa(placa_trab)
+        alerta_pers = False
+        alerta_msg = ""
+        if viatura:
+            alerta_pers, alerta_msg = _alerta_personalizacao_viatura(
+                seguradora_srv, viatura.get("personalizacao")
+            )
 
         saida.append({
             **m,
             "ocupado": bool(ocupado),
             "servico_ocupado": ocupado.get("protocolo") if ocupado else None,
+            "viatura_exibicao": viatura.get("nome_exibicao") if viatura else (placa_trab or "-"),
+            "viatura_placa": viatura.get("placa") if viatura else placa_trab,
+            "viatura_origem": viatura.get("origem") if viatura else "",
+            "viatura_origem_label": viatura.get("origem_label") if viatura else "",
+            "viatura_personalizacao": viatura.get("personalizacao") if viatura else "",
+            "viatura_personalizada": bool(viatura.get("personalizada")) if viatura else False,
+            "viatura_classificacao": viatura.get("classificacao_original") if viatura else "",
+            "alerta_personalizacao": alerta_pers,
+            "alerta_personalizacao_msg": alerta_msg,
+            "seguradora_servico": seguradora_srv,
             **info,
         })
 

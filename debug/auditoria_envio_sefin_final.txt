@@ -1,20 +1,20 @@
 ==================================
 AUDITORIA ENVIO SEFIN — DEFINITIVA
-Gerado em: 2026-06-09T16:48:40-03:00
+Gerado em: 2026-06-10T15:57:45-03:00
 ==================================
 
 === HASH SHA256 (4 obrigatórios) ===
-hash_xml_final:              b1d435e7daf237f256749a7c8ae96153014d7f87bd1fa318d0bed6bd1acc8f6d
-hash_debug_file:             b1d435e7daf237f256749a7c8ae96153014d7f87bd1fa318d0bed6bd1acc8f6d
-hash_payload_gzip_raw:       e35bc92d40dbd756a780f55f85067b7985fd7b85207150c73089722a91999ca8
-hash_payload_descompactado:  b1d435e7daf237f256749a7c8ae96153014d7f87bd1fa318d0bed6bd1acc8f6d
+hash_xml_final:              74f7a14b59220791167a1f4eac54c27d9902a10962651182324ea134053cb179
+hash_debug_file:             74f7a14b59220791167a1f4eac54c27d9902a10962651182324ea134053cb179
+hash_payload_gzip_raw:       f71fca4ec019ca5fc57e637f9f8d36da00071688765076029a6626dbe1d10bb1
+hash_payload_descompactado:  74f7a14b59220791167a1f4eac54c27d9902a10962651182324ea134053cb179
 hashes_xml_iguais:           True
 
 === TAMANHOS ===
 tamanho_xml_final_bytes:     4796
-tamanho_gzip_raw_bytes:      2909
+tamanho_gzip_raw_bytes:      2916
 tamanho_payload_descompactado: 4796
-tamanho_dpsXmlGZipB64:       3880
+tamanho_dpsXmlGZipB64:       3888
 
 === ASSINATURA ===
 SignatureMethod: http://www.w3.org/2001/04/xmldsig-more#rsa-sha256

@@ -23,22 +23,40 @@
     </div>
   </header>
 
-  <div class="ctrl-kpis" id="cadKpisViaturas">
+  <div class="ctrl-kpis cad-kpis-viaturas" id="cadKpisViaturas">
     <div class="ctrl-kpi accent"><small>Total</small><b id="kpiVTotal">{{ kpis.total }}</b></div>
     <div class="ctrl-kpi"><small>Ativas</small><b id="kpiVAtivas">{{ kpis.ativas }}</b></div>
     <div class="ctrl-kpi"><small>Inativas</small><b id="kpiVInativas">{{ kpis.inativas }}</b></div>
     <div class="ctrl-kpi"><small>Com documentos</small><b id="kpiVDocs">{{ kpis.com_documentos }}</b></div>
+    <div class="ctrl-kpi"><small>Personalizadas</small><b id="kpiVPersonalizadas">{{ kpis.personalizadas }}</b></div>
+    <div class="ctrl-kpi"><small>Próprias</small><b id="kpiVProprias">{{ kpis.proprias }}</b></div>
+    <div class="ctrl-kpi"><small>Terceiros</small><b id="kpiVTerceiros">{{ kpis.terceiros }}</b></div>
   </div>
 
   <section class="ctrl-panel">
     <h2>Filtros</h2>
     <div class="ctrl-filters">
-      <div class="ctrl-field"><label>Busca rápida</label><input type="search" id="filtroBuscaV" placeholder="Placa, marca, modelo..."></div>
+      <div class="ctrl-field"><label>Busca rápida</label><input type="search" id="filtroBuscaV" placeholder="Exibição, placa, marca, personalização..."></div>
       <div class="ctrl-field"><label>Status</label>
         <select id="filtroStatusV"><option value="">Todos</option><option value="ativo">Ativo</option><option value="inativo">Inativo</option></select>
       </div>
-      <div class="ctrl-field"><label>Tipo</label><input type="text" id="filtroTipoV" placeholder="Tipo de viatura"></div>
-      <div class="ctrl-field"><label>Ano / modelo</label><input type="text" id="filtroAnoV" placeholder="Ex.: 2022"></div>
+      <div class="ctrl-field"><label>Classificação</label>
+        <select id="filtroClassificacaoV">
+          <option value="">Todas</option>
+          <option value="propria">Próprias</option>
+          <option value="terceiro">Terceiros</option>
+        </select>
+      </div>
+      <div class="ctrl-field"><label>Personalização</label>
+        <select id="filtroPersonalizacaoV">
+          <option value="">Todas</option>
+          <option value="com">Com personalização</option>
+          <option value="sem">Sem personalização</option>
+        </select>
+      </div>
+      <div class="ctrl-field"><label>Seguradora</label>
+        <select id="filtroSeguradoraV"><option value="">Todas</option></select>
+      </div>
       <div class="ctrl-field"><label>&nbsp;</label><button type="button" class="ctrl-btn ctrl-btn-outline" style="width:100%" id="btnLimparFiltrosV">Limpar</button></div>
     </div>
   </section>
@@ -49,7 +67,16 @@
       <table class="ctrl-table" id="tabelaViaturas">
         <thead>
           <tr>
-            <th>Exibição</th><th>Placa</th><th>Marca</th><th>Modelo</th><th>Ano Fab.</th><th>Ano Modelo</th><th>Tipo</th><th>Status</th><th>Ações</th>
+            <th>Exibição</th>
+            <th>Placa</th>
+            <th>Marca</th>
+            <th>Modelo</th>
+            <th>Ano Fab.</th>
+            <th>Ano Modelo</th>
+            <th>Classificação</th>
+            <th>Personalização</th>
+            <th>Status</th>
+            <th>Ações</th>
           </tr>
         </thead>
         <tbody id="tbodyViaturas"></tbody>
@@ -70,11 +97,17 @@
     </nav>
     <main class="cad-modal-main">
       <h2 class="cad-modal-title" id="modalViaturaTitulo">Nova viatura</h2>
+      <div id="viaturaBadgePersonalizada" class="cad-badge-personalizada" style="display:none"></div>
       <input type="hidden" id="viaturaId">
 
       <div class="cad-panel active" data-cad-panel="editar">
         <div class="cad-form-grid">
+          <div class="full"><label>Exibição (obrigatório)</label><input id="v_exibicao" required placeholder="Nome exibido na Central"></div>
           <div><label>Placa</label><input id="v_placa" required></div>
+          <div><label>Classificação original</label><input id="v_classificacao_original" placeholder="LOG SOLUÇÕES / TERCEIRO"></div>
+          <div><label>Origem</label>
+            <select id="v_origem"><option value="propria">Própria</option><option value="terceiro">Terceiro</option></select>
+          </div>
           <div><label>Marca</label><input id="v_marca"></div>
           <div><label>Modelo</label><input id="v_modelo"></div>
           <div><label>Renavam</label><input id="v_renavam"></div>
@@ -86,6 +119,7 @@
           <div><label>Cor predominante</label><input id="v_cor"></div>
           <div><label>Estado da placa</label><input id="v_estado_placa"></div>
           <div><label>Tipo da viatura</label><input id="v_tipo_viatura"></div>
+          <div><label>Personalização</label><input id="v_personalizacao" placeholder="Ex.: TOKIO MARINE"></div>
           <div><label>Status</label><select id="v_status"><option value="ativo">Ativo</option><option value="inativo">Inativo</option></select></div>
           <div class="full"><label>Observações</label><textarea id="v_observacoes" rows="3"></textarea></div>
         </div>
@@ -94,12 +128,10 @@
       <div class="cad-panel" data-cad-panel="config">
         <div class="cad-form-grid">
           <div><label>CPF/CNPJ no CRLV</label><input id="v_cpf_cnpj_crlv"></div>
-          <div><label>Exibição no sistema</label><input id="v_exibicao"></div>
           <div><label>Telefone da viatura</label><input id="v_telefone"></div>
-          <div><label>Personalização</label><input id="v_personalizacao"></div>
           <div><label>Consumo km/L</label><input type="number" step="0.01" id="v_consumo_km_l"></div>
           <div><label>Hodômetro</label><input type="number" id="v_hodometro"></div>
-          <div><label>Terceiro</label><select id="v_terceiro"><option value="false">Não</option><option value="true">Sim</option></select></div>
+          <div><label>Terceiro (legado)</label><select id="v_terceiro"><option value="false">Não</option><option value="true">Sim</option></select></div>
         </div>
       </div>
 
@@ -141,6 +173,6 @@
   </div>
 </div>
 
-<script src="/static/cadastros_viaturas.js"></script>
+<script src="/static/cadastros_viaturas.js?v=20260529"></script>
 </body>
 </html>

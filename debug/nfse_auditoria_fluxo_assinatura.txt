@@ -1,6 +1,6 @@
 ==================================
 AUDITORIA FLUXO ASSINATURA NFS-E
-Gerado em: 2026-06-09T16:48:40-03:00
+Gerado em: 2026-06-10T15:57:45-03:00
 ==================================
 
 ASSINATURA VÁLIDA APÓS SIGN = True

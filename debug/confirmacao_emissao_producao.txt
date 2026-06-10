@@ -160,3 +160,45 @@ codigos: ['E0714']
 status_http: 400
 detalhes: [{'Codigo': 'E0714', 'Descricao': 'Arquivo enviado com erro na assinatura.'}]
 
+==================================
+[2026-06-10T15:57:44-03:00] PRE-POST PRODUCAO — resumo antes da emissão
+==================================
+nota_id: 32f5ebe2-225b-45b4-b83d-fbae07d88cc0
+numero_rps: 2
+cnpj_prestador: 31494899000170
+im_prestador: 1.132.123-2
+razao_social: EZ LOGISTICA EIRELI
+tomador_nome: AWP SERVICE BRASIL LTDA
+tomador_doc: 52910023000137
+valor_nota: 1.0
+serie: 00001
+serie_rps: 1
+nDPS: 64509929799255
+nDPS_padded: 064509929799255
+infDPS_Id_previsto: DPS330455723149489900017000001064509929799255
+ambiente: producao
+ambiente_label: Produção
+endpoint_sefin: https://sefin.nfse.gov.br/SefinNacional/nfse
+aviso_validade_fiscal: ATENÇÃO: esta nota terá validade fiscal real perante a SEFIN Nacional.
+confirmacao_obrigatoria: EMITIR PRODUCAO
+confirmacao_recebida: EMITIR PRODUCAO
+resumo_texto: CNPJ prestador: 31494899000170
+IM: 1.132.123-2
+Tomador: AWP SERVICE BRASIL LTDA (52910023000137)
+Valor: R$ 1.00
+Série: 1 (Id: 00001)
+nDPS: 64509929799255
+infDPS.Id previsto: DPS330455723149489900017000001064509929799255
+Ambiente: Produção
+Endpoint: https://sefin.nfse.gov.br/SefinNacional/nfse
+ATENÇÃO: esta nota terá validade fiscal real perante a SEFIN Nacional.
+
+==================================
+[2026-06-10T15:57:49-03:00] POS-POST PRODUCAO — rejeitada
+==================================
+nota_id: 32f5ebe2-225b-45b4-b83d-fbae07d88cc0
+erro: E0714: Arquivo enviado com erro na assinatura.
+codigos: ['E0714']
+status_http: 400
+detalhes: [{'Codigo': 'E0714', 'Descricao': 'Arquivo enviado com erro na assinatura.'}]
+

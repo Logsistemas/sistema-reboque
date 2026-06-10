@@ -328,3 +328,41 @@
   max-width: 920px;
   grid-template-columns: 1fr;
 }
+
+/* Viaturas — classificação e personalização */
+.cad-kpis-viaturas {
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
+.cad-viatura-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.cad-badge-propria {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+.cad-badge-terceiro {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+.cad-badge-personalizada {
+  background: #fff7ed;
+  color: #9a3412;
+  border: 1px solid #fdba74;
+}
+.cad-row-personalizada {
+  background: rgba(255, 247, 237, 0.45);
+}
+#viaturaBadgePersonalizada.cad-badge-personalizada {
+  display: block;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+}

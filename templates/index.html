@@ -507,21 +507,42 @@ async function abrirModalMotorista(servicoId) {
   ` + ms.map((m, idx) => {
     const online = !!m.online;
     const ocupado = !!m.ocupado;
-    const placaAtual = m.placa_atual || m.placa || '';
+    const placaAtual = m.viatura_placa || m.placa_atual || m.placa || '';
+    const exibicao = m.viatura_exibicao || m.nome || '';
+    const origemLabel = m.viatura_origem_label || '';
+    const personalizacao = m.viatura_personalizacao || '';
     const distancia = formatarDistanciaMotorista(m);
     const disabled = (!online || ocupado) ? 'disabled' : '';
     const checked = (!disabled && idx === primeiroLivre) ? 'checked' : '';
     const statusTxt = !online ? 'Offline' : ocupado ? `Ocupado${m.servico_ocupado ? ' - ' + m.servico_ocupado : ''}` : 'Livre';
     const cls = !online ? 'offline' : ocupado ? 'ocupado' : 'online';
+    const alertaPers = !!m.alerta_personalizacao;
+    const badgePers = personalizacao
+      ? `<span class="central-badge-viatura central-badge-pers">Personalizada: ${escapeHtml(personalizacao)}</span>`
+      : '';
+    const badgeOrigem = origemLabel
+      ? `<span class="central-badge-viatura central-badge-origem">${escapeHtml(origemLabel)}</span>`
+      : '';
+    const alertaHtml = alertaPers
+      ? `<div class="central-alerta-personalizacao">${escapeHtml(m.alerta_personalizacao_msg || 'Viatura personalizada incompatível com a seguradora do serviço.')}</div>`
+      : '';
 
     return `
-      <label class="motorista-opcao ranking ${disabled ? 'bloqueado' : ''}">
+      <label class="motorista-opcao ranking ${disabled ? 'bloqueado' : ''} ${alertaPers ? 'alerta-personalizacao' : ''}">
         <span class="rank-num">${idx + 1}</span>
         <span class="rank-main">
           <input type="radio" name="motorista_id" value="${m.id}" ${checked} ${disabled}>
           <b>${safe(m.nome)}</b>
-          <span class="muted">(${safe(placaAtual || '-')})</span><br>
-          <span class="rank-badges"><span class="badge-dist">📍 ${safe(distancia)}</span></span>
+          <div class="rank-viatura-line">
+            <span><strong>${safe(exibicao)}</strong></span>
+            <span class="muted">Placa: ${safe(placaAtual || '-')}</span>
+          </div>
+          <span class="rank-badges">
+            <span class="badge-dist">📍 ${safe(distancia)}</span>
+            ${badgeOrigem}
+            ${badgePers}
+          </span>
+          ${alertaHtml}
         </span>
         <span class="status-dot ${cls}">${statusTxt}</span>
       </label>
