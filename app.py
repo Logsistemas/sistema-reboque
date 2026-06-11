@@ -688,6 +688,36 @@ def one(sql, params=None):
     rows=q(sql, params, True)
     return rows[0] if rows else None
 
+
+def _backup_controle_multas_frota_if_needed():
+    """Backup opcional de multas — não chamar no startup."""
+    marker = Path("data/backup/.multas_frota_v1")
+    if marker.exists():
+        return
+    try:
+        Path("data/backup").mkdir(parents=True, exist_ok=True)
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SET LOCAL statement_timeout = '5s'")
+                cur.execute(
+                    """
+                    select id, viatura, placa, auto_infracao, data_infracao, valor, vencimento, created_at
+                      from controle_multas
+                     order by created_at asc nulls last
+                     limit 5000
+                    """
+                )
+                rows = cur.fetchall() or []
+            conn.commit()
+        payload = [dict(r) for r in rows]
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        out = Path(f"data/backup/multas_backup_{ts}.json")
+        out.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+        marker.write_text(ts, encoding="utf-8")
+    except Exception as exc:
+        print(f"[warn] backup controle_multas ignorado: {exc}")
+
+
 def init_db():
     with get_conn() as conn:
         with conn.cursor() as cur:
@@ -873,6 +903,30 @@ def init_db():
               created_at timestamp default now(),
               updated_at timestamp default now()
             );""")
+            cur.execute("""
+            create table if not exists controle_patio (
+              id uuid primary key default uuid_generate_v4(),
+              data_entrada date,
+              hora_chegada time,
+              data_hora_chegada timestamp,
+              motorista text,
+              placa text not null,
+              modelo text,
+              cor text,
+              seguradora text,
+              data_saida date,
+              hora_saida time,
+              data_hora_saida timestamp,
+              responsavel_entrada text,
+              responsavel_saida text,
+              observacao text,
+              observacao_saida text,
+              status text default 'no_patio',
+              tempo_no_patio_minutos integer default 0,
+              anexos jsonb default '[]'::jsonb,
+              created_at timestamp default now(),
+              updated_at timestamp default now()
+            );""")
             alters=[
             "alter table motoristas add column if not exists tipo text;",
             "alter table motoristas add column if not exists cpf text;",
@@ -932,9 +986,23 @@ def init_db():
                 "alter table controle_abastecimentos add column if not exists data_hora timestamp;",
                 "alter table controle_abastecimentos add column if not exists desconsiderar_ultimo_km boolean default false;",
                 "alter table controle_abastecimentos add column if not exists gerar_contas_pagar boolean default false;",
+                "alter table controle_abastecimentos add column if not exists viatura_id uuid;",
+                "alter table controle_abastecimentos add column if not exists profissional_id uuid;",
+                "alter table controle_abastecimentos add column if not exists placa text;",
+                "alter table controle_abastecimentos add column if not exists km_rodado numeric(12,0);",
+                "alter table controle_abastecimentos add column if not exists media_km_litro numeric(12,3);",
+                "alter table controle_abastecimentos add column if not exists contas_pagar_id uuid;",
+                "alter table controle_abastecimentos add column if not exists alerta_hodometro text;",
                 "alter table controle_manutencoes add column if not exists itens jsonb default '[]'::jsonb;",
                 "alter table controle_manutencoes add column if not exists total_produtos numeric(12,2) default 0;",
                 "alter table controle_manutencoes add column if not exists total_servicos numeric(12,2) default 0;",
+                "alter table controle_manutencoes add column if not exists viatura_id uuid;",
+                "alter table controle_manutencoes add column if not exists placa text;",
+                "alter table controle_manutencoes add column if not exists fornecedor_id uuid;",
+                "alter table controle_manutencoes add column if not exists contas_pagar_id uuid;",
+                "alter table controle_manutencoes add column if not exists gerar_contas_pagar boolean default false;",
+                "alter table controle_manutencoes add column if not exists alerta_hodometro text;",
+                "alter table controle_manutencoes add column if not exists hodometro_menor_ultimo boolean default false;",
                 "alter table controle_multas add column if not exists data_hora_infracao timestamp;",
                 "alter table controle_multas add column if not exists data_limite_indicacao date;",
                 "alter table controle_multas add column if not exists endereco text;",
@@ -945,12 +1013,23 @@ def init_db():
                 "alter table controle_multas add column if not exists valor_pago numeric(12,2) default 0;",
                 "alter table controle_multas add column if not exists contas_pagar boolean default false;",
                 "alter table controle_multas add column if not exists extrato_profissional boolean default false;",
+                "alter table controle_multas add column if not exists viatura_id uuid;",
+                "alter table controle_multas add column if not exists placa text;",
+                "alter table controle_multas add column if not exists condutor_id uuid;",
+                "alter table controle_multas add column if not exists condutor_responsavel_id uuid;",
+                "alter table controle_multas add column if not exists valor_aberto numeric(12,2) default 0;",
+                "alter table controle_multas add column if not exists gerar_contas_pagar boolean default false;",
+                "alter table controle_multas add column if not exists gerar_extrato_profissional boolean default false;",
+                "alter table controle_multas add column if not exists contas_pagar_id uuid;",
+                "alter table controle_multas add column if not exists contas_pagar_ids jsonb default '[]'::jsonb;",
+                "alter table controle_multas add column if not exists extrato_profissional_id text;",
                 "alter table controle_seguros add column if not exists corretor text;",
                 "alter table controle_seguros add column if not exists telefone text;",
                 "alter table controle_seguros add column if not exists vencimento date;",
                 "alter table controle_checklists_viatura add column if not exists data_hora timestamp;",
                 "alter table controle_checklists_viatura add column if not exists itens_conferidos text;",
                 "alter table controle_checklists_viatura add column if not exists itens_problema text;",
+                "alter table controle_patio add column if not exists servico_id uuid;",
             ]
             for a in alters:
                 cur.execute(a)
@@ -1066,9 +1145,15 @@ def init_db():
                 "alter table cadastro_profissional_arquivos add column if not exists extensao text;",
                 "alter table cadastro_profissional_arquivos add column if not exists tipo text;",
                 "alter table cadastro_profissional_arquivos add column if not exists caminho_arquivo text;",
+                "alter table cadastro_profissionais add column if not exists classificacao_vinculo text;",
             ]
             for a in profissionais_alters:
                 cur.execute(a)
+            cur.execute("""
+                update cadastro_profissionais
+                   set classificacao_vinculo = case when coalesce(terceiro, false) then 'terceiro' else 'contratado' end
+                 where coalesce(trim(classificacao_vinculo), '') = ''
+            """)
             cur.execute("""
             create table if not exists cadastro_contatos (
               id uuid primary key default uuid_generate_v4(),
@@ -2787,6 +2872,90 @@ def _nome_exibicao_profissional(item):
     )
 
 
+def normalizar_cpf_profissional(cpf):
+    if not cpf:
+        return ""
+    digits = re.sub(r"\D", "", str(cpf))
+    return digits
+
+
+def formatar_cpf_profissional(cpf):
+    n = normalizar_cpf_profissional(cpf)
+    if len(n) == 11:
+        return f"{n[:3]}.{n[3:6]}.{n[6:9]}-{n[9:]}"
+    if len(n) == 14:
+        return f"{n[:2]}.{n[2:5]}.{n[5:8]}/{n[8:12]}-{n[12:]}"
+    return (cpf or "").strip()
+
+
+def normalizar_telefone_profissional(tel):
+    if not tel:
+        return ""
+    return re.sub(r"\D", "", str(tel))
+
+
+def formatar_telefone_profissional(tel):
+    n = normalizar_telefone_profissional(tel)
+    if len(n) == 11:
+        return f"({n[:2]}) {n[2:7]}-{n[7:]}"
+    if len(n) == 10:
+        return f"({n[:2]}) {n[2:6]}-{n[6:]}"
+    return (tel or "").strip()
+
+
+def normalizar_nome_trabalho_profissional(nome):
+    return " ".join(str(nome or "").split())
+
+
+def normalizar_nome_completo_profissional(nome):
+    return " ".join(str(nome or "").upper().split())
+
+
+def mapear_classificacao_vinculo_profissional(classificacao):
+    raw = (classificacao or "").strip()
+    norm = raw.upper().replace("Ç", "C").replace("Ã", "A").replace("Õ", "O").replace("É", "E").replace("Ô", "O")
+    if any(t in norm for t in ("TERCEIRO", "TERCEIROS", "PRESTADOR", "AUTONOMO", "AUTÔNOMO", "TERCEIRIZADO", "TERCEIRIZADA")):
+        return {"classificacao_vinculo": "terceiro", "terceiro": True, "classificacao_original": raw or "TERCEIRO"}
+    if any(t in norm for t in ("CONTRATADO", "FUNCIONARIO", "FUNCIONÁRIO", "COLABORADOR", "FIXO")):
+        return {"classificacao_vinculo": "contratado", "terceiro": False, "classificacao_original": raw or "CONTRATADO"}
+    return {"classificacao_vinculo": "contratado", "terceiro": False, "classificacao_original": raw or "CONTRATADO"}
+
+
+_MOTORISTA_KEYWORDS = (
+    "MOTORISTA", "LEVE", "PESADO", "PRANCHAO", "PRANCHÃO", "APOIO", "REBOQUEIRO", "CARRETINHA", "CARRETINHO",
+)
+
+
+def inferir_tipo_e_funcao_profissional(funcao=None, categoria=None, nome_trabalho=None):
+    partes = [funcao, categoria, nome_trabalho]
+    texto = " ".join(str(p or "") for p in partes).upper()
+    texto = texto.replace("Ã", "A").replace("Ç", "C").replace("Õ", "O").replace("Ô", "O")
+    if any(kw in texto for kw in _MOTORISTA_KEYWORDS):
+        func = _txt_cad(funcao) or _txt_cad(categoria) or ""
+        if not func:
+            nt = (nome_trabalho or "").upper()
+            for k in ("CARRETINHA", "CARRETINHO", "PESADO", "PRANCHAO", "PRANCHÃO", "LEVE", "REBOQUEIRO", "MOTORISTA", "APOIO"):
+                if k in nt:
+                    func = k.title().replace("Pranchao", "Pranchão")
+                    break
+        return {"tipo_profissional": "motorista", "funcao": func or "Motorista"}
+    func = _txt_cad(funcao) or _txt_cad(categoria) or ""
+    if not func:
+        nt = (nome_trabalho or "").upper()
+        for k in ("DIARISTA", "PLANTAO", "PLANTÃO", "ADMINISTRATIVO", "OPERACIONAL"):
+            if k in nt:
+                func = k.title().replace("Plantao", "Plantão")
+                break
+    return {"tipo_profissional": "operacional", "funcao": func or "Operacional"}
+
+
+def _vinculo_profissional_de_item(item):
+    vinculo = (_txt_cad(item.get("classificacao_vinculo")) or "").lower()
+    if vinculo in ("contratado", "terceiro"):
+        return vinculo
+    return "terceiro" if bool(item.get("terceiro")) else "contratado"
+
+
 def normalizar_profissional_cadastro(row, com_arquivos=False):
     if not row:
         return None
@@ -2794,16 +2963,30 @@ def normalizar_profissional_cadastro(row, com_arquivos=False):
     item["id"] = str(item.get("id"))
     if item.get("motorista_id"):
         item["motorista_id"] = str(item["motorista_id"])
-    item["nome_completo"] = (item.get("nome_completo") or item.get("nome") or "").strip()
-    item["nome_trabalho"] = (item.get("nome_trabalho") or item.get("nome_completo") or item.get("nome") or "").strip()
-    item["nome"] = _nome_exibicao_profissional(item)
-    item["telefone"] = (item.get("telefone_movel") or item.get("telefone_fixo") or item.get("telefone") or "").strip()
+    item["nome_completo"] = normalizar_nome_completo_profissional(
+        item.get("nome_completo") or item.get("nome") or ""
+    )
+    item["nome_trabalho"] = normalizar_nome_trabalho_profissional(
+        item.get("nome_trabalho") or item.get("nome_completo") or item.get("nome") or ""
+    )
+    item["nome_exibicao"] = _nome_exibicao_profissional(item)
+    item["nome"] = item["nome_exibicao"]
+    tel_raw = item.get("telefone_movel") or item.get("telefone_fixo") or item.get("telefone") or ""
+    item["telefone"] = formatar_telefone_profissional(tel_raw)
+    item["telefone_norm"] = normalizar_telefone_profissional(tel_raw)
+    item["cpf_norm"] = normalizar_cpf_profissional(item.get("cpf"))
+    item["cpf"] = formatar_cpf_profissional(item.get("cpf")) if item["cpf_norm"] else (item.get("cpf") or "").strip()
+    item["classificacao_vinculo"] = _vinculo_profissional_de_item(item)
+    item["terceiro"] = item["classificacao_vinculo"] == "terceiro"
+    item["vinculo_label"] = "Terceiro" if item["terceiro"] else "Contratado"
+    tp = (_txt_cad(item.get("tipo_profissional")) or "operacional").lower()
+    item["tipo_profissional"] = "motorista" if tp == "motorista" else "operacional"
+    item["tipo_profissional_label"] = "Motorista" if item["tipo_profissional"] == "motorista" else "Operacional"
     item["cnh_numero"] = (item.get("cnh_numero") or item.get("cnh") or "").strip()
     item["cnh_vencimento"] = _fmt_data_cad(item.get("cnh_vencimento") or item.get("validade_cnh"))
     item["cnh_categoria"] = (item.get("cnh_categoria") or item.get("categoria_cnh") or "").strip()
     item["data_nascimento_fmt"] = _fmt_data_cad(item.get("data_nascimento"))
     item["status"] = _status_cad(item.get("status"))
-    item["terceiro"] = bool(item.get("terceiro"))
     item["pode_receber_servicos"] = bool(item.get("pode_receber_servicos"))
     item["pode_aparecer_controle"] = bool(item.get("pode_aparecer_controle"))
     item["created_at"] = dt_str(item.get("created_at"))
@@ -2858,7 +3041,20 @@ def resumo_profissionais_cadastro():
           count(*)::int as total,
           count(*) filter (where coalesce(status,'ativo')='ativo')::int as ativos,
           count(*) filter (where coalesce(status,'ativo')='inativo')::int as inativos,
-          count(*) filter (where coalesce(funcao,'') ilike '%%motorista%%')::int as motoristas
+          count(*) filter (
+            where coalesce(tipo_profissional, '') = 'motorista'
+               or coalesce(funcao, '') ilike '%%motorista%%'
+          )::int as motoristas,
+          count(*) filter (
+            where coalesce(tipo_profissional, '') = 'operacional'
+               and coalesce(funcao, '') not ilike '%%motorista%%'
+          )::int as operacionais,
+          count(*) filter (
+            where coalesce(classificacao_vinculo, case when coalesce(terceiro,false) then 'terceiro' else 'contratado' end) = 'contratado'
+          )::int as contratados,
+          count(*) filter (
+            where coalesce(classificacao_vinculo, case when coalesce(terceiro,false) then 'terceiro' else 'contratado' end) = 'terceiro'
+          )::int as terceiros
         from cadastro_profissionais
         """
     ) or {}
@@ -2867,6 +3063,9 @@ def resumo_profissionais_cadastro():
         "ativos": int(row.get("ativos") or 0),
         "inativos": int(row.get("inativos") or 0),
         "motoristas": int(row.get("motoristas") or 0),
+        "operacionais": int(row.get("operacionais") or 0),
+        "contratados": int(row.get("contratados") or 0),
+        "terceiros": int(row.get("terceiros") or 0),
     }
 
 
@@ -3296,17 +3495,131 @@ def profissional_cadastro_por_id(pid):
     return normalizar_profissional_cadastro(row, com_arquivos=True) if row else None
 
 
+def profissional_cadastro_por_cpf(cpf):
+    cpf_n = normalizar_cpf_profissional(cpf)
+    if not cpf_n:
+        return None
+    row = one(
+        """
+        select * from cadastro_profissionais
+         where regexp_replace(coalesce(cpf,''), '[^0-9]', '', 'g') = %s
+         limit 1
+        """,
+        (cpf_n,),
+    )
+    return normalizar_profissional_cadastro(row) if row else None
+
+
+def profissional_cadastro_por_nome_telefone(nome_completo, telefone):
+    nome_n = normalizar_nome_completo_profissional(nome_completo)
+    tel_n = normalizar_telefone_profissional(telefone)
+    if not nome_n or not tel_n:
+        return None
+    row = one(
+        """
+        select * from cadastro_profissionais
+         where upper(trim(coalesce(nome_completo, nome))) = %s
+           and regexp_replace(coalesce(telefone_movel, telefone, ''), '[^0-9]', '', 'g') = %s
+         limit 1
+        """,
+        (nome_n, tel_n),
+    )
+    return normalizar_profissional_cadastro(row) if row else None
+
+
+def profissional_cadastro_por_motorista_id(mid):
+    if not mid:
+        return None
+    row = one(
+        "select * from cadastro_profissionais where motorista_id=%s limit 1",
+        (str(mid),),
+    )
+    return normalizar_profissional_cadastro(row) if row else None
+
+
+def _sync_motorista_profissional(prof_id, payload):
+    """Cria/atualiza registro em motoristas para profissionais do tipo motorista."""
+    prof = profissional_cadastro_por_id(prof_id)
+    if not prof:
+        return
+    if (prof.get("tipo_profissional") or "").lower() != "motorista":
+        return
+    nome_exib = prof.get("nome_exibicao") or prof.get("nome_trabalho") or prof.get("nome_completo")
+    tel = prof.get("telefone_norm") or normalizar_telefone_profissional(prof.get("telefone"))
+    cpf = prof.get("cpf_norm") or normalizar_cpf_profissional(prof.get("cpf"))
+    cnh = (prof.get("cnh_numero") or "").strip()
+    mid = prof.get("motorista_id")
+    if mid:
+        q(
+            """
+            update motoristas set
+              nome=%s, telefone=%s, cpf=%s, cnh=%s, tipo=%s, ativo=%s, ultima_atualizacao=now()
+             where id=%s
+            """,
+            (
+                nome_exib,
+                formatar_telefone_profissional(tel) if tel else None,
+                cpf or None,
+                cnh or None,
+                prof.get("funcao") or "Motorista",
+                prof.get("status") == "ativo",
+                str(mid),
+            ),
+        )
+        return
+    row = one(
+        """
+        insert into motoristas (nome, telefone, cpf, cnh, tipo, ativo, online, ultima_atualizacao)
+        values (%s, %s, %s, %s, %s, %s, false, now())
+        returning id
+        """,
+        (
+            nome_exib,
+            formatar_telefone_profissional(tel) if tel else None,
+            cpf or None,
+            cnh or None,
+            prof.get("funcao") or "Motorista",
+            prof.get("status") == "ativo",
+        ),
+    )
+    if row:
+        q("update cadastro_profissionais set motorista_id=%s, updated_at=now() where id=%s", (str(row["id"]), str(prof_id)))
+
+
 def _params_profissional_cadastro(p):
     p = p or {}
-    nome_completo = _txt_cad(p.get("nome_completo") or p.get("nome"))
+    nome_completo = normalizar_nome_completo_profissional(p.get("nome_completo") or p.get("nome"))
     if not nome_completo:
         raise ValueError("Nome completo é obrigatório")
-    nome_trabalho = _txt_cad(p.get("nome_trabalho")) or nome_completo
+    nome_trabalho = normalizar_nome_trabalho_profissional(
+        p.get("nome_trabalho") or p.get("nome_exibicao") or nome_completo
+    )
     nome_legacy = nome_trabalho
+    vinculo_in = (_txt_cad(p.get("classificacao_vinculo")) or "").lower()
+    if vinculo_in in ("contratado", "terceiro"):
+        vinculo = vinculo_in
+        terceiro = vinculo == "terceiro"
+    else:
+        mapped = mapear_classificacao_vinculo_profissional(p.get("classificacao_original") or p.get("classificacao"))
+        vinculo = mapped["classificacao_vinculo"]
+        terceiro = mapped["terceiro"]
+    tipo_in = (_txt_cad(p.get("tipo_profissional")) or "").lower()
+    if tipo_in in ("motorista", "operacional"):
+        tipo_prof = tipo_in
+    else:
+        infer = inferir_tipo_e_funcao_profissional(p.get("funcao"), p.get("categoria"), nome_trabalho)
+        tipo_prof = infer["tipo_profissional"]
+    funcao = _txt_cad(p.get("funcao")) or inferir_tipo_e_funcao_profissional(
+        p.get("funcao"), p.get("categoria"), nome_trabalho
+    ).get("funcao")
     cnh_numero = _txt_cad(p.get("cnh_numero") or p.get("cnh"))
     cnh_venc = _parse_data_controle(p.get("cnh_vencimento") or p.get("validade_cnh"))
     cnh_cat = _txt_cad(p.get("cnh_categoria") or p.get("categoria_cnh"))
-    tel_movel = _txt_cad(p.get("telefone_movel") or p.get("telefone"))
+    tel_movel_raw = normalizar_telefone_profissional(p.get("telefone_movel") or p.get("telefone"))
+    tel_movel = tel_movel_raw or None
+    tel_fixo_raw = normalizar_telefone_profissional(p.get("telefone_fixo"))
+    tel_fixo = tel_fixo_raw or None
+    cpf = normalizar_cpf_profissional(p.get("cpf")) or None
     remuneracao = _txt_cad(p.get("remuneracao"))
     if remuneracao is None and p.get("comissao_padrao") not in (None, ""):
         remuneracao = str(p.get("comissao_padrao"))
@@ -3315,10 +3628,10 @@ def _params_profissional_cadastro(p):
         nome_completo,
         nome_trabalho,
         _parse_data_controle(p.get("data_nascimento")),
-        _txt_cad(p.get("cpf")),
+        cpf,
         _txt_cad(p.get("rg")),
         tel_movel,
-        _txt_cad(p.get("telefone_fixo")),
+        tel_fixo,
         _txt_cad(p.get("estado_civil")),
         _txt_cad(p.get("email")),
         _txt_cad(p.get("cep")),
@@ -3327,9 +3640,9 @@ def _params_profissional_cadastro(p):
         _txt_cad(p.get("cidade")),
         _txt_cad(p.get("uf")),
         _txt_cad(p.get("observacoes")),
-        _bool_cad(p.get("terceiro")),
+        terceiro,
         _txt_cad(p.get("cnpj")),
-        _txt_cad(p.get("funcao")),
+        funcao,
         remuneracao,
         _txt_cad(p.get("forma_pagamento")),
         _parse_data_controle(p.get("data_admissao")),
@@ -3350,17 +3663,34 @@ def _params_profissional_cadastro(p):
         cnh_venc,
         tel_movel,
         _txt_cad(p.get("endereco")),
-        _txt_cad(p.get("tipo_profissional")),
+        tipo_prof,
         _num_controle(p.get("comissao_padrao")),
         _bool_cad(p.get("pode_receber_servicos")),
         _bool_cad(p.get("pode_aparecer_controle")),
         (p.get("motorista_id") or "").strip() or None,
+        vinculo,
     )
 
 
 def salvar_profissional_cadastro(payload):
     p = payload or {}
     pid = (p.get("id") or "").strip()
+    if not pid:
+        cpf_busca = normalizar_cpf_profissional(p.get("cpf"))
+        if cpf_busca:
+            existente = profissional_cadastro_por_cpf(cpf_busca)
+            if existente:
+                pid = existente["id"]
+        if not pid:
+            existente = profissional_cadastro_por_nome_telefone(
+                p.get("nome_completo") or p.get("nome"),
+                p.get("telefone_movel") or p.get("telefone"),
+            )
+            if existente:
+                pid = existente["id"]
+    if pid:
+        p = dict(p)
+        p["id"] = pid
     params = _params_profissional_cadastro(p)
     cols_update = """
       filial_cnpj=%s, nome_completo=%s, nome_trabalho=%s, data_nascimento=%s,
@@ -3372,10 +3702,11 @@ def salvar_profissional_cadastro(payload):
       cnh_numero=%s, cnh_vencimento=%s, cnh_categoria=%s, status=%s,
       nome=%s, cnh=%s, categoria_cnh=%s, validade_cnh=%s, telefone=%s, endereco=%s,
       tipo_profissional=%s, comissao_padrao=%s, pode_receber_servicos=%s,
-      pode_aparecer_controle=%s, motorista_id=%s, updated_at=now()
+      pode_aparecer_controle=%s, motorista_id=%s, classificacao_vinculo=%s, updated_at=now()
     """
     if pid:
         q(f"update cadastro_profissionais set {cols_update} where id=%s", params + (pid,))
+        _sync_motorista_profissional(pid, p)
         return profissional_cadastro_por_id(pid)
     row = one(
         f"""
@@ -3389,13 +3720,15 @@ def salvar_profissional_cadastro(payload):
           cnh_numero, cnh_vencimento, cnh_categoria, status,
           nome, cnh, categoria_cnh, validade_cnh, telefone, endereco,
           tipo_profissional, comissao_padrao, pode_receber_servicos,
-          pode_aparecer_controle, motorista_id, updated_at
+          pode_aparecer_controle, motorista_id, classificacao_vinculo, updated_at
         ) values ({",".join(["%s"] * len(params))}, now())
         returning id
         """,
         params,
     )
-    return profissional_cadastro_por_id(row["id"])
+    new_id = str(row["id"])
+    _sync_motorista_profissional(new_id, p)
+    return profissional_cadastro_por_id(new_id)
 
 
 def excluir_profissional_cadastro(pid):
@@ -3770,7 +4103,8 @@ def opcoes_motoristas_controle():
     rows = q(
         """
         select id,
-               coalesce(nullif(trim(nome_trabalho),''), nullif(trim(nome_completo),''), nome) as nome
+               coalesce(nullif(trim(nome_trabalho),''), nullif(trim(nome_completo),''), nome) as nome,
+               nome_completo, nome_trabalho, funcao, tipo_profissional, classificacao_vinculo, terceiro
           from cadastro_profissionais
          where coalesce(status, 'ativo') = 'ativo'
            and (
@@ -3783,10 +4117,21 @@ def opcoes_motoristas_controle():
         """,
         fetch=True,
     )
-    out = [
-        {"id": str(r["id"]), "nome": (r.get("nome") or "").strip(), "status": "ativo"}
-        for r in rows
-    ]
+    out = []
+    for r in rows:
+        item = normalizar_profissional_cadastro(r)
+        out.append({
+            "id": item["id"],
+            "nome": item.get("nome_exibicao") or item.get("nome"),
+            "nome_exibicao": item.get("nome_exibicao"),
+            "nome_completo": item.get("nome_completo"),
+            "funcao": item.get("funcao"),
+            "tipo_profissional": item.get("tipo_profissional"),
+            "tipo_profissional_label": item.get("tipo_profissional_label"),
+            "classificacao_vinculo": item.get("classificacao_vinculo"),
+            "vinculo_label": item.get("vinculo_label"),
+            "status": "ativo",
+        })
     if out:
         return out
     return opcoes_motoristas_legado()
@@ -3857,6 +4202,2414 @@ def api_opcoes_profissionais():
 @app.get("/api/opcoes/viaturas")
 def api_opcoes_viaturas():
     return opcoes_viaturas_controle()
+
+
+# ============================================================
+# FROTA — Abastecimentos (premium)
+# ============================================================
+
+FROTA_POSTOS_ABASTECIMENTO = ("INTERNO", "BOMBA EXTERNA", "BOMBA INTERNA")
+FROTA_COMBUSTIVEIS = ("DIESEL S10", "DIESEL S500", "GASOLINA", "ETANOL", "ARLA 32")
+
+
+def _label_viatura_abastecimento(v):
+    if not v:
+        return ""
+    exib = (v.get("nome_exibicao") or v.get("exibicao") or v.get("modelo") or "").strip()
+    placa = (v.get("placa") or "").strip()
+    if exib and placa:
+        return f"{exib} — {placa}"
+    return exib or placa or ""
+
+
+def _fornecedor_pagar_abastecimento(posto):
+    p = (posto or "").strip().upper()
+    if p == "INTERNO":
+        return "Posto Interno"
+    return (posto or "").strip() or "Posto"
+
+
+def _criar_conta_pagar_abastecimento(abast):
+    row_cat = one(
+        """
+        select id, descricao from financeiro_categorias
+         where natureza='Despesa'
+           and (descricao ilike '%%Combust%%' or descricao ilike '%%Abastec%%')
+         order by case when descricao ilike '%%Combust%%' then 0 else 1 end, ordem asc
+         limit 1
+        """
+    )
+    categoria_id = str(row_cat["id"]) if row_cat else None
+    categoria = (row_cat.get("descricao") if row_cat else None) or "Combustível"
+    viatura_label = (abast.get("viatura") or abast.get("placa") or "").strip()
+    combustivel = (abast.get("combustivel") or "").strip()
+    litros = float(abast.get("litros") or 0)
+    litros_txt = f"{litros:.3f}".rstrip("0").rstrip(".")
+    descricao = f"Abastecimento - {viatura_label} - {combustivel} - {litros_txt}L"
+    venc = abast.get("data_abastecimento")
+    if hasattr(venc, "isoformat"):
+        venc = venc
+    elif isinstance(venc, str) and venc:
+        venc = _parse_data_controle(venc)
+    else:
+        venc = None
+    valor = float(abast.get("valor_total") or 0)
+    if valor <= 0:
+        raise ValueError("Valor total inválido para contas a pagar")
+    row = one(
+        """
+        insert into financeiro_contas_pagar (
+          fornecedor, descricao, categoria, categoria_id, competencia, emissao, vencimento,
+          valor, parcelas, status, observacoes, updated_at
+        ) values (%s,%s,%s,%s,%s,%s,%s,%s,1,'em_aberto',%s,now())
+        returning id
+        """,
+        (
+            _fornecedor_pagar_abastecimento(abast.get("posto")),
+            descricao,
+            categoria,
+            categoria_id,
+            venc,
+            venc,
+            venc,
+            valor,
+            f"Gerado automaticamente do abastecimento {abast.get('id') or ''}".strip(),
+        ),
+    )
+    return str(row["id"])
+
+
+def ultimo_abastecimento_viatura_frota(viatura_id, excluir_id=None):
+    if not viatura_id:
+        return None
+    params = [str(viatura_id)]
+    sql = """
+        select id, hodometro, data_hora, data_abastecimento, viatura, placa
+          from controle_abastecimentos
+         where coalesce(status, 'ativo') = 'ativo'
+           and viatura_id = %s
+           and hodometro is not null
+    """
+    if excluir_id:
+        sql += " and id <> %s"
+        params.append(str(excluir_id))
+    sql += """
+         order by coalesce(data_hora, data_abastecimento::timestamp) desc nulls last,
+                  hodometro desc nulls last
+         limit 1
+    """
+    return one(sql, tuple(params))
+
+
+def _calcular_km_media_abastecimento(hodometro_atual, litros, ultimo, desconsiderar=False):
+    hod = _int_controle(hodometro_atual)
+    lit = _num_controle(litros)
+    km_rodado = None
+    media = None
+    alerta = ""
+    ult_hod = None
+    if ultimo and ultimo.get("hodometro") is not None:
+        ult_hod = _int_controle(ultimo.get("hodometro"))
+        if hod is not None and ult_hod is not None:
+            km_rodado = hod - ult_hod
+            if km_rodado < 0 and not desconsiderar:
+                alerta = (
+                    f"Hodômetro informado ({hod}) é menor que o último registrado ({ult_hod}) "
+                    f"para esta viatura."
+                )
+            elif km_rodado >= 0 and lit > 0:
+                media = round(km_rodado / lit, 3)
+            elif km_rodado < 0 and desconsiderar:
+                km_rodado = None
+                media = None
+    return {
+        "km_rodado": km_rodado,
+        "media_km_litro": media,
+        "alerta_hodometro": alerta,
+        "ultimo_hodometro": ult_hod,
+    }
+
+
+def normalizar_abastecimento_frota(row):
+    if not row:
+        return None
+    item = dict(row)
+    item["id"] = str(item.get("id"))
+    if item.get("viatura_id"):
+        item["viatura_id"] = str(item["viatura_id"])
+    if item.get("profissional_id"):
+        item["profissional_id"] = str(item["profissional_id"])
+    if item.get("contas_pagar_id"):
+        item["contas_pagar_id"] = str(item["contas_pagar_id"])
+    item["litros"] = float(item.get("litros") or 0)
+    item["valor_unitario"] = float(item.get("valor_unitario") or 0)
+    item["valor_total"] = float(item.get("valor_total") or 0)
+    item["hodometro"] = _int_controle(item.get("hodometro")) if item.get("hodometro") is not None else None
+    item["km_rodado"] = _int_controle(item.get("km_rodado")) if item.get("km_rodado") is not None else None
+    item["media_km_litro"] = float(item["media_km_litro"]) if item.get("media_km_litro") is not None else None
+    item["desconsiderar_ultimo_km"] = bool(item.get("desconsiderar_ultimo_km"))
+    item["gerar_contas_pagar"] = bool(item.get("gerar_contas_pagar"))
+    item["status"] = (item.get("status") or "ativo").lower()
+    dh = item.get("data_hora")
+    if dh and hasattr(dh, "strftime"):
+        item["data_hora_fmt"] = dh.strftime("%d/%m/%Y %H:%M")
+        item["data_hora_iso"] = dh.strftime("%Y-%m-%dT%H:%M")
+    else:
+        item["data_hora_fmt"] = _formatar_valor_controle("data_hora", dh)
+        item["data_hora_iso"] = str(dh)[:16] if dh else ""
+    item["litros_fmt"] = f"{item['litros']:.3f}".rstrip("0").rstrip(".")
+    item["valor_unitario_fmt"] = fmt_moeda(item["valor_unitario"])
+    item["valor_total_fmt"] = fmt_moeda(item["valor_total"])
+    item["media_km_litro_fmt"] = f"{item['media_km_litro']:.2f}" if item.get("media_km_litro") is not None else "-"
+    item["km_rodado_fmt"] = str(item["km_rodado"]) if item.get("km_rodado") is not None else "-"
+    item["hodometro_fmt"] = str(item["hodometro"]) if item.get("hodometro") is not None else "-"
+    item["posto_interno"] = (item.get("posto") or "").strip().upper() == "INTERNO"
+    item["created_at"] = dt_str(item.get("created_at"))
+    item["updated_at"] = dt_str(item.get("updated_at"))
+    return item
+
+
+def _where_abastecimentos_frota(filtros=None):
+    filtros = filtros or {}
+    parts = ["coalesce(a.status, 'ativo') <> 'cancelado'"]
+    params = []
+    if filtros.get("data_ini"):
+        parts.append("coalesce(a.data_hora, a.data_abastecimento::timestamp)::date >= %s")
+        params.append(filtros["data_ini"])
+    if filtros.get("data_fim"):
+        parts.append("coalesce(a.data_hora, a.data_abastecimento::timestamp)::date <= %s")
+        params.append(filtros["data_fim"])
+    if filtros.get("viatura_id"):
+        parts.append("a.viatura_id = %s")
+        params.append(str(filtros["viatura_id"]))
+    if filtros.get("profissional_id"):
+        parts.append("a.profissional_id = %s")
+        params.append(str(filtros["profissional_id"]))
+    if filtros.get("posto"):
+        parts.append("upper(trim(coalesce(a.posto,''))) = upper(trim(%s))")
+        params.append(filtros["posto"])
+    if filtros.get("combustivel"):
+        parts.append("upper(trim(coalesce(a.combustivel,''))) = upper(trim(%s))")
+        params.append(filtros["combustivel"])
+    if filtros.get("busca"):
+        parts.append(
+            """
+            (
+              coalesce(a.viatura,'') ilike %s
+              or coalesce(a.placa,'') ilike %s
+              or coalesce(a.profissional,'') ilike %s
+              or coalesce(a.posto,'') ilike %s
+              or coalesce(a.combustivel,'') ilike %s
+              or coalesce(a.observacoes,'') ilike %s
+            )
+            """
+        )
+        b = f"%{filtros['busca']}%"
+        params.extend([b, b, b, b, b, b])
+    where = " where " + " and ".join(parts) if parts else ""
+    return where, params
+
+
+def resumo_abastecimentos_frota(filtros=None):
+    where, params = _where_abastecimentos_frota(filtros)
+    row = one(
+        f"""
+        select
+          count(*)::int as total,
+          coalesce(sum(litros), 0)::float as litros,
+          coalesce(sum(valor_total), 0)::float as valor_total,
+          coalesce(sum(km_rodado), 0)::float as km_total,
+          count(*) filter (where upper(trim(coalesce(posto,''))) = 'INTERNO')::int as internos,
+          count(*) filter (where upper(trim(coalesce(posto,''))) <> 'INTERNO')::int as externos
+        from controle_abastecimentos a
+        {where}
+        """,
+        tuple(params) if params else None,
+    ) or {}
+    litros = float(row.get("litros") or 0)
+    km_total = float(row.get("km_total") or 0)
+    media_geral = round(km_total / litros, 2) if litros > 0 and km_total > 0 else 0
+    return {
+        "total": int(row.get("total") or 0),
+        "litros": round(litros, 3),
+        "valor_total": round(float(row.get("valor_total") or 0), 2),
+        "media_km_litro": media_geral,
+        "internos": int(row.get("internos") or 0),
+        "externos": int(row.get("externos") or 0),
+    }
+
+
+def listar_abastecimentos_frota(filtros=None):
+    where, params = _where_abastecimentos_frota(filtros)
+    rows = q(
+        f"""
+        select a.*
+          from controle_abastecimentos a
+        {where}
+         order by coalesce(a.data_hora, a.data_abastecimento::timestamp) desc nulls last,
+                  a.created_at desc nulls last
+         limit 1000
+        """,
+        tuple(params) if params else None,
+        fetch=True,
+    )
+    return [normalizar_abastecimento_frota(r) for r in rows]
+
+
+def abastecimento_frota_por_id(aid):
+    row = one("select * from controle_abastecimentos where id=%s", (str(aid),))
+    return normalizar_abastecimento_frota(row) if row else None
+
+
+def _validar_payload_abastecimento_frota(p, aid=None):
+    p = p or {}
+    viatura_id = (p.get("viatura_id") or "").strip()
+    if not viatura_id:
+        raise ValueError("Viatura é obrigatória")
+    viatura = viatura_cadastro_por_id(viatura_id)
+    if not viatura:
+        raise ValueError("Viatura não encontrada")
+    data_hora = _parse_datetime_controle(p.get("data_hora"))
+    if not data_hora:
+        raise ValueError("Data e hora são obrigatórias")
+    posto = (_txt_controle(p.get("posto"), 80) or "").upper()
+    if posto not in FROTA_POSTOS_ABASTECIMENTO:
+        raise ValueError("Posto inválido")
+    profissional_id = (p.get("profissional_id") or "").strip()
+    if not profissional_id:
+        raise ValueError("Profissional é obrigatório")
+    prof = profissional_cadastro_por_id(profissional_id)
+    if not prof:
+        raise ValueError("Profissional não encontrado")
+    combustivel = (_txt_controle(p.get("combustivel"), 80) or "").upper()
+    if combustivel not in FROTA_COMBUSTIVEIS:
+        raise ValueError("Combustível inválido")
+    litros = _num_controle(p.get("litros"))
+    valor_unit = _num_controle(p.get("valor_unitario"))
+    valor_total = _num_controle(p.get("valor_total"))
+    if litros <= 0:
+        raise ValueError("Litros abastecidos deve ser maior que zero")
+    if valor_unit <= 0:
+        raise ValueError("Valor unitário deve ser maior que zero")
+    if valor_total <= 0:
+        raise ValueError("Valor total deve ser maior que zero")
+    desconsiderar = _bool_controle(p.get("desconsiderar_ultimo_km"))
+    hod_raw = p.get("hodometro")
+    hod_str = str(hod_raw or "").strip()
+    if not hod_str:
+        if not desconsiderar:
+            raise ValueError("Hodômetro (KM) é obrigatório")
+        hodometro = None
+    else:
+        hodometro = _int_controle(hod_raw)
+    ultimo = ultimo_abastecimento_viatura_frota(viatura_id, excluir_id=aid)
+    km_info = _calcular_km_media_abastecimento(hodometro, litros, ultimo, desconsiderar)
+    if km_info.get("alerta_hodometro") and not desconsiderar:
+        raise ValueError(km_info["alerta_hodometro"])
+    viatura_label = _label_viatura_abastecimento(viatura)
+    profissional_label = prof.get("nome_exibicao") or prof.get("nome_trabalho") or prof.get("nome_completo")
+    return {
+        "viatura_id": viatura_id,
+        "viatura": viatura_label,
+        "placa": viatura.get("placa") or "",
+        "profissional_id": profissional_id,
+        "profissional": profissional_label,
+        "data_hora": data_hora,
+        "data_abastecimento": data_hora.date(),
+        "posto": posto,
+        "combustivel": combustivel,
+        "litros": litros,
+        "valor_unitario": valor_unit,
+        "valor_total": valor_total,
+        "hodometro": hodometro,
+        "observacoes": _txt_controle(p.get("observacao") or p.get("observacoes")),
+        "desconsiderar_ultimo_km": desconsiderar,
+        "gerar_contas_pagar": _bool_controle(p.get("gerar_contas_pagar")),
+        "km_rodado": km_info.get("km_rodado"),
+        "media_km_litro": km_info.get("media_km_litro"),
+        "alerta_hodometro": km_info.get("alerta_hodometro") or None,
+        "status": _status_cad(p.get("status")) if p.get("status") else "ativo",
+    }
+
+
+def salvar_abastecimento_frota(payload):
+    p = payload or {}
+    aid = (p.get("id") or "").strip()
+    dados = _validar_payload_abastecimento_frota(p, aid=aid or None)
+    params = (
+        dados["data_abastecimento"],
+        dados["data_hora"],
+        dados["viatura"],
+        dados["placa"],
+        dados["viatura_id"],
+        dados["posto"],
+        dados["profissional"],
+        dados["profissional_id"],
+        dados["combustivel"],
+        dados["litros"],
+        dados["valor_unitario"],
+        dados["valor_total"],
+        dados["hodometro"],
+        dados["km_rodado"],
+        dados["media_km_litro"],
+        dados["observacoes"],
+        dados["desconsiderar_ultimo_km"],
+        dados["gerar_contas_pagar"],
+        dados["alerta_hodometro"],
+        dados["status"],
+    )
+    if aid:
+        q(
+            """
+            update controle_abastecimentos set
+              data_abastecimento=%s, data_hora=%s, viatura=%s, placa=%s, viatura_id=%s,
+              posto=%s, profissional=%s, profissional_id=%s, combustivel=%s,
+              litros=%s, valor_unitario=%s, valor_total=%s, hodometro=%s,
+              km_rodado=%s, media_km_litro=%s, observacoes=%s,
+              desconsiderar_ultimo_km=%s, gerar_contas_pagar=%s, alerta_hodometro=%s,
+              status=%s, updated_at=now()
+            where id=%s
+            """,
+            params + (aid,),
+        )
+        item = abastecimento_frota_por_id(aid)
+    else:
+        row = one(
+            """
+            insert into controle_abastecimentos (
+              data_abastecimento, data_hora, viatura, placa, viatura_id,
+              posto, profissional, profissional_id, combustivel,
+              litros, valor_unitario, valor_total, hodometro,
+              km_rodado, media_km_litro, observacoes,
+              desconsiderar_ultimo_km, gerar_contas_pagar, alerta_hodometro,
+              status, updated_at
+            ) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,now())
+            returning id
+            """,
+            params,
+        )
+        item = abastecimento_frota_por_id(row["id"])
+    if dados["gerar_contas_pagar"] and not item.get("contas_pagar_id"):
+        cp_id = _criar_conta_pagar_abastecimento(item)
+        q(
+            "update controle_abastecimentos set contas_pagar_id=%s, updated_at=now() where id=%s",
+            (cp_id, item["id"]),
+        )
+        item = abastecimento_frota_por_id(item["id"])
+    return item
+
+
+def excluir_abastecimento_frota(aid):
+    q(
+        "update controle_abastecimentos set status='cancelado', updated_at=now() where id=%s",
+        (str(aid),),
+    )
+
+
+def opcoes_viaturas_frota_abastecimento():
+    rows = q(
+        """
+        select id, placa, exibicao, marca, modelo, status
+          from cadastro_viaturas
+         where coalesce(status, 'ativo') = 'ativo'
+         order by coalesce(exibicao, placa) asc nulls last
+        """,
+        fetch=True,
+    )
+    out = []
+    for r in rows:
+        v = normalizar_viatura_cadastro(r)
+        label = _label_viatura_abastecimento(v)
+        out.append({
+            "id": v["id"],
+            "placa": v.get("placa") or "",
+            "nome_exibicao": v.get("nome_exibicao") or v.get("exibicao") or "",
+            "label": label,
+        })
+    return out
+
+
+def _labels_profissional_operacional(p):
+    nome = (
+        p.get("nome_exibicao")
+        or p.get("nome_trabalho")
+        or p.get("nome_completo")
+        or p.get("nome")
+        or ""
+    ).strip()
+    funcao = (p.get("funcao") or "Profissional").strip()
+    vinc = (p.get("vinculo_label") or p.get("classificacao_vinculo") or "").strip()
+    label_operacional = f"{nome} — {funcao}" if nome else funcao
+    label_admin = f"{label_operacional} ({vinc})" if vinc else label_operacional
+    return {
+        "nome_exibicao": nome,
+        "funcao": funcao,
+        "label_operacional": label_operacional,
+        "label_admin": label_admin,
+    }
+
+
+def _label_profissional_frota(p):
+    return _labels_profissional_operacional(p)["label_operacional"]
+
+
+def opcoes_profissionais_frota_abastecimento():
+    rows = q(
+        """
+        select id, nome_trabalho, nome_completo, funcao, classificacao_vinculo, terceiro, status
+          from cadastro_profissionais
+         where coalesce(status, 'ativo') = 'ativo'
+         order by coalesce(nullif(trim(nome_trabalho),''), nome_completo) asc nulls last
+        """,
+        fetch=True,
+    )
+    out = []
+    for r in rows:
+        p = normalizar_profissional_cadastro(r)
+        labels = _labels_profissional_operacional(p)
+        out.append({
+            "id": p["id"],
+            "nome_exibicao": labels["nome_exibicao"],
+            "nome_completo": p.get("nome_completo") or "",
+            "funcao": labels["funcao"],
+            "vinculo_label": p.get("vinculo_label") or "",
+            "label": labels["label_operacional"],
+            "label_operacional": labels["label_operacional"],
+            "label_admin": labels["label_admin"],
+        })
+    return out
+
+
+FROTA_MANUTENCAO_STATUS = ("pendente", "finalizada", "cancelada")
+FROTA_MANUTENCAO_TIPOS_ITEM = ("ESTOQUE", "PRODUTO", "SERVICO", "SERVIÇO")
+
+
+def _status_manutencao_frota(v):
+    s = (_txt_cad(v) or "finalizada").lower()
+    if s == "ativo":
+        return "finalizada"
+    if s in FROTA_MANUTENCAO_STATUS:
+        return s
+    return "finalizada"
+
+
+def _label_status_manutencao(st):
+    m = {"pendente": "Pendente", "finalizada": "Finalizada", "cancelada": "Cancelada"}
+    return m.get(st, st.capitalize() if st else "Finalizada")
+
+
+def ultimo_hodometro_viatura_frota(viatura_id, excluir_manutencao_id=None):
+    if not viatura_id:
+        return None
+    params = [str(viatura_id), str(viatura_id)]
+    excl_sql = ""
+    if excluir_manutencao_id:
+        excl_sql = " and not (origem = 'manutencao' and registro_id = %s)"
+        params.append(str(excluir_manutencao_id))
+    row = one(
+        f"""
+        select hodometro, origem, registro_id from (
+          select hodometro, 'abastecimento' as origem, id as registro_id,
+                 coalesce(data_hora, data_abastecimento::timestamp) as dt
+            from controle_abastecimentos
+           where viatura_id = %s
+             and hodometro is not null
+             and coalesce(status, 'ativo') <> 'cancelado'
+          union all
+          select hodometro, 'manutencao', id,
+                 coalesce(data_manutencao::timestamp, created_at)
+            from controle_manutencoes
+           where viatura_id = %s
+             and hodometro is not null
+             and coalesce(status, 'finalizada') not in ('cancelada', 'cancelado')
+        ) u
+        where hodometro is not null {excl_sql}
+        order by hodometro desc, dt desc nulls last
+        limit 1
+        """,
+        tuple(params),
+    )
+    if not row:
+        return None
+    return {
+        "hodometro": _int_controle(row.get("hodometro")),
+        "origem": row.get("origem"),
+        "registro_id": str(row["registro_id"]) if row.get("registro_id") else None,
+    }
+
+
+def _normalizar_itens_manutencao(raw_itens):
+    itens = raw_itens or []
+    if isinstance(itens, str):
+        try:
+            itens = json.loads(itens)
+        except Exception:
+            itens = []
+    out = []
+    for it in itens:
+        if not isinstance(it, dict):
+            continue
+        tipo = (_txt_cad(it.get("tipo")) or "PRODUTO").upper().replace("Ç", "C")
+        if tipo not in ("ESTOQUE", "PRODUTO", "SERVICO"):
+            tipo = "PRODUTO"
+        nome_item = _txt_cad(it.get("item") or it.get("descricao"), 300)
+        if not nome_item:
+            continue
+        qtd = _num_controle(it.get("quantidade"), 1) or 1
+        if qtd <= 0:
+            continue
+        vu = _num_controle(it.get("valor_unitario"))
+        if vu < 0:
+            vu = 0
+        vt = _num_controle(it.get("valor_total"), qtd * vu)
+        if vt < 0:
+            vt = 0
+        out.append({
+            "tipo": tipo,
+            "item": nome_item,
+            "descricao": nome_item,
+            "valor_unitario": vu,
+            "quantidade": qtd,
+            "valor_total": vt,
+            "observacao": _txt_cad(it.get("observacao") or it.get("obs"), 500) or "",
+        })
+    return out
+
+
+def _totais_manutencao_itens(itens):
+    total_prod = 0.0
+    total_serv = 0.0
+    for it in itens or []:
+        t = (it.get("tipo") or "").upper().replace("Ç", "C")
+        v = float(it.get("valor_total") or 0)
+        if t == "SERVICO":
+            total_serv += v
+        else:
+            total_prod += v
+    return round(total_prod, 2), round(total_serv, 2), round(total_prod + total_serv, 2)
+
+
+def _criar_conta_pagar_manutencao(manut):
+    row_cat = one(
+        """
+        select id, descricao from financeiro_categorias
+         where natureza='Despesa'
+           and descricao ilike '%%Manuten%%'
+         order by ordem asc limit 1
+        """
+    )
+    categoria_id = str(row_cat["id"]) if row_cat else None
+    categoria = (row_cat.get("descricao") if row_cat else None) or "Manutenção"
+    viatura_label = (manut.get("viatura") or manut.get("placa") or "").strip()
+    documento = (manut.get("documento") or "").strip()
+    doc_txt = f" - Documento {documento}" if documento else ""
+    descricao = f"Manutenção - {viatura_label}{doc_txt}"
+    venc = manut.get("data_manutencao")
+    if isinstance(venc, str):
+        venc = _parse_data_controle(venc)
+    valor = float(manut.get("total") or 0)
+    if valor <= 0:
+        raise ValueError("Valor total inválido para contas a pagar")
+    row = one(
+        """
+        insert into financeiro_contas_pagar (
+          fornecedor, descricao, categoria, categoria_id, competencia, emissao, vencimento,
+          valor, parcelas, status, observacoes, updated_at
+        ) values (%s,%s,%s,%s,%s,%s,%s,%s,1,'em_aberto',%s,now())
+        returning id
+        """,
+        (
+            (manut.get("fornecedor") or "Fornecedor").strip(),
+            descricao,
+            categoria,
+            categoria_id,
+            venc,
+            venc,
+            venc,
+            valor,
+            f"Gerado automaticamente da manutenção {manut.get('id') or ''}".strip(),
+        ),
+    )
+    return str(row["id"])
+
+
+def normalizar_manutencao_frota(row):
+    if not row:
+        return None
+    item = dict(row)
+    item["id"] = str(item.get("id"))
+    if item.get("viatura_id"):
+        item["viatura_id"] = str(item["viatura_id"])
+    if item.get("fornecedor_id"):
+        item["fornecedor_id"] = str(item["fornecedor_id"])
+    if item.get("contas_pagar_id"):
+        item["contas_pagar_id"] = str(item["contas_pagar_id"])
+    item["status"] = _status_manutencao_frota(item.get("status"))
+    item["status_label"] = _label_status_manutencao(item["status"])
+    raw_itens = item.get("itens")
+    if isinstance(raw_itens, str):
+        try:
+            raw_itens = json.loads(raw_itens)
+        except Exception:
+            raw_itens = []
+    item["itens"] = _normalizar_itens_manutencao(raw_itens)
+    tp, ts, tg = _totais_manutencao_itens(item["itens"])
+    item["total_produtos"] = float(item.get("total_produtos") or tp)
+    item["total_servicos"] = float(item.get("total_servicos") or ts)
+    item["total"] = float(item.get("total") or tg)
+    item["hodometro"] = _int_controle(item.get("hodometro")) if item.get("hodometro") is not None else None
+    item["gerar_contas_pagar"] = bool(item.get("gerar_contas_pagar"))
+    item["hodometro_menor_ultimo"] = bool(item.get("hodometro_menor_ultimo"))
+    dm = item.get("data_manutencao")
+    if dm and hasattr(dm, "strftime"):
+        item["data_fmt"] = dm.strftime("%d/%m/%Y")
+        item["data_iso"] = dm.strftime("%Y-%m-%d")
+    else:
+        item["data_fmt"] = _formatar_valor_controle("data_manutencao", dm)
+        item["data_iso"] = str(dm)[:10] if dm else ""
+    item["total_produtos_fmt"] = fmt_moeda(item["total_produtos"])
+    item["total_servicos_fmt"] = fmt_moeda(item["total_servicos"])
+    item["total_fmt"] = fmt_moeda(item["total"])
+    item["hodometro_fmt"] = str(item["hodometro"]) if item.get("hodometro") is not None else "-"
+    item["created_at"] = dt_str(item.get("created_at"))
+    item["updated_at"] = dt_str(item.get("updated_at"))
+    return item
+
+
+def _where_manutencoes_frota(filtros=None):
+    filtros = filtros or {}
+    parts = ["coalesce(m.status, 'finalizada') not in ('cancelada', 'cancelado')"]
+    params = []
+    if filtros.get("data_ini"):
+        parts.append("m.data_manutencao >= %s")
+        params.append(filtros["data_ini"])
+    if filtros.get("data_fim"):
+        parts.append("m.data_manutencao <= %s")
+        params.append(filtros["data_fim"])
+    if filtros.get("viatura_id"):
+        parts.append("m.viatura_id = %s")
+        params.append(str(filtros["viatura_id"]))
+    if filtros.get("fornecedor"):
+        parts.append("coalesce(m.fornecedor,'') ilike %s")
+        params.append(f"%{filtros['fornecedor']}%")
+    if filtros.get("documento"):
+        parts.append("coalesce(m.documento,'') ilike %s")
+        params.append(f"%{filtros['documento']}%")
+    if filtros.get("status"):
+        parts.append("coalesce(m.status, 'finalizada') = %s")
+        params.append(filtros["status"])
+    if filtros.get("busca"):
+        parts.append(
+            """
+            (
+              coalesce(m.viatura,'') ilike %s
+              or coalesce(m.placa,'') ilike %s
+              or coalesce(m.fornecedor,'') ilike %s
+              or coalesce(m.documento,'') ilike %s
+              or coalesce(m.observacoes,'') ilike %s
+            )
+            """
+        )
+        b = f"%{filtros['busca']}%"
+        params.extend([b, b, b, b, b])
+    where = " where " + " and ".join(parts) if parts else ""
+    return where, params
+
+
+def resumo_manutencoes_frota(filtros=None):
+    where, params = _where_manutencoes_frota(filtros)
+    row = one(
+        f"""
+        select
+          count(*)::int as total,
+          coalesce(sum(total), 0)::float as valor_total,
+          coalesce(sum(total_produtos), 0)::float as total_produtos,
+          coalesce(sum(total_servicos), 0)::float as total_servicos,
+          count(*) filter (
+            where date_trunc('month', coalesce(data_manutencao, created_at::date))
+              = date_trunc('month', current_date)
+          )::int as mes
+        from controle_manutencoes m
+        {where}
+        """,
+        tuple(params) if params else None,
+    ) or {}
+    total = int(row.get("total") or 0)
+    valor = float(row.get("valor_total") or 0)
+    return {
+        "total": total,
+        "valor_total": round(valor, 2),
+        "total_produtos": round(float(row.get("total_produtos") or 0), 2),
+        "total_servicos": round(float(row.get("total_servicos") or 0), 2),
+        "media_manutencao": round(valor / total, 2) if total > 0 else 0,
+        "mes": int(row.get("mes") or 0),
+    }
+
+
+def listar_manutencoes_frota(filtros=None):
+    where, params = _where_manutencoes_frota(filtros)
+    rows = q(
+        f"""
+        select m.* from controle_manutencoes m
+        {where}
+         order by coalesce(m.data_manutencao, m.created_at::date) desc nulls last,
+                  m.created_at desc nulls last
+         limit 1000
+        """,
+        tuple(params) if params else None,
+        fetch=True,
+    )
+    return [normalizar_manutencao_frota(r) for r in rows]
+
+
+def manutencao_frota_por_id(mid):
+    row = one("select * from controle_manutencoes where id=%s", (str(mid),))
+    return normalizar_manutencao_frota(row) if row else None
+
+
+def opcoes_fornecedores_frota():
+    rows = q(
+        """
+        select id,
+               coalesce(nullif(trim(nome_fantasia),''), nullif(trim(razao_social),''), nullif(trim(nome),'')) as nome
+          from cadastro_contatos
+         where coalesce(fornecedor, false) = true
+           and coalesce(status, 'ativo') = 'ativo'
+         order by nome asc nulls last
+        """,
+        fetch=True,
+    )
+    out = []
+    for r in rows:
+        nome = (r.get("nome") or "").strip()
+        if not nome:
+            continue
+        out.append({"id": str(r["id"]), "nome": nome, "label": nome})
+    return out
+
+
+def _validar_payload_manutencao_frota(p, mid=None):
+    p = p or {}
+    viatura_id = (p.get("viatura_id") or "").strip()
+    if not viatura_id:
+        raise ValueError("Viatura é obrigatória")
+    viatura = viatura_cadastro_por_id(viatura_id)
+    if not viatura:
+        raise ValueError("Viatura não encontrada")
+    data_man = _parse_data_controle(p.get("data") or p.get("data_manutencao"))
+    if not data_man:
+        raise ValueError("Data é obrigatória")
+    hod_str = str(p.get("hodometro") or "").strip()
+    if not hod_str:
+        raise ValueError("Hodômetro (KM) é obrigatório")
+    hodometro = _int_controle(hod_str)
+    fornecedor = _txt_controle(p.get("fornecedor"), 200)
+    if not fornecedor:
+        raise ValueError("Fornecedor é obrigatório")
+    itens = _normalizar_itens_manutencao(p.get("itens"))
+    if not itens:
+        raise ValueError("Adicione ao menos um item à manutenção")
+    total_prod, total_serv, total_geral = _totais_manutencao_itens(itens)
+    ultimo = ultimo_hodometro_viatura_frota(viatura_id, excluir_manutencao_id=mid)
+    alerta = ""
+    hodometro_menor = False
+    if ultimo and ultimo.get("hodometro") is not None and hodometro is not None:
+        if hodometro < ultimo["hodometro"]:
+            hodometro_menor = True
+            alerta = (
+                f"Hodômetro informado ({hodometro}) é menor que o último registrado "
+                f"({ultimo['hodometro']} km — origem: {ultimo.get('origem', '-')})."
+            )
+    status = _status_manutencao_frota(p.get("status") or "finalizada")
+    obs = _txt_controle(p.get("observacao") or p.get("observacoes"))
+    if hodometro_menor and alerta:
+        extra = f"[Alerta hodômetro] {alerta}"
+        obs = f"{obs}\n{extra}".strip() if obs else extra
+    return {
+        "viatura_id": viatura_id,
+        "viatura": _label_viatura_abastecimento(viatura),
+        "placa": viatura.get("placa") or "",
+        "data_manutencao": data_man,
+        "hodometro": hodometro,
+        "documento": _txt_controle(p.get("documento"), 120),
+        "fornecedor": fornecedor,
+        "fornecedor_id": (p.get("fornecedor_id") or "").strip() or None,
+        "observacoes": obs,
+        "itens": itens,
+        "total_produtos": total_prod,
+        "total_servicos": total_serv,
+        "total": total_geral,
+        "gerar_contas_pagar": _bool_controle(p.get("gerar_contas_pagar")),
+        "alerta_hodometro": alerta or None,
+        "hodometro_menor_ultimo": hodometro_menor,
+        "status": status,
+    }
+
+
+def salvar_manutencao_frota(payload):
+    p = payload or {}
+    mid = (p.get("id") or "").strip()
+    dados = _validar_payload_manutencao_frota(p, mid=mid or None)
+    params = (
+        dados["data_manutencao"],
+        dados["viatura"],
+        dados["placa"],
+        dados["viatura_id"],
+        dados["hodometro"],
+        dados["documento"],
+        dados["fornecedor"],
+        dados["fornecedor_id"],
+        dados["observacoes"],
+        Json(dados["itens"]),
+        dados["total_produtos"],
+        dados["total_servicos"],
+        dados["total"],
+        dados["gerar_contas_pagar"],
+        dados["alerta_hodometro"],
+        dados["hodometro_menor_ultimo"],
+        dados["status"],
+    )
+    if mid:
+        q(
+            """
+            update controle_manutencoes set
+              data_manutencao=%s, viatura=%s, placa=%s, viatura_id=%s, hodometro=%s,
+              documento=%s, fornecedor=%s, fornecedor_id=%s, observacoes=%s,
+              itens=%s, total_produtos=%s, total_servicos=%s, total=%s,
+              gerar_contas_pagar=%s, alerta_hodometro=%s, hodometro_menor_ultimo=%s,
+              status=%s, updated_at=now()
+            where id=%s
+            """,
+            params + (mid,),
+        )
+        item = manutencao_frota_por_id(mid)
+    else:
+        row = one(
+            """
+            insert into controle_manutencoes (
+              data_manutencao, viatura, placa, viatura_id, hodometro,
+              documento, fornecedor, fornecedor_id, observacoes,
+              itens, total_produtos, total_servicos, total,
+              gerar_contas_pagar, alerta_hodometro, hodometro_menor_ultimo,
+              status, updated_at
+            ) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,now())
+            returning id
+            """,
+            params,
+        )
+        item = manutencao_frota_por_id(row["id"])
+    if dados["gerar_contas_pagar"] and not item.get("contas_pagar_id"):
+        cp_id = _criar_conta_pagar_manutencao(item)
+        q(
+            "update controle_manutencoes set contas_pagar_id=%s, updated_at=now() where id=%s",
+            (cp_id, item["id"]),
+        )
+        item = manutencao_frota_por_id(item["id"])
+    return item
+
+
+def excluir_manutencao_frota(mid):
+    q(
+        "update controle_manutencoes set status='cancelada', updated_at=now() where id=%s",
+        (str(mid),),
+    )
+
+
+def _parse_filtros_manutencoes_request(request):
+    qparams = request.query_params if request else {}
+    return {
+        "data_ini": _parse_data_controle(qparams.get("data_ini")),
+        "data_fim": _parse_data_controle(qparams.get("data_fim")),
+        "viatura_id": (qparams.get("viatura_id") or "").strip() or None,
+        "fornecedor": (qparams.get("fornecedor") or "").strip() or None,
+        "documento": (qparams.get("documento") or "").strip() or None,
+        "status": (qparams.get("status") or "").strip().lower() or None,
+        "busca": (qparams.get("busca") or "").strip() or None,
+    }
+
+
+def _parse_filtros_abastecimentos_request(request):
+    qparams = request.query_params if request else {}
+    return {
+        "data_ini": _parse_data_controle(qparams.get("data_ini")),
+        "data_fim": _parse_data_controle(qparams.get("data_fim")),
+        "viatura_id": (qparams.get("viatura_id") or "").strip() or None,
+        "profissional_id": (qparams.get("profissional_id") or "").strip() or None,
+        "posto": (qparams.get("posto") or "").strip() or None,
+        "combustivel": (qparams.get("combustivel") or "").strip() or None,
+        "busca": (qparams.get("busca") or "").strip() or None,
+    }
+
+
+@app.get("/frota/abastecimentos", response_class=HTMLResponse)
+def frota_pagina_abastecimentos(request: Request):
+    return templates.TemplateResponse(
+        "frota/abastecimentos.html",
+        {
+            "request": request,
+            "nav_ativo": "frota",
+            "nav_som": False,
+            "kpis": resumo_abastecimentos_frota(),
+            "postos": FROTA_POSTOS_ABASTECIMENTO,
+            "combustiveis": FROTA_COMBUSTIVEIS,
+        },
+    )
+
+
+@app.get("/frota/manutencoes", response_class=HTMLResponse)
+def frota_pagina_manutencoes(request: Request):
+    return templates.TemplateResponse(
+        "frota/manutencoes.html",
+        {
+            "request": request,
+            "nav_ativo": "frota",
+            "nav_som": False,
+            "kpis": resumo_manutencoes_frota(),
+            "status_opcoes": FROTA_MANUTENCAO_STATUS,
+            "tipos_item": ("ESTOQUE", "PRODUTO", "SERVIÇO"),
+        },
+    )
+
+
+@app.get("/frota/controle-patio", response_class=HTMLResponse)
+def frota_pagina_controle_patio(request: Request):
+    return templates.TemplateResponse(
+        "frota/controle_patio.html",
+        {
+            "request": request,
+            "nav_ativo": "frota",
+            "nav_som": False,
+            "kpis": resumo_patio_frota(),
+            "status_opcoes": FROTA_PATIO_STATUS,
+            "responsavel_padrao": "Operação",
+        },
+    )
+
+
+@app.get("/api/frota/abastecimentos")
+def api_frota_lista_abastecimentos(request: Request):
+    filtros = _parse_filtros_abastecimentos_request(request)
+    return {
+        "ok": True,
+        "itens": listar_abastecimentos_frota(filtros),
+        "kpis": resumo_abastecimentos_frota(filtros),
+    }
+
+
+@app.get("/api/frota/abastecimentos/opcoes/viaturas")
+def api_frota_opcoes_viaturas_abastecimento():
+    return {"ok": True, "itens": opcoes_viaturas_frota_abastecimento()}
+
+
+@app.get("/api/frota/abastecimentos/opcoes/profissionais")
+def api_frota_opcoes_profissionais_abastecimento():
+    return {"ok": True, "itens": opcoes_profissionais_frota_abastecimento()}
+
+
+@app.get("/api/frota/abastecimentos/ultimo-km")
+def api_frota_ultimo_km_abastecimento(viatura_id: str, hodometro: str = "", excluir_id: str = ""):
+    ultimo = ultimo_abastecimento_viatura_frota(viatura_id, excluir_id=excluir_id or None)
+    desconsiderar = False
+    km_info = _calcular_km_media_abastecimento(hodometro, 1, ultimo, desconsiderar)
+    return {
+        "ok": True,
+        "ultimo_hodometro": km_info.get("ultimo_hodometro"),
+        "ultimo_id": str(ultimo["id"]) if ultimo else None,
+        "alerta": km_info.get("alerta_hodometro") or "",
+    }
+
+
+@app.get("/api/frota/abastecimentos/{aid}")
+def api_frota_get_abastecimento(aid: str):
+    item = abastecimento_frota_por_id(aid)
+    if not item:
+        return JSONResponse({"ok": False, "erro": "Abastecimento não encontrado"}, status_code=404)
+    return {"ok": True, "item": item}
+
+
+@app.post("/api/frota/abastecimentos")
+async def api_frota_post_abastecimento(request: Request):
+    try:
+        payload = await request.json()
+        item = salvar_abastecimento_frota(payload)
+        filtros = _parse_filtros_abastecimentos_request(request)
+        return {"ok": True, "item": item, "kpis": resumo_abastecimentos_frota(filtros)}
+    except Exception as exc:
+        return JSONResponse({"ok": False, "erro": str(exc)}, status_code=400)
+
+
+@app.put("/api/frota/abastecimentos/{aid}")
+async def api_frota_put_abastecimento(aid: str, request: Request):
+    try:
+        payload = await request.json()
+        payload["id"] = aid
+        item = salvar_abastecimento_frota(payload)
+        filtros = _parse_filtros_abastecimentos_request(request)
+        return {"ok": True, "item": item, "kpis": resumo_abastecimentos_frota(filtros)}
+    except Exception as exc:
+        return JSONResponse({"ok": False, "erro": str(exc)}, status_code=400)
+
+
+@app.delete("/api/frota/abastecimentos/{aid}")
+def api_frota_delete_abastecimento(aid: str):
+    try:
+        excluir_abastecimento_frota(aid)
+        return {"ok": True, "kpis": resumo_abastecimentos_frota()}
+    except Exception as exc:
+        return JSONResponse({"ok": False, "erro": str(exc)}, status_code=400)
+
+
+@app.get("/api/frota/viaturas-opcoes")
+def api_frota_viaturas_opcoes():
+    return {"ok": True, "itens": opcoes_viaturas_frota_abastecimento()}
+
+
+@app.get("/api/frota/fornecedores-opcoes")
+def api_frota_fornecedores_opcoes():
+    return {"ok": True, "itens": opcoes_fornecedores_frota()}
+
+
+@app.get("/api/frota/ultimo-hodometro/{viatura_id}")
+def api_frota_ultimo_hodometro(viatura_id: str, hodometro: str = "", excluir_id: str = ""):
+    ultimo = ultimo_hodometro_viatura_frota(viatura_id, excluir_manutencao_id=excluir_id or None)
+    alerta = ""
+    hod = _int_controle(hodometro) if str(hodometro or "").strip() else None
+    if ultimo and hod is not None and ultimo.get("hodometro") is not None and hod < ultimo["hodometro"]:
+        alerta = (
+            f"Hodômetro informado ({hod}) é menor que o último registrado "
+            f"({ultimo['hodometro']} km)."
+        )
+    return {
+        "ok": True,
+        "ultimo_hodometro": ultimo.get("hodometro") if ultimo else None,
+        "origem": ultimo.get("origem") if ultimo else None,
+        "alerta": alerta,
+    }
+
+
+@app.get("/api/frota/manutencoes")
+def api_frota_lista_manutencoes(request: Request):
+    filtros = _parse_filtros_manutencoes_request(request)
+    return {
+        "ok": True,
+        "itens": listar_manutencoes_frota(filtros),
+        "kpis": resumo_manutencoes_frota(filtros),
+    }
+
+
+@app.get("/api/frota/manutencoes/{mid}")
+def api_frota_get_manutencao(mid: str):
+    item = manutencao_frota_por_id(mid)
+    if not item:
+        return JSONResponse({"ok": False, "erro": "Manutenção não encontrada"}, status_code=404)
+    return {"ok": True, "item": item}
+
+
+@app.post("/api/frota/manutencoes")
+async def api_frota_post_manutencao(request: Request):
+    try:
+        payload = await request.json()
+        item = salvar_manutencao_frota(payload)
+        filtros = _parse_filtros_manutencoes_request(request)
+        return {"ok": True, "item": item, "kpis": resumo_manutencoes_frota(filtros)}
+    except Exception as exc:
+        return JSONResponse({"ok": False, "erro": str(exc)}, status_code=400)
+
+
+@app.put("/api/frota/manutencoes/{mid}")
+async def api_frota_put_manutencao(mid: str, request: Request):
+    try:
+        payload = await request.json()
+        payload["id"] = mid
+        item = salvar_manutencao_frota(payload)
+        filtros = _parse_filtros_manutencoes_request(request)
+        return {"ok": True, "item": item, "kpis": resumo_manutencoes_frota(filtros)}
+    except Exception as exc:
+        return JSONResponse({"ok": False, "erro": str(exc)}, status_code=400)
+
+
+@app.delete("/api/frota/manutencoes/{mid}")
+def api_frota_delete_manutencao(mid: str):
+    try:
+        excluir_manutencao_frota(mid)
+        return {"ok": True, "kpis": resumo_manutencoes_frota()}
+    except Exception as exc:
+        return JSONResponse({"ok": False, "erro": str(exc)}, status_code=400)
+
+
+FROTA_MULTAS_NATUREZAS = ("Leve", "Média", "Grave", "Gravíssima")
+FROTA_MULTAS_STATUS = ("pendente", "pago", "vencido", "cancelado")
+EXTRATOS_PROFISSIONAIS_JSON = Path("data/extratos_profissionais.json")
+
+
+def _add_meses_data(d, meses):
+    import calendar
+    from datetime import date as date_cls
+
+    if not d:
+        return None
+    if isinstance(d, str):
+        d = _parse_data_controle(d)
+    if not d:
+        return None
+    month = d.month - 1 + int(meses)
+    year = d.year + month // 12
+    month = month % 12 + 1
+    day = min(d.day, calendar.monthrange(year, month)[1])
+    return date_cls(year, month, day)
+
+
+def _calcular_status_multa_frota(valor, valor_pago, vencimento, status_manual=None):
+    st = (_txt_cad(status_manual) or "").lower()
+    if st in ("cancelado", "cancelada"):
+        return "cancelado"
+    valor = float(valor or 0)
+    valor_pago = float(valor_pago or 0)
+    if valor > 0 and valor_pago >= valor:
+        return "pago"
+    from datetime import date as date_cls
+
+    venc = vencimento
+    if isinstance(venc, str):
+        venc = _parse_data_controle(venc)
+    if venc and venc < date_cls.today():
+        return "vencido"
+    return "pendente"
+
+
+def normalizar_multa_frota(row, recalcular_status=True):
+    if not row:
+        return None
+    item = dict(row)
+    item["id"] = str(item.get("id"))
+    for fk in ("viatura_id", "condutor_id", "condutor_responsavel_id", "contas_pagar_id"):
+        if item.get(fk):
+            item[fk] = str(item[fk])
+    item["valor"] = float(item.get("valor") or 0)
+    item["valor_pago"] = float(item.get("valor_pago") or 0)
+    item["valor_aberto"] = round(max(item["valor"] - item["valor_pago"], 0), 2)
+    item["parcelas"] = int(item.get("parcelas") or 1)
+    item["gerar_contas_pagar"] = bool(item.get("gerar_contas_pagar") or item.get("contas_pagar"))
+    item["gerar_extrato_profissional"] = bool(
+        item.get("gerar_extrato_profissional") or item.get("extrato_profissional")
+    )
+    cp_ids = item.get("contas_pagar_ids")
+    if isinstance(cp_ids, str):
+        try:
+            cp_ids = json.loads(cp_ids)
+        except Exception:
+            cp_ids = []
+    if not isinstance(cp_ids, list):
+        cp_ids = []
+    item["contas_pagar_ids"] = [str(x) for x in cp_ids if x]
+    st = (item.get("status") or item.get("situacao") or "pendente").lower()
+    if st == "ativo":
+        st = "pendente"
+    if recalcular_status and st != "cancelado":
+        st = _calcular_status_multa_frota(
+            item["valor"], item["valor_pago"], item.get("vencimento"), st
+        )
+    item["status"] = st
+    item["situacao"] = st
+    dh = item.get("data_hora_infracao")
+    if dh and hasattr(dh, "strftime"):
+        item["data_hora_infracao_fmt"] = dh.strftime("%d/%m/%Y %H:%M")
+        item["data_hora_infracao_iso"] = dh.strftime("%Y-%m-%dT%H:%M")
+    else:
+        item["data_hora_infracao_fmt"] = _formatar_valor_controle("data_hora", dh)
+        item["data_hora_infracao_iso"] = str(dh)[:16] if dh else ""
+    di = item.get("data_infracao")
+    if di and hasattr(di, "strftime"):
+        item["data_infracao_fmt"] = di.strftime("%d/%m/%Y")
+        item["data_infracao_iso"] = di.strftime("%Y-%m-%d")
+    else:
+        item["data_infracao_fmt"] = _formatar_valor_controle("data", di)
+        item["data_infracao_iso"] = str(di)[:10] if di else ""
+    for fld, sfx in (
+        ("data_limite_indicacao", "data_limite_indicacao"),
+        ("vencimento", "data_vencimento"),
+    ):
+        val = item.get(fld)
+        if val and hasattr(val, "strftime"):
+            item[f"{sfx}_fmt"] = val.strftime("%d/%m/%Y")
+            item[f"{sfx}_iso"] = val.strftime("%Y-%m-%d")
+        else:
+            item[f"{sfx}_fmt"] = _formatar_valor_controle("data", val)
+            item[f"{sfx}_iso"] = str(val)[:10] if val else ""
+    item["valor_fmt"] = fmt_moeda(item["valor"])
+    item["valor_pago_fmt"] = fmt_moeda(item["valor_pago"])
+    item["valor_aberto_fmt"] = fmt_moeda(item["valor_aberto"])
+    item["viatura_nome_exibicao"] = item.get("viatura") or ""
+    item["condutor_nome_exibicao"] = item.get("condutor") or ""
+    item["condutor_responsavel_nome_exibicao"] = item.get("condutor_responsavel") or ""
+    item["created_at"] = dt_str(item.get("created_at"))
+    item["updated_at"] = dt_str(item.get("updated_at"))
+    return item
+
+
+def _where_multas_frota(filtros=None):
+    filtros = filtros or {}
+    st_filtro = (filtros.get("status") or "").lower()
+    if st_filtro == "cancelado":
+        parts = ["coalesce(m.status, m.situacao, 'ativo') in ('cancelado', 'cancelada')"]
+    else:
+        parts = ["coalesce(m.status, m.situacao, 'ativo') not in ('cancelado', 'cancelada')"]
+    params = []
+    if filtros.get("data_ini"):
+        parts.append(
+            "coalesce(m.data_hora_infracao, m.data_infracao::timestamp)::date >= %s"
+        )
+        params.append(filtros["data_ini"])
+    if filtros.get("data_fim"):
+        parts.append(
+            "coalesce(m.data_hora_infracao, m.data_infracao::timestamp)::date <= %s"
+        )
+        params.append(filtros["data_fim"])
+    if filtros.get("viatura_id"):
+        parts.append("m.viatura_id = %s")
+        params.append(str(filtros["viatura_id"]))
+    if filtros.get("condutor_id"):
+        parts.append("(m.condutor_id = %s or m.condutor_responsavel_id = %s)")
+        params.extend([str(filtros["condutor_id"]), str(filtros["condutor_id"])])
+    if filtros.get("municipio"):
+        parts.append("coalesce(m.municipio,'') ilike %s")
+        params.append(f"%{filtros['municipio']}%")
+    if filtros.get("status"):
+        st = filtros["status"].lower()
+        if st == "pago":
+            parts.append("coalesce(m.valor_pago,0) >= coalesce(m.valor,0) and coalesce(m.valor,0) > 0")
+        elif st == "vencido":
+            parts.append(
+                "coalesce(m.valor_pago,0) < coalesce(m.valor,0) and m.vencimento is not null and m.vencimento < current_date"
+            )
+        elif st == "pendente":
+            parts.append(
+                "coalesce(m.valor_pago,0) < coalesce(m.valor,0) and (m.vencimento is null or m.vencimento >= current_date)"
+            )
+    if filtros.get("busca"):
+        parts.append(
+            """
+            (
+              coalesce(m.viatura,'') ilike %s
+              or coalesce(m.placa,'') ilike %s
+              or coalesce(m.auto_infracao,'') ilike %s
+              or coalesce(m.municipio,'') ilike %s
+              or coalesce(m.condutor,'') ilike %s
+              or coalesce(m.condutor_responsavel,'') ilike %s
+              or coalesce(m.descricao_multa,'') ilike %s
+              or coalesce(m.natureza,'') ilike %s
+            )
+            """
+        )
+        b = f"%{filtros['busca']}%"
+        params.extend([b] * 8)
+    where = " where " + " and ".join(parts) if parts else ""
+    return where, params
+
+
+def resumo_multas_frota(filtros=None):
+    from datetime import date as date_cls
+
+    where, params = _where_multas_frota(filtros)
+    row = one(
+        f"""
+        select
+          count(*)::int as total,
+          coalesce(sum(valor), 0)::float as valor_total,
+          coalesce(sum(valor_pago), 0)::float as valor_pago,
+          coalesce(sum(greatest(valor - coalesce(valor_pago,0), 0)), 0)::float as valor_aberto,
+          count(*) filter (
+            where coalesce(valor_pago,0) < coalesce(valor,0)
+              and vencimento is not null
+              and vencimento < current_date
+          )::int as vencidas,
+          count(*) filter (
+            where date_trunc('month', coalesce(data_hora_infracao, data_infracao::timestamp))
+              = date_trunc('month', current_timestamp)
+          )::int as mes
+        from controle_multas m
+        {where}
+        """,
+        tuple(params) if params else None,
+    ) or {}
+    return {
+        "total": int(row.get("total") or 0),
+        "valor_total": round(float(row.get("valor_total") or 0), 2),
+        "valor_pago": round(float(row.get("valor_pago") or 0), 2),
+        "valor_aberto": round(float(row.get("valor_aberto") or 0), 2),
+        "vencidas": int(row.get("vencidas") or 0),
+        "mes": int(row.get("mes") or 0),
+    }
+
+
+def listar_multas_frota(filtros=None):
+    where, params = _where_multas_frota(filtros)
+    rows = q(
+        f"""
+        select m.*
+          from controle_multas m
+        {where}
+         order by coalesce(m.data_hora_infracao, m.data_infracao::timestamp) desc nulls last,
+                  m.created_at desc nulls last
+         limit 1000
+        """,
+        tuple(params) if params else None,
+        fetch=True,
+    )
+    return [normalizar_multa_frota(r) for r in rows]
+
+
+def multa_frota_por_id(mid):
+    row = one("select * from controle_multas where id=%s", (str(mid),))
+    return normalizar_multa_frota(row) if row else None
+
+
+def opcoes_municipios_multas_frota():
+    rows = q(
+        """
+        select distinct trim(municipio) as municipio
+          from controle_multas
+         where coalesce(trim(municipio),'') <> ''
+         order by municipio asc
+         limit 500
+        """,
+        fetch=True,
+    )
+    return [r["municipio"] for r in rows if r.get("municipio")]
+
+
+def _validar_payload_multa_frota(p, mid=None):
+    p = p or {}
+    viatura_id = (p.get("viatura_id") or "").strip()
+    if not viatura_id:
+        raise ValueError("Viatura é obrigatória")
+    viatura = viatura_cadastro_por_id(viatura_id)
+    if not viatura:
+        raise ValueError("Viatura não encontrada")
+    auto = (_txt_controle(p.get("auto_infracao"), 80) or "").strip()
+    if not auto:
+        raise ValueError("Auto de Infração é obrigatório")
+    data_hora = _parse_datetime_controle(p.get("data_hora_infracao"))
+    if not data_hora:
+        raise ValueError("Data e Hora da Infração são obrigatórias")
+    municipio = (_txt_controle(p.get("municipio"), 120) or "").strip()
+    if not municipio:
+        raise ValueError("Município é obrigatório")
+    endereco = (_txt_controle(p.get("endereco")) or "").strip()
+    if not endereco:
+        raise ValueError("Endereço é obrigatório")
+    descricao = (_txt_controle(p.get("descricao_multa")) or "").strip()
+    if not descricao:
+        raise ValueError("Descrição da Multa é obrigatória")
+    natureza = (_txt_controle(p.get("natureza"), 80) or "").strip()
+    if not natureza:
+        raise ValueError("Natureza é obrigatória")
+    condutor_id = (p.get("condutor_id") or "").strip()
+    if not condutor_id:
+        raise ValueError("Condutor é obrigatório")
+    cond = profissional_cadastro_por_id(condutor_id)
+    if not cond:
+        raise ValueError("Condutor não encontrado")
+    resp_id = (p.get("condutor_responsavel_id") or "").strip()
+    if not resp_id:
+        raise ValueError("Condutor Responsável é obrigatório")
+    resp = profissional_cadastro_por_id(resp_id)
+    if not resp:
+        raise ValueError("Condutor Responsável não encontrado")
+    parcelas = _int_controle(p.get("parcelas"), 1) or 1
+    if parcelas < 1:
+        raise ValueError("Parcelas deve ser >= 1")
+    vencimento = _parse_data_controle(p.get("data_vencimento") or p.get("vencimento"))
+    if not vencimento:
+        raise ValueError("Data de Vencimento é obrigatória")
+    valor = _num_controle(p.get("valor"))
+    if valor <= 0:
+        raise ValueError("Valor deve ser maior que zero")
+    valor_pago = _num_controle(p.get("valor_pago"))
+    if valor_pago < 0:
+        raise ValueError("Valor pago não pode ser negativo")
+    valor_aberto = round(max(valor - valor_pago, 0), 2)
+    status_manual = (_txt_controle(p.get("status"), 40) or "").lower()
+    if mid:
+        atual = multa_frota_por_id(mid)
+        if atual and atual.get("status") == "cancelado":
+            status_manual = "cancelado"
+    status = _calcular_status_multa_frota(valor, valor_pago, vencimento, status_manual)
+    viatura_label = _label_viatura_abastecimento(viatura)
+    return {
+        "viatura_id": viatura_id,
+        "viatura": viatura_label,
+        "placa": viatura.get("placa") or "",
+        "auto_infracao": auto,
+        "data_hora_infracao": data_hora,
+        "data_infracao": data_hora.date(),
+        "data_limite_indicacao": _parse_data_controle(p.get("data_limite_indicacao")),
+        "municipio": municipio,
+        "endereco": endereco,
+        "descricao_multa": descricao,
+        "natureza": natureza,
+        "condutor_id": condutor_id,
+        "condutor": _label_profissional_frota(cond),
+        "condutor_responsavel_id": resp_id,
+        "condutor_responsavel": _label_profissional_frota(resp),
+        "parcelas": parcelas,
+        "vencimento": vencimento,
+        "valor": valor,
+        "valor_pago": valor_pago,
+        "valor_aberto": valor_aberto,
+        "observacoes": _txt_controle(p.get("observacao") or p.get("observacoes")),
+        "gerar_contas_pagar": _bool_controle(p.get("gerar_contas_pagar")),
+        "gerar_extrato_profissional": _bool_controle(p.get("gerar_extrato_profissional")),
+        "status": status,
+    }
+
+
+def _criar_contas_pagar_multa_frota(multa):
+    row_cat = one(
+        """
+        select id, descricao from financeiro_categorias
+         where natureza='Despesa'
+           and (descricao ilike '%%Multa%%' or descricao ilike '%%Infra%%')
+         order by case when descricao ilike '%%Multa%%' then 0 else 1 end, ordem asc
+         limit 1
+        """
+    )
+    categoria_id = str(row_cat["id"]) if row_cat else None
+    categoria = (row_cat.get("descricao") if row_cat else None) or "Multas"
+    viatura_label = (multa.get("viatura") or multa.get("placa") or "").strip()
+    auto = (multa.get("auto_infracao") or "").strip()
+    condutor = (multa.get("condutor") or "").strip()
+    hist_base = f"Multa - {viatura_label} - Auto {auto} - Condutor {condutor}"
+    valor_base = float(multa.get("valor_aberto") or multa.get("valor") or 0)
+    if valor_base <= 0:
+        raise ValueError("Valor em aberto inválido para contas a pagar")
+    parcelas = int(multa.get("parcelas") or 1)
+    venc0 = multa.get("vencimento")
+    if isinstance(venc0, str):
+        venc0 = _parse_data_controle(venc0)
+    valor_parcela = round(valor_base / parcelas, 2)
+    ids = []
+    for i in range(parcelas):
+        venc = _add_meses_data(venc0, i) if venc0 else None
+        valor_linha = valor_parcela
+        if i == parcelas - 1:
+            valor_linha = round(valor_base - valor_parcela * (parcelas - 1), 2)
+        desc = hist_base if parcelas == 1 else f"{hist_base} — Parcela {i + 1}/{parcelas}"
+        row = one(
+            """
+            insert into financeiro_contas_pagar (
+              fornecedor, descricao, categoria, categoria_id, competencia, emissao, vencimento,
+              valor, parcelas, status, observacoes, updated_at
+            ) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,'em_aberto',%s,now())
+            returning id
+            """,
+            (
+                "Multa de Trânsito",
+                desc,
+                categoria,
+                categoria_id,
+                venc,
+                venc,
+                venc,
+                valor_linha,
+                parcelas,
+                f"Gerado automaticamente da multa {multa.get('id') or ''}".strip(),
+            ),
+        )
+        ids.append(str(row["id"]))
+    return ids
+
+
+def _registrar_extrato_profissional_multa(multa):
+    EXTRATOS_PROFISSIONAIS_JSON.parent.mkdir(parents=True, exist_ok=True)
+    itens = []
+    if EXTRATOS_PROFISSIONAIS_JSON.exists():
+        try:
+            itens = json.loads(EXTRATOS_PROFISSIONAIS_JSON.read_text(encoding="utf-8"))
+        except Exception:
+            itens = []
+    if not isinstance(itens, list):
+        itens = []
+    ext_id = str(uuid.uuid4())
+    venc = multa.get("vencimento")
+    data_ref = multa.get("data_infracao") or multa.get("data_hora_infracao")
+    if hasattr(data_ref, "date"):
+        data_ref = data_ref.date()
+    if hasattr(venc, "isoformat"):
+        data_ext = venc.isoformat()
+    elif data_ref and hasattr(data_ref, "isoformat"):
+        data_ext = data_ref.isoformat()
+    else:
+        data_ext = str(venc or data_ref or "")[:10]
+    registro = {
+        "id": ext_id,
+        "profissional_id": multa.get("condutor_responsavel_id"),
+        "profissional_nome": multa.get("condutor_responsavel"),
+        "tipo": "desconto",
+        "categoria": "Multa",
+        "valor": float(multa.get("valor_aberto") or multa.get("valor") or 0),
+        "descricao": (
+            f"Multa - Auto {multa.get('auto_infracao')} - Viatura {multa.get('placa')} - "
+            f"{multa.get('descricao_multa') or ''}"
+        ).strip(),
+        "data": data_ext,
+        "multa_id": multa.get("id"),
+        "criado_em": datetime.now().isoformat(),
+    }
+    itens.append(registro)
+    EXTRATOS_PROFISSIONAIS_JSON.write_text(
+        json.dumps(itens, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    return ext_id
+
+
+def salvar_multa_frota(payload):
+    p = payload or {}
+    mid = (p.get("id") or "").strip()
+    dados = _validar_payload_multa_frota(p, mid=mid or None)
+    existente = multa_frota_por_id(mid) if mid else None
+    cp_ids_existentes = (existente or {}).get("contas_pagar_ids") or []
+    ext_id_existente = (existente or {}).get("extrato_profissional_id")
+    params = (
+        dados["viatura"],
+        dados["placa"],
+        dados["viatura_id"],
+        dados["auto_infracao"],
+        dados["data_infracao"],
+        dados["data_hora_infracao"],
+        dados["data_limite_indicacao"],
+        dados["municipio"],
+        dados["endereco"],
+        dados["descricao_multa"],
+        dados["natureza"],
+        dados["condutor"],
+        dados["condutor_id"],
+        dados["condutor_responsavel"],
+        dados["condutor_responsavel_id"],
+        dados["parcelas"],
+        dados["vencimento"],
+        dados["valor"],
+        dados["valor_pago"],
+        dados["valor_aberto"],
+        dados["observacoes"],
+        dados["status"],
+        dados["status"],
+        dados["gerar_contas_pagar"],
+        dados["gerar_extrato_profissional"],
+        dados["gerar_contas_pagar"],
+        dados["gerar_extrato_profissional"],
+    )
+    if mid:
+        q(
+            """
+            update controle_multas set
+              viatura=%s, placa=%s, viatura_id=%s, auto_infracao=%s,
+              data_infracao=%s, data_hora_infracao=%s, data_limite_indicacao=%s,
+              municipio=%s, endereco=%s, descricao_multa=%s, natureza=%s,
+              condutor=%s, condutor_id=%s, condutor_responsavel=%s, condutor_responsavel_id=%s,
+              parcelas=%s, vencimento=%s, valor=%s, valor_pago=%s, valor_aberto=%s,
+              observacoes=%s, status=%s, situacao=%s,
+              gerar_contas_pagar=%s, gerar_extrato_profissional=%s,
+              contas_pagar=%s, extrato_profissional=%s,
+              updated_at=now()
+            where id=%s
+            """,
+            params + (mid,),
+        )
+        item = multa_frota_por_id(mid)
+    else:
+        row = one(
+            """
+            insert into controle_multas (
+              viatura, placa, viatura_id, auto_infracao,
+              data_infracao, data_hora_infracao, data_limite_indicacao,
+              municipio, endereco, descricao_multa, natureza,
+              condutor, condutor_id, condutor_responsavel, condutor_responsavel_id,
+              parcelas, vencimento, valor, valor_pago, valor_aberto,
+              observacoes, status, situacao,
+              gerar_contas_pagar, gerar_extrato_profissional,
+              contas_pagar, extrato_profissional,
+              updated_at
+            ) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,now())
+            returning id
+            """,
+            params,
+        )
+        item = multa_frota_por_id(row["id"])
+    if dados["gerar_contas_pagar"] and not cp_ids_existentes and not item.get("contas_pagar_ids"):
+        cp_ids = _criar_contas_pagar_multa_frota(item)
+        cp_principal = cp_ids[0] if cp_ids else None
+        q(
+            """
+            update controle_multas set
+              contas_pagar_id=%s, contas_pagar_ids=%s, updated_at=now()
+            where id=%s
+            """,
+            (cp_principal, Json(cp_ids), item["id"]),
+        )
+        item = multa_frota_por_id(item["id"])
+    if dados["gerar_extrato_profissional"] and not ext_id_existente and not item.get("extrato_profissional_id"):
+        ext_id = _registrar_extrato_profissional_multa(item)
+        q(
+            "update controle_multas set extrato_profissional_id=%s, updated_at=now() where id=%s",
+            (ext_id, item["id"]),
+        )
+        item = multa_frota_por_id(item["id"])
+    return item
+
+
+def excluir_multa_frota(mid):
+    q(
+        """
+        update controle_multas
+           set status='cancelado', situacao='cancelado', updated_at=now()
+         where id=%s
+        """,
+        (str(mid),),
+    )
+
+
+def _parse_filtros_multas_request(request):
+    qparams = request.query_params if request else {}
+    return {
+        "data_ini": _parse_data_controle(qparams.get("data_ini")),
+        "data_fim": _parse_data_controle(qparams.get("data_fim")),
+        "viatura_id": (qparams.get("viatura_id") or "").strip() or None,
+        "condutor_id": (qparams.get("condutor_id") or "").strip() or None,
+        "municipio": (qparams.get("municipio") or "").strip() or None,
+        "status": (qparams.get("status") or "").strip().lower() or None,
+        "busca": (qparams.get("busca") or "").strip() or None,
+    }
+
+
+@app.get("/frota/multas", response_class=HTMLResponse)
+def frota_pagina_multas(request: Request):
+    return templates.TemplateResponse(
+        "frota/multas.html",
+        {
+            "request": request,
+            "nav_ativo": "frota",
+            "nav_som": False,
+            "kpis": resumo_multas_frota(),
+            "naturezas": FROTA_MULTAS_NATUREZAS,
+            "status_opcoes": FROTA_MULTAS_STATUS,
+        },
+    )
+
+
+@app.get("/api/frota/multas")
+def api_frota_lista_multas(request: Request):
+    filtros = _parse_filtros_multas_request(request)
+    return {
+        "ok": True,
+        "itens": listar_multas_frota(filtros),
+        "kpis": resumo_multas_frota(filtros),
+    }
+
+
+@app.get("/api/frota/multas/opcoes/municipios")
+def api_frota_multas_opcoes_municipios():
+    return {"ok": True, "itens": opcoes_municipios_multas_frota()}
+
+
+@app.get("/api/frota/multas/{mid}")
+def api_frota_get_multa(mid: str):
+    item = multa_frota_por_id(mid)
+    if not item:
+        return JSONResponse({"ok": False, "erro": "Multa não encontrada"}, status_code=404)
+    return {"ok": True, "item": item}
+
+
+@app.post("/api/frota/multas")
+async def api_frota_post_multa(request: Request):
+    try:
+        payload = await request.json()
+        item = salvar_multa_frota(payload)
+        filtros = _parse_filtros_multas_request(request)
+        return {"ok": True, "item": item, "kpis": resumo_multas_frota(filtros)}
+    except Exception as exc:
+        return JSONResponse({"ok": False, "erro": str(exc)}, status_code=400)
+
+
+@app.put("/api/frota/multas/{mid}")
+async def api_frota_put_multa(mid: str, request: Request):
+    try:
+        payload = await request.json()
+        payload["id"] = mid
+        item = salvar_multa_frota(payload)
+        filtros = _parse_filtros_multas_request(request)
+        return {"ok": True, "item": item, "kpis": resumo_multas_frota(filtros)}
+    except Exception as exc:
+        return JSONResponse({"ok": False, "erro": str(exc)}, status_code=400)
+
+
+@app.delete("/api/frota/multas/{mid}")
+def api_frota_delete_multa(mid: str):
+    try:
+        excluir_multa_frota(mid)
+        return {"ok": True, "kpis": resumo_multas_frota()}
+    except Exception as exc:
+        return JSONResponse({"ok": False, "erro": str(exc)}, status_code=400)
+
+
+@app.get("/api/frota/profissionais-opcoes")
+def api_frota_profissionais_opcoes():
+    return {"ok": True, "itens": opcoes_profissionais_frota_abastecimento()}
+
+
+FROTA_PATIO_STATUS = ("no_patio", "saiu", "cancelado")
+FROTA_PATIO_STATUS_LABEL = {
+    "no_patio": "No pátio",
+    "saiu": "Saiu",
+    "cancelado": "Cancelado",
+}
+
+
+def _label_status_patio(st):
+    s = (_txt_cad(st) or "no_patio").lower()
+    return FROTA_PATIO_STATUS_LABEL.get(s, s.replace("_", " ").title())
+
+
+def _combinar_data_hora_patio(data_val, hora_val=None, datetime_val=None):
+    if datetime_val:
+        dt = _parse_datetime_controle(datetime_val)
+        if dt:
+            return dt
+    d = _parse_data_controle(data_val)
+    if not d:
+        return None
+    if hora_val:
+        if hasattr(hora_val, "hour"):
+            t = hora_val
+        else:
+            txt = str(hora_val).strip()
+            if len(txt) >= 5 and ":" in txt:
+                parts = txt.split(":")
+                try:
+                    from datetime import time as time_cls
+
+                    t = time_cls(int(parts[0]), int(parts[1]), int(parts[2]) if len(parts) > 2 else 0)
+                except Exception:
+                    t = None
+            else:
+                t = None
+        if t:
+            return datetime.combine(d, t)
+    return datetime.combine(d, datetime.min.time())
+
+
+def _calcular_tempo_patio_minutos(chegada, saida=None, status="no_patio"):
+    if not chegada:
+        return 0
+    if isinstance(chegada, str):
+        chegada = _parse_datetime_controle(chegada)
+    if not chegada:
+        return 0
+    st = (_txt_cad(status) or "no_patio").lower()
+    if st == "no_patio" or not saida:
+        fim = datetime.now()
+    else:
+        fim = saida if not isinstance(saida, str) else _parse_datetime_controle(saida)
+    if not fim:
+        fim = datetime.now()
+    delta = fim - chegada
+    return max(int(delta.total_seconds() // 60), 0)
+
+
+def _formatar_tempo_patio(minutos):
+    if minutos is None:
+        return "-"
+    mins = int(minutos or 0)
+    if mins <= 0:
+        return "0min"
+    if mins < 60:
+        return f"{mins}min"
+    horas = mins // 60
+    resto = mins % 60
+    if horas < 24:
+        return f"{horas}h {resto}min" if resto else f"{horas}h"
+    dias = horas // 24
+    horas_r = horas % 24
+    partes = [f"{dias} dia{'s' if dias > 1 else ''}"]
+    if horas_r:
+        partes.append(f"{horas_r}h")
+    elif resto:
+        partes.append(f"{resto}min")
+    return " ".join(partes)
+
+
+def normalizar_patio_frota(row):
+    if not row:
+        return None
+    item = dict(row)
+    item["id"] = str(item.get("id"))
+    item["placa"] = normalizar_placa_viatura(item.get("placa"))
+    st = (_txt_cad(item.get("status")) or "no_patio").lower()
+    if st == "ativo":
+        st = "no_patio"
+    item["status"] = st
+    item["status_label"] = _label_status_patio(st)
+    chegada = item.get("data_hora_chegada")
+    if not chegada and item.get("data_entrada"):
+        chegada = _combinar_data_hora_patio(item.get("data_entrada"), item.get("hora_chegada"))
+    saida = item.get("data_hora_saida")
+    if not saida and item.get("data_saida"):
+        saida = _combinar_data_hora_patio(item.get("data_saida"), item.get("hora_saida"))
+    item["data_hora_chegada"] = chegada
+    item["data_hora_saida"] = saida
+    if chegada and hasattr(chegada, "date"):
+        item["data_entrada"] = chegada.date()
+        item["data_entrada_fmt"] = chegada.strftime("%d/%m/%Y")
+        item["data_entrada_iso"] = chegada.strftime("%Y-%m-%d")
+        item["hora_chegada_fmt"] = chegada.strftime("%H:%M")
+    else:
+        item["data_entrada_fmt"] = _formatar_valor_controle("data", item.get("data_entrada"))
+        item["data_entrada_iso"] = str(item.get("data_entrada") or "")[:10]
+        item["hora_chegada_fmt"] = str(item.get("hora_chegada") or "")[:5]
+    if saida and hasattr(saida, "strftime"):
+        item["data_saida"] = saida.date()
+        item["data_saida_fmt"] = saida.strftime("%d/%m/%Y")
+        item["data_saida_iso"] = saida.strftime("%Y-%m-%d")
+        item["hora_saida_fmt"] = saida.strftime("%H:%M")
+    else:
+        item["data_saida_fmt"] = _formatar_valor_controle("data", item.get("data_saida")) if item.get("data_saida") else "-"
+        item["data_saida_iso"] = str(item.get("data_saida") or "")[:10]
+        item["hora_saida_fmt"] = str(item.get("hora_saida") or "")[:5] if item.get("hora_saida") else "-"
+    mins = _calcular_tempo_patio_minutos(chegada, saida, st)
+    item["tempo_no_patio_minutos"] = mins
+    item["tempo_no_patio_fmt"] = _formatar_tempo_patio(mins)
+    obs = item.get("observacao") or item.get("observacoes") or ""
+    item["observacao"] = obs
+    item["observacao_resumo"] = (obs[:80] + "…") if len(obs) > 80 else obs
+    item["created_at"] = dt_str(item.get("created_at"))
+    item["updated_at"] = dt_str(item.get("updated_at"))
+    return item
+
+
+def _where_patio_frota(filtros=None):
+    filtros = filtros or {}
+    parts = []
+    params = []
+    st = (filtros.get("status") or "").lower()
+    if st == "cancelado":
+        parts.append("coalesce(p.status,'no_patio') = 'cancelado'")
+    elif st:
+        parts.append("coalesce(p.status,'no_patio') = %s")
+        params.append(st)
+    else:
+        parts.append("coalesce(p.status,'no_patio') <> 'cancelado'")
+    if filtros.get("data_ini"):
+        parts.append("coalesce(p.data_entrada, p.data_hora_chegada::date) >= %s")
+        params.append(filtros["data_ini"])
+    if filtros.get("data_fim"):
+        parts.append("coalesce(p.data_entrada, p.data_hora_chegada::date) <= %s")
+        params.append(filtros["data_fim"])
+    if filtros.get("seguradora"):
+        parts.append("coalesce(p.seguradora,'') ilike %s")
+        params.append(f"%{filtros['seguradora']}%")
+    if filtros.get("placa"):
+        placa_n = normalizar_placa_viatura(filtros["placa"])
+        parts.append(
+            "upper(replace(replace(replace(coalesce(p.placa,''), ' ', ''), '-', ''), '.', '')) = %s"
+        )
+        params.append(placa_n)
+    if filtros.get("motorista"):
+        parts.append("coalesce(p.motorista,'') ilike %s")
+        params.append(f"%{filtros['motorista']}%")
+    if filtros.get("responsavel"):
+        parts.append(
+            "(coalesce(p.responsavel_entrada,'') ilike %s or coalesce(p.responsavel_saida,'') ilike %s)"
+        )
+        b = f"%{filtros['responsavel']}%"
+        params.extend([b, b])
+    if filtros.get("busca"):
+        parts.append(
+            """
+            (
+              coalesce(p.placa,'') ilike %s
+              or coalesce(p.motorista,'') ilike %s
+              or coalesce(p.modelo,'') ilike %s
+              or coalesce(p.cor,'') ilike %s
+              or coalesce(p.seguradora,'') ilike %s
+              or coalesce(p.responsavel_entrada,'') ilike %s
+              or coalesce(p.observacao,'') ilike %s
+            )
+            """
+        )
+        b = f"%{filtros['busca']}%"
+        params.extend([b, b, b, b, b, b, b])
+    where = " where " + " and ".join(parts) if parts else ""
+    return where, params
+
+
+def resumo_patio_frota(filtros=None):
+    where, params = _where_patio_frota(filtros)
+    row = one(
+        f"""
+        select
+          count(*) filter (where coalesce(p.status,'no_patio') = 'no_patio')::int as no_patio,
+          count(*) filter (
+            where coalesce(p.data_entrada, p.data_hora_chegada::date) = current_date
+          )::int as entradas_hoje,
+          count(*) filter (
+            where coalesce(p.status,'no_patio') = 'saiu'
+              and coalesce(p.data_saida, p.data_hora_saida::date) = current_date
+          )::int as saidas_hoje,
+          count(*)::int as total_periodo,
+          coalesce(avg(
+            case when coalesce(p.status,'no_patio') = 'saiu' and p.tempo_no_patio_minutos > 0
+                 then p.tempo_no_patio_minutos end
+          ), 0)::float as tempo_medio
+        from controle_patio p
+        {where}
+        """,
+        tuple(params) if params else None,
+    ) or {}
+    no_patio = int(row.get("no_patio") or 0)
+    tempo_medio = int(round(float(row.get("tempo_medio") or 0)))
+    return {
+        "no_patio": no_patio,
+        "entradas_hoje": int(row.get("entradas_hoje") or 0),
+        "saidas_hoje": int(row.get("saidas_hoje") or 0),
+        "pendentes_saida": no_patio,
+        "tempo_medio_minutos": tempo_medio,
+        "tempo_medio_fmt": _formatar_tempo_patio(tempo_medio),
+        "total_periodo": int(row.get("total_periodo") or 0),
+    }
+
+
+def listar_patio_frota(filtros=None):
+    where, params = _where_patio_frota(filtros)
+    rows = q(
+        f"""
+        select p.*
+          from controle_patio p
+        {where}
+         order by coalesce(p.data_hora_chegada, p.data_entrada::timestamp) desc nulls last,
+                  p.created_at desc nulls last
+         limit 1000
+        """,
+        tuple(params) if params else None,
+        fetch=True,
+    )
+    return [normalizar_patio_frota(r) for r in rows]
+
+
+def patio_frota_por_id(pid):
+    row = one("select * from controle_patio where id=%s", (str(pid),))
+    return normalizar_patio_frota(row) if row else None
+
+
+# --- Integração experimental Central ↔ Pátio (Fase 1 — somente consulta) ---
+CENTRAL_PATIO_BADGE_KEYS = ("no_patio", "pendente_saida", "saiu")
+
+
+def _status_exibicao_central_patio(patio_status, servico_status):
+    ps = (_txt_cad(patio_status) or "no_patio").lower()
+    if ps == "saiu":
+        return "SAIU DO PÁTIO", "saiu"
+    if ps == "no_patio":
+        ss = (_txt_cad(servico_status) or "").lower()
+        if ss == "finalizado":
+            return "PENDENTE DE SAÍDA", "pendente_saida"
+        return "NO PÁTIO", "no_patio"
+    return None, None
+
+
+def patio_integracao_central_por_servico(sid):
+    """Consulta read-only de registro de pátio vinculado a um serviço da Central."""
+    s = servico_by_id(sid)
+    if not s:
+        return None
+    placa = normalizar_placa_viatura(
+        s.get("placa_veiculo_removido") or s.get("placa_removida") or ""
+    )
+    row = one(
+        """
+        select *
+          from controle_patio
+         where servico_id = %s
+           and coalesce(status,'no_patio') <> 'cancelado'
+         order by coalesce(data_hora_chegada, data_entrada::timestamp) desc nulls last
+         limit 1
+        """,
+        (str(sid),),
+    )
+    vinculo_por = "servico_id" if row else None
+    if not row and placa:
+        row = one(
+            """
+            select *
+              from controle_patio
+             where coalesce(status,'no_patio') <> 'cancelado'
+               and upper(replace(replace(replace(coalesce(placa,''), ' ', ''), '-', ''), '.', '')) = %s
+             order by
+               case when coalesce(status,'no_patio') = 'no_patio' then 0 else 1 end,
+               coalesce(data_hora_chegada, data_entrada::timestamp) desc nulls last
+             limit 1
+            """,
+            (placa,),
+        )
+        if row:
+            vinculo_por = "placa"
+    if not row:
+        return None
+    item = normalizar_patio_frota(row)
+    st_db = (item.get("status") or "no_patio").lower()
+    if st_db == "cancelado":
+        return None
+    label, badge_key = _status_exibicao_central_patio(st_db, s.get("status"))
+    if not label:
+        return None
+    chegada = item.get("data_hora_chegada")
+    saida = item.get("data_hora_saida")
+    if chegada:
+        entrada_fmt = formatar_data_hora_central(chegada)
+    else:
+        entrada_fmt = f"{item.get('data_entrada_fmt') or '-'} {item.get('hora_chegada_fmt') or ''}".strip()
+    saida_fmt = formatar_data_hora_central(saida) if saida else None
+    return {
+        "id": item.get("id"),
+        "status": badge_key,
+        "status_label": label,
+        "data_hora_entrada": entrada_fmt,
+        "tempo_no_patio_fmt": item.get("tempo_no_patio_fmt")
+        or _formatar_tempo_patio(item.get("tempo_no_patio_minutos") or 0),
+        "responsavel_entrada": item.get("responsavel_entrada") or "-",
+        "data_hora_saida": saida_fmt,
+        "responsavel_saida": (item.get("responsavel_saida") or "").strip() or None,
+        "url_registro": f"/frota/controle-patio?registro={item.get('id')}",
+        "vinculo_por": vinculo_por,
+        "placa": item.get("placa") or placa or "",
+    }
+
+
+def placa_no_patio_frota(placa, excluir_id=None):
+    placa_n = normalizar_placa_viatura(placa)
+    if not placa_n:
+        return None
+    params = [placa_n]
+    sql = """
+        select id, placa, motorista, data_hora_chegada, status
+          from controle_patio
+         where coalesce(status,'no_patio') = 'no_patio'
+           and upper(replace(replace(replace(coalesce(placa,''), ' ', ''), '-', ''), '.', '')) = %s
+    """
+    if excluir_id:
+        sql += " and id <> %s"
+        params.append(str(excluir_id))
+    sql += " order by data_hora_chegada desc nulls last limit 1"
+    row = one(sql, tuple(params))
+    return normalizar_patio_frota(row) if row else None
+
+
+def opcoes_seguradoras_frota():
+    nomes = set()
+    rows_cli = q(
+        """
+        select coalesce(nullif(trim(nome_fantasia),''), nullif(trim(razao_social),''), nullif(trim(nome),'')) as nome
+          from cadastro_contatos
+         where coalesce(cliente, false) = true
+           and coalesce(status,'ativo') = 'ativo'
+        """,
+        fetch=True,
+    ) or []
+    for r in rows_cli:
+        n = (r.get("nome") or "").strip()
+        if n:
+            nomes.add(n)
+    rows_srv = q(
+        """
+        select distinct trim(seguradora) as nome
+          from servicos
+         where coalesce(trim(seguradora),'') <> ''
+         limit 500
+        """,
+        fetch=True,
+    ) or []
+    for r in rows_srv:
+        n = (r.get("nome") or "").strip()
+        if n:
+            nomes.add(n)
+    rows_pat = q(
+        """
+        select distinct trim(seguradora) as nome
+          from controle_patio
+         where coalesce(trim(seguradora),'') <> ''
+         limit 500
+        """,
+        fetch=True,
+    ) or []
+    for r in rows_pat:
+        n = (r.get("nome") or "").strip()
+        if n:
+            nomes.add(n)
+    return sorted(nomes, key=lambda x: x.lower())
+
+
+def _validar_payload_patio_frota(p, pid=None):
+    p = p or {}
+    placa = normalizar_placa_viatura(p.get("placa"))
+    if not placa:
+        raise ValueError("Placa é obrigatória")
+    data_entrada = p.get("data_entrada")
+    hora_chegada = p.get("hora_chegada")
+    data_hora_chegada = _combinar_data_hora_patio(
+        data_entrada, hora_chegada, p.get("data_hora_chegada")
+    )
+    if not data_hora_chegada:
+        raise ValueError("Data e hora de chegada são obrigatórias")
+    responsavel_entrada = (_txt_controle(p.get("responsavel_entrada"), 120) or "").strip()
+    if not responsavel_entrada:
+        raise ValueError("Responsável pela entrada é obrigatório")
+    st = (_txt_controle(p.get("status"), 40) or "no_patio").lower()
+    if st not in FROTA_PATIO_STATUS:
+        st = "no_patio"
+    if pid:
+        atual = patio_frota_por_id(pid)
+        if atual and atual.get("status") == "cancelado":
+            st = "cancelado"
+    data_hora_saida = None
+    if p.get("data_hora_saida") or p.get("data_saida") or p.get("hora_saida"):
+        data_hora_saida = _combinar_data_hora_patio(
+            p.get("data_saida"), p.get("hora_saida"), p.get("data_hora_saida")
+        )
+    if st == "saiu" and not data_hora_saida:
+        raise ValueError("Hora de saída é obrigatória para status Saiu")
+    if data_hora_saida and data_hora_saida < data_hora_chegada:
+        raise ValueError("Saída não pode ser anterior à chegada")
+    tempo = _calcular_tempo_patio_minutos(data_hora_chegada, data_hora_saida, st)
+    return {
+        "data_entrada": data_hora_chegada.date(),
+        "hora_chegada": data_hora_chegada.time(),
+        "data_hora_chegada": data_hora_chegada,
+        "motorista": _txt_controle(p.get("motorista"), 200),
+        "placa": placa,
+        "modelo": _txt_controle(p.get("modelo"), 120),
+        "cor": _txt_controle(p.get("cor"), 80),
+        "seguradora": _txt_controle(p.get("seguradora"), 200),
+        "data_saida": data_hora_saida.date() if data_hora_saida else None,
+        "hora_saida": data_hora_saida.time() if data_hora_saida else None,
+        "data_hora_saida": data_hora_saida,
+        "responsavel_entrada": responsavel_entrada,
+        "responsavel_saida": _txt_controle(p.get("responsavel_saida"), 120),
+        "observacao": _txt_controle(p.get("observacao") or p.get("observacoes")),
+        "observacao_saida": _txt_controle(p.get("observacao_saida")),
+        "status": st,
+        "tempo_no_patio_minutos": tempo,
+    }
+
+
+def salvar_patio_frota(payload):
+    p = payload or {}
+    pid = (p.get("id") or "").strip()
+    if not pid and not _bool_controle(p.get("confirmar_duplicata")):
+        dup = placa_no_patio_frota(p.get("placa"))
+        if dup:
+            return {
+                "requer_confirmacao": True,
+                "mensagem": "Esta placa já está no pátio. Deseja continuar mesmo assim?",
+                "placa_duplicada": dup,
+            }
+    dados = _validar_payload_patio_frota(p, pid=pid or None)
+    params = (
+        dados["data_entrada"],
+        dados["hora_chegada"],
+        dados["data_hora_chegada"],
+        dados["motorista"],
+        dados["placa"],
+        dados["modelo"],
+        dados["cor"],
+        dados["seguradora"],
+        dados["data_saida"],
+        dados["hora_saida"],
+        dados["data_hora_saida"],
+        dados["responsavel_entrada"],
+        dados["responsavel_saida"],
+        dados["observacao"],
+        dados["observacao_saida"],
+        dados["status"],
+        dados["tempo_no_patio_minutos"],
+    )
+    if pid:
+        q(
+            """
+            update controle_patio set
+              data_entrada=%s, hora_chegada=%s, data_hora_chegada=%s,
+              motorista=%s, placa=%s, modelo=%s, cor=%s, seguradora=%s,
+              data_saida=%s, hora_saida=%s, data_hora_saida=%s,
+              responsavel_entrada=%s, responsavel_saida=%s,
+              observacao=%s, observacao_saida=%s,
+              status=%s, tempo_no_patio_minutos=%s, updated_at=now()
+            where id=%s
+            """,
+            params + (pid,),
+        )
+        return patio_frota_por_id(pid)
+    row = one(
+        """
+        insert into controle_patio (
+          data_entrada, hora_chegada, data_hora_chegada,
+          motorista, placa, modelo, cor, seguradora,
+          data_saida, hora_saida, data_hora_saida,
+          responsavel_entrada, responsavel_saida,
+          observacao, observacao_saida,
+          status, tempo_no_patio_minutos, updated_at
+        ) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,now())
+        returning id
+        """,
+        params,
+    )
+    return patio_frota_por_id(row["id"])
+
+
+def registrar_saida_patio_frota(pid, payload):
+    item = patio_frota_por_id(pid)
+    if not item:
+        raise ValueError("Registro não encontrado")
+    if item.get("status") == "cancelado":
+        raise ValueError("Registro cancelado")
+    if item.get("status") == "saiu":
+        raise ValueError("Saída já registrada")
+    p = payload or {}
+    data_hora_saida = _combinar_data_hora_patio(
+        p.get("data_saida") or datetime.now().date(),
+        p.get("hora_saida"),
+        p.get("data_hora_saida") or datetime.now().strftime("%Y-%m-%dT%H:%M"),
+    )
+    if not data_hora_saida:
+        raise ValueError("Hora de saída é obrigatória")
+    chegada = item.get("data_hora_chegada")
+    if chegada and data_hora_saida < chegada:
+        raise ValueError("Saída não pode ser anterior à chegada")
+    resp = (_txt_controle(p.get("responsavel_saida"), 120) or "").strip()
+    if not resp:
+        raise ValueError("Responsável pela saída é obrigatório")
+    tempo = _calcular_tempo_patio_minutos(chegada, data_hora_saida, "saiu")
+    q(
+        """
+        update controle_patio set
+          data_saida=%s, hora_saida=%s, data_hora_saida=%s,
+          responsavel_saida=%s, observacao_saida=%s,
+          status='saiu', tempo_no_patio_minutos=%s, updated_at=now()
+        where id=%s
+        """,
+        (
+            data_hora_saida.date(),
+            data_hora_saida.time(),
+            data_hora_saida,
+            resp,
+            _txt_controle(p.get("observacao_saida")),
+            tempo,
+            str(pid),
+        ),
+    )
+    return patio_frota_por_id(pid)
+
+
+def excluir_patio_frota(pid):
+    q(
+        "update controle_patio set status='cancelado', updated_at=now() where id=%s",
+        (str(pid),),
+    )
+
+
+def _parse_filtros_patio_request(request):
+    qparams = request.query_params if request else {}
+    return {
+        "data_ini": _parse_data_controle(qparams.get("data_ini")),
+        "data_fim": _parse_data_controle(qparams.get("data_fim")),
+        "status": (qparams.get("status") or "").strip().lower() or None,
+        "seguradora": (qparams.get("seguradora") or "").strip() or None,
+        "placa": (qparams.get("placa") or "").strip() or None,
+        "motorista": (qparams.get("motorista") or "").strip() or None,
+        "responsavel": (qparams.get("responsavel") or "").strip() or None,
+        "busca": (qparams.get("busca") or "").strip() or None,
+    }
+
+
+@app.get("/api/frota/controle-patio")
+def api_frota_lista_patio(request: Request):
+    filtros = _parse_filtros_patio_request(request)
+    return {
+        "ok": True,
+        "itens": listar_patio_frota(filtros),
+        "kpis": resumo_patio_frota(filtros),
+    }
+
+
+@app.get("/api/frota/controle-patio/{pid}")
+def api_frota_get_patio(pid: str):
+    item = patio_frota_por_id(pid)
+    if not item:
+        return JSONResponse({"ok": False, "erro": "Registro não encontrado"}, status_code=404)
+    return {"ok": True, "item": item}
+
+
+@app.post("/api/frota/controle-patio")
+async def api_frota_post_patio(request: Request):
+    try:
+        payload = await request.json()
+        result = salvar_patio_frota(payload)
+        if isinstance(result, dict) and result.get("requer_confirmacao"):
+            return JSONResponse({"ok": False, **result}, status_code=409)
+        filtros = _parse_filtros_patio_request(request)
+        return {"ok": True, "item": result, "kpis": resumo_patio_frota(filtros)}
+    except Exception as exc:
+        return JSONResponse({"ok": False, "erro": str(exc)}, status_code=400)
+
+
+@app.put("/api/frota/controle-patio/{pid}")
+async def api_frota_put_patio(pid: str, request: Request):
+    try:
+        payload = await request.json()
+        payload["id"] = pid
+        result = salvar_patio_frota(payload)
+        if isinstance(result, dict) and result.get("requer_confirmacao"):
+            return JSONResponse({"ok": False, **result}, status_code=409)
+        filtros = _parse_filtros_patio_request(request)
+        return {"ok": True, "item": result, "kpis": resumo_patio_frota(filtros)}
+    except Exception as exc:
+        return JSONResponse({"ok": False, "erro": str(exc)}, status_code=400)
+
+
+@app.post("/api/frota/controle-patio/{pid}/saida")
+async def api_frota_saida_patio(pid: str, request: Request):
+    try:
+        payload = await request.json()
+        item = registrar_saida_patio_frota(pid, payload)
+        filtros = _parse_filtros_patio_request(request)
+        return {"ok": True, "item": item, "kpis": resumo_patio_frota(filtros)}
+    except Exception as exc:
+        return JSONResponse({"ok": False, "erro": str(exc)}, status_code=400)
+
+
+@app.delete("/api/frota/controle-patio/{pid}")
+def api_frota_delete_patio(pid: str):
+    try:
+        excluir_patio_frota(pid)
+        return {"ok": True, "kpis": resumo_patio_frota()}
+    except Exception as exc:
+        return JSONResponse({"ok": False, "erro": str(exc)}, status_code=400)
+
+
+@app.get("/api/frota/seguradoras-opcoes")
+def api_frota_seguradoras_opcoes():
+    return {"ok": True, "itens": opcoes_seguradoras_frota()}
+
+
+@app.get("/api/integracao/central-patio/servico/{sid}")
+def api_integracao_central_patio_servico(sid: str):
+    """Fase 1 — consulta visual desacoplada; não altera fluxos operacionais."""
+    if not servico_by_id(sid):
+        return JSONResponse({"ok": False, "erro": "Serviço não encontrado"}, status_code=404)
+    registro = patio_integracao_central_por_servico(sid)
+    return {
+        "ok": True,
+        "experimental": True,
+        "vinculo": registro is not None,
+        "registro": registro,
+    }
 
 
 @app.get("/controle/danos", response_class=HTMLResponse)
@@ -3948,30 +6701,6 @@ async def api_controle_post_multas(request: Request):
 async def api_controle_post_seguros(request: Request):
     return await api_controle_salvar("seguros", request)
 
-
-@app.get('/', response_class=HTMLResponse)
-def dashboard(request: Request):
-    live = payload_dashboard_live()
-    return templates.TemplateResponse(
-        'dashboard.html',
-        {
-            'request': request,
-            'nav_ativo': 'dashboard',
-            'nav_som': False,
-            'data_ref': live['data_ref'],
-            'kpis': live['kpis'],
-            'resumo_status': live['resumo_status'],
-            'resumo_financeiro': live['resumo_financeiro'],
-            'alertas': live['alertas'],
-            'ranking': live['ranking'],
-            'motoristas_mapa_json': json.dumps(live['motoristas_mapa']),
-        },
-    )
-
-
-@app.get('/api/dashboard/live')
-def api_dashboard_live():
-    return payload_dashboard_live()
 
 
 @app.get('/central', response_class=HTMLResponse)
@@ -4887,9 +7616,24 @@ def api_motoristas_para_servico(sid: str):
             alerta_pers, alerta_msg = _alerta_personalizacao_viatura(
                 seguradora_srv, viatura.get("personalizacao")
             )
+        prof = profissional_cadastro_por_motorista_id(m.get("id"))
+        if not prof:
+            cpf_m = normalizar_cpf_profissional(m.get("cpf"))
+            if cpf_m:
+                prof = profissional_cadastro_por_cpf(cpf_m)
+        nome_exib = (prof.get("nome_exibicao") if prof else None) or m.get("nome")
+        nome_compl = (prof.get("nome_completo") if prof else None) or m.get("nome")
 
         saida.append({
             **m,
+            "nome": nome_exib,
+            "nome_exibicao": nome_exib,
+            "nome_completo": nome_compl,
+            "funcao": prof.get("funcao") if prof else (m.get("tipo") or ""),
+            "tipo_profissional": prof.get("tipo_profissional") if prof else "motorista",
+            "tipo_profissional_label": prof.get("tipo_profissional_label") if prof else "Motorista",
+            "classificacao_vinculo": prof.get("classificacao_vinculo") if prof else "",
+            "vinculo_label": prof.get("vinculo_label") if prof else "",
             "ocupado": bool(ocupado),
             "servico_ocupado": ocupado.get("protocolo") if ocupado else None,
             "viatura_exibicao": viatura.get("nome_exibicao") if viatura else (placa_trab or "-"),
@@ -5644,6 +8388,89 @@ async def faturamento_acao_massa(request: Request):
     return RedirectResponse(destino, 303)
 
 
+_FAT_STATUS_EXPORT = {
+    "para_conferir": "Para conferir",
+    "para_faturar": "Para faturar",
+    "negociacao": "Negociar",
+    "faturado": "Faturado",
+}
+
+
+def _formatar_planilha_faturamento_export(ws, total_linhas: int):
+    from openpyxl.styles import Font
+    from openpyxl.utils import get_column_letter
+
+    for cell in ws[1]:
+        cell.font = Font(bold=True)
+
+    ultima = total_linhas + 1
+    for row in range(2, ultima + 1):
+        ws.cell(row=row, column=2).number_format = "DD/MM/YYYY HH:MM"
+        ws.cell(row=row, column=9).number_format = 'R$ #,##0.00'
+
+    for col_idx in range(1, 10):
+        col_letter = get_column_letter(col_idx)
+        max_len = 0
+        for row_idx in range(1, ultima + 1):
+            val = ws.cell(row=row_idx, column=col_idx).value
+            max_len = max(max_len, len(str(val if val is not None else "")))
+        ws.column_dimensions[col_letter].width = min(max(max_len + 2, 10), 48)
+
+
+@app.post("/faturamento/exportar-excel")
+async def faturamento_exportar_excel(request: Request):
+    form = await request.form()
+    ids = [str(x).strip() for x in form.getlist("servico_ids") if str(x).strip()]
+    if not ids:
+        return JSONResponse(
+            {"ok": False, "erro": "Selecione ao menos um serviço para exportar."},
+            status_code=400,
+        )
+
+    linhas = []
+    for sid in ids:
+        row = one("select * from servicos where id=%s", (sid,))
+        if not row:
+            continue
+        fat_st = (row.get("status_faturamento") or "para_conferir").strip()
+        dt_raw = _parse_dt_valor(row.get("created_at"))
+        data_cell = _dt_para_local_br(dt_raw) if dt_raw else None
+        placa = row.get("placa_veiculo_removido") or row.get("placa_removida") or "-"
+        linhas.append(
+            {
+                "Protocolo": row.get("protocolo") or "-",
+                "Data": data_cell,
+                "Seguradora": row.get("seguradora") or "-",
+                "Tipo": row.get("tipo") or "-",
+                "Status Operacional": row.get("status") or "-",
+                "Status Faturamento": _FAT_STATUS_EXPORT.get(fat_st, fat_st),
+                "Motorista": row.get("motorista_nome") or "-",
+                "Placa": placa,
+                "Valor": float(row.get("valor_total") or 0),
+            }
+        )
+
+    if not linhas:
+        return JSONResponse(
+            {"ok": False, "erro": "Selecione ao menos um serviço para exportar."},
+            status_code=400,
+        )
+
+    df = pd.DataFrame(linhas)
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="Serviços")
+        _formatar_planilha_faturamento_export(writer.sheets["Serviços"], len(linhas))
+    output.seek(0)
+
+    nome = f"faturamento_servicos_selecionados_{datetime.now().strftime('%d-%m-%Y')}.xlsx"
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{nome}"'},
+    )
+
+
 @app.get('/faturamento/{sid}', response_class=HTMLResponse)
 def faturamento_detalhe(sid: str, request: Request, aba: str = "editar", ok: str = ""):
     s = servico_by_id(sid)
@@ -5657,7 +8484,7 @@ def faturamento_detalhe(sid: str, request: Request, aba: str = "editar", ok: str
     end_origem = desmontar_endereco_servico(s.get("origem"))
     end_destino = desmontar_endereco_servico(s.get("destino"))
     chk = checklist_resumo_servico(sid)
-    abas_validas = {"editar", "financeiro", "comentarios", "arquivos", "checklist"}
+    abas_validas = {"editar", "financeiro", "comentarios", "arquivos", "checklist", "patio"}
     aba_ativa = aba if aba in abas_validas else "editar"
     return templates.TemplateResponse(
         'servico_financeiro.html',
@@ -5814,8 +8641,12 @@ import financeiro_notas_entrada
 import financeiro_nfse
 import financeiro_config_fiscal
 import cadastros_import_clientes
+import relatorios_faturamento
+import dashboard_api
 financeiro_routes.register(app, templates)
 financeiro_notas_entrada.register(app, templates)
 financeiro_config_fiscal.register(app, templates)
 financeiro_nfse.register(app, templates)
 cadastros_import_clientes.register(app)
+relatorios_faturamento.register(app, templates)
+dashboard_api.register(app, templates)

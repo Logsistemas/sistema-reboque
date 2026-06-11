@@ -532,13 +532,16 @@ async function abrirModalMotorista(servicoId) {
         <span class="rank-num">${idx + 1}</span>
         <span class="rank-main">
           <input type="radio" name="motorista_id" value="${m.id}" ${checked} ${disabled}>
-          <b>${safe(m.nome)}</b>
+          <b>${safe(m.nome_exibicao || m.nome)}</b>
+          <div class="rank-prof-line muted">${safe(m.nome_completo || '')}</div>
           <div class="rank-viatura-line">
             <span><strong>${safe(exibicao)}</strong></span>
             <span class="muted">Placa: ${safe(placaAtual || '-')}</span>
           </div>
           <span class="rank-badges">
             <span class="badge-dist">📍 ${safe(distancia)}</span>
+            ${m.funcao ? `<span class="central-badge-prof">${escapeHtml(m.funcao)}</span>` : ''}
+            ${m.tipo_profissional_label ? `<span class="central-badge-prof central-badge-tipo">${escapeHtml(m.tipo_profissional_label)}</span>` : ''}
             ${badgeOrigem}
             ${badgePers}
           </span>

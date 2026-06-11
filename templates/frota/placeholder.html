@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{{ titulo }} — Frota</title>
+  {% include "partials/head_pages_v2.html" %}
+  <link rel="stylesheet" href="/static/frota.css">
+</head>
+<body class="ess-app">
+{% include "partials/app_shell_start.html" %}
+<div class="full ess-page-inner ctrl-wrap">
+  <header class="ctrl-header">
+    <div>
+      <p class="ctrl-breadcrumb"><a href="/frota/abastecimentos">Frota</a> / {{ titulo }}</p>
+      <span class="ctrl-badge frota-badge">{{ icone }} Frota</span>
+      <h1>{{ titulo }}</h1>
+      <p>{{ descricao }}</p>
+    </div>
+    <div class="ctrl-mod-actions">
+      <a href="/frota/abastecimentos" class="ctrl-btn ctrl-btn-outline">← Abastecimentos</a>
+    </div>
+  </header>
+  <section class="ctrl-panel frota-placeholder-box">
+    <p class="frota-placeholder-msg">Este módulo será disponibilizado em uma próxima versão.</p>
+  </section>
+</div>
+{% include "partials/app_shell_end.html" %}
+</body>
+</html>

@@ -1,58 +1,110 @@
-/* Faturamento premium — alinhado à Central */
+/* Faturamento premium — Essência Logística */
+
 body.fat-body {
   margin: 0;
-  background: #eef2f7;
+  background: linear-gradient(160deg, #eef2f7 0%, #e8eef5 45%, #f1f5f9 100%);
   color: #0f172a;
   font-family: "Segoe UI", Arial, Helvetica, sans-serif;
+  min-height: 100vh;
 }
 
 .fat-wrap {
-  padding: 20px 22px 32px;
-  max-width: 1600px;
+  padding: 22px 24px 40px;
+  max-width: 1680px;
   margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
 }
 
+/* —— Cabeçalho —— */
 .fat-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 18px;
+  gap: 20px;
+  margin-bottom: 22px;
   flex-wrap: wrap;
+}
+
+.fat-badge {
+  display: inline-block;
+  background: linear-gradient(135deg, #0b2f57, #1d4ed8);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 6px 12px;
+  border-radius: 999px;
+  margin-bottom: 10px;
 }
 
 .fat-header h1 {
   margin: 0;
-  font-size: 26px;
+  font-size: 28px;
   font-weight: 800;
   color: #0b2f57;
+  letter-spacing: -0.02em;
 }
 
 .fat-header p {
-  margin: 4px 0 0;
+  margin: 8px 0 0;
   color: #64748b;
-  font-size: 14px;
+  font-size: 15px;
+  max-width: 560px;
+  line-height: 1.45;
 }
 
+.fat-header-link {
+  align-self: center;
+  white-space: nowrap;
+}
+
+/* —— Cards —— */
 .fat-card {
   background: #fff;
-  border-radius: 14px;
-  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.07);
-  padding: 18px 20px;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.07);
+  padding: 20px 22px;
+  margin-bottom: 18px;
+}
+
+.fat-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   margin-bottom: 16px;
 }
 
-.fat-card h2 {
-  margin: 0 0 14px;
+.fat-card-head h2 {
+  margin: 0;
   font-size: 16px;
   font-weight: 800;
   color: #0b2f57;
 }
 
+.fat-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: #eff6ff;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.fat-filters-card {
+  padding-bottom: 22px;
+}
+
+/* —— Filtros —— */
 .fat-filters {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 10px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 14px 16px;
   align-items: end;
 }
 
@@ -62,46 +114,85 @@ body.fat-body {
   font-weight: 700;
   color: #64748b;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
-  margin-bottom: 4px;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
 }
 
 .fat-field input,
 .fat-field select {
   width: 100%;
-  padding: 9px 11px;
+  min-height: 42px;
+  padding: 10px 12px;
   border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  font-size: 13px;
+  border-radius: 10px;
+  font-size: 14px;
   box-sizing: border-box;
+  background: #fff;
+  color: #0f172a;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
+.fat-field input:focus,
+.fat-field select:focus {
+  outline: none;
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.fat-field-action .fat-btn-filter {
+  width: 100%;
+  min-height: 42px;
+  justify-content: center;
+  font-size: 14px;
+}
+
+/* —— KPIs —— */
 .fat-kpis {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 12px;
-  margin-bottom: 16px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
 }
 
 .fat-kpi {
+  position: relative;
   background: #fff;
-  border-radius: 12px;
-  padding: 16px 18px;
-  box-shadow: 0 3px 14px rgba(15, 23, 42, 0.06);
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 18px 18px 18px 20px;
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.05);
   border-left: 4px solid #0b2f57;
+  min-height: 96px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.fat-kpi-icon {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  font-size: 18px;
+  opacity: 0.45;
+  line-height: 1;
 }
 
 .fat-kpi small {
   color: #64748b;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
 .fat-kpi b {
   display: block;
-  font-size: 24px;
-  margin-top: 4px;
+  font-size: 26px;
+  font-weight: 800;
+  margin-top: 6px;
   color: #0f172a;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
 }
 
 .fat-kpi.orange { border-left-color: #ff6b00; }
@@ -109,18 +200,19 @@ body.fat-body {
 .fat-kpi.yellow { border-left-color: #eab308; }
 .fat-kpi.blue { border-left-color: #2563eb; }
 
+/* —— Barra de seleção em massa —— */
 .fat-bulk-bar {
   display: none;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
-  background: #0b2f57;
+  background: linear-gradient(135deg, #0b2f57 0%, #123f6e 100%);
   color: #fff;
-  border-radius: 12px;
-  padding: 14px 18px;
-  margin-bottom: 14px;
-  box-shadow: 0 4px 16px rgba(11, 47, 87, 0.25);
+  border-radius: 14px;
+  padding: 14px 20px;
+  margin-bottom: 16px;
+  box-shadow: 0 6px 24px rgba(11, 47, 87, 0.28);
 }
 
 .fat-bulk-bar.visible { display: flex; }
@@ -136,70 +228,142 @@ body.fat-body {
   flex-wrap: wrap;
 }
 
+/* —— Botões —— */
 .fat-btn {
   border: 0;
-  border-radius: 8px;
-  padding: 9px 14px;
+  border-radius: 10px;
+  padding: 10px 16px;
   font-weight: 700;
-  font-size: 12px;
+  font-size: 13px;
   cursor: pointer;
   text-decoration: none;
   display: inline-flex;
   align-items: center;
   white-space: nowrap;
+  transition: background 0.15s, transform 0.1s;
 }
+
+.fat-btn:active { transform: scale(0.98); }
 
 .fat-btn-primary { background: #ff6b00; color: #fff; }
 .fat-btn-primary:hover { background: #e55f00; }
 .fat-btn-dark { background: #0b2f57; color: #fff; border: 1px solid rgba(255,255,255,0.2); }
 .fat-btn-dark:hover { background: #092847; }
 .fat-btn-outline { background: #fff; color: #0b2f57; border: 1px solid #cbd5e1; }
-.fat-btn-outline:hover { background: #f1f5f9; }
+.fat-btn-outline:hover { background: #f1f5f9; border-color: #94a3b8; }
 .fat-btn-ghost {
   background: transparent;
   color: #fff;
   border: 1px solid rgba(255,255,255,0.35);
 }
 .fat-btn-ghost:hover { background: rgba(255,255,255,0.1); }
-.fat-btn-sm { padding: 6px 10px; font-size: 11px; }
 
-.fat-table-wrap { overflow-x: auto; }
+/* —— Tabela —— */
+.fat-table-card {
+  padding-bottom: 8px;
+}
+
+.fat-table-head {
+  justify-content: space-between;
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.fat-table-head-tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.fat-btn-export {
+  padding: 8px 14px;
+  font-size: 12px;
+}
+
+.fat-table-meta {
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.fat-table-wrap {
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
 
 .fat-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
+  min-width: 980px;
+}
+
+.fat-table thead {
+  background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
 }
 
 .fat-table thead th {
-  background: #f1f5f9;
   color: #0b2f57;
   font-weight: 800;
   font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  padding: 12px 10px;
+  letter-spacing: 0.05em;
+  padding: 14px 12px;
   text-align: left;
-  border-bottom: 2px solid #e2e8f0;
+  border-bottom: 2px solid #cbd5e1;
   white-space: nowrap;
 }
 
 .fat-table tbody td {
-  padding: 12px 10px;
-  border-bottom: 1px solid #eef2f7;
+  padding: 14px 12px;
+  border-bottom: 1px solid #f1f5f9;
   vertical-align: middle;
+  color: #334155;
+}
+
+.fat-table tbody tr {
+  transition: background 0.12s ease;
 }
 
 .fat-table tbody tr:hover { background: #f8fafc; }
-
 .fat-table tbody tr.selected { background: #eff6ff; }
 
-.fat-col-check { width: 40px; text-align: center; }
+.fat-col-check {
+  width: 44px;
+  text-align: center;
+}
 
 .fat-col-check input {
-  width: 16px;
-  height: 16px;
+  width: 17px;
+  height: 17px;
   cursor: pointer;
+  accent-color: #0b2f57;
+}
+
+.fat-col-num,
+.fat-table th.fat-col-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.fat-col-date {
+  white-space: nowrap;
+  color: #475569;
+}
+
+.fat-col-placa b {
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: 0.02em;
+}
+
+.fat-col-actions {
+  width: 120px;
+  white-space: nowrap;
 }
 
 .fat-protocolo a {
@@ -208,56 +372,281 @@ body.fat-body {
   text-decoration: none;
 }
 
-.fat-protocolo a:hover { text-decoration: underline; }
+.fat-protocolo a:hover {
+  color: #1d4ed8;
+  text-decoration: underline;
+}
 
+/* —— Badges —— */
 .fat-badge-op {
   display: inline-block;
-  padding: 4px 10px;
+  padding: 5px 11px;
   border-radius: 999px;
   background: #e8eef7;
   color: #0b2f57;
   font-size: 11px;
   font-weight: 700;
+  border: 1px solid #cbd5e1;
 }
 
 .fat-badge-fat {
   display: inline-block;
-  padding: 4px 10px;
+  padding: 5px 11px;
   border-radius: 999px;
   font-size: 11px;
   font-weight: 700;
-  background: #fef3c7;
-  color: #92400e;
+  background: #fef9c3;
+  color: #854d0e;
+  border: 1px solid #fde047;
 }
 
-.fat-badge-fat.para_faturar { background: #e0f2fe; color: #075985; }
-.fat-badge-fat.negociacao { background: #fee2e2; color: #991b1b; }
-.fat-badge-fat.faturado { background: #dcfce7; color: #166534; }
+.fat-badge-fat.para_conferir { background: #fef9c3; color: #854d0e; border-color: #fde047; }
+.fat-badge-fat.para_faturar { background: #e0f2fe; color: #075985; border-color: #7dd3fc; }
+.fat-badge-fat.negociacao { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
+.fat-badge-fat.faturado { background: #dcfce7; color: #166534; border-color: #86efac; }
 
+.fat-valor {
+  font-weight: 800;
+  color: #0b2f57;
+  font-size: 14px;
+}
+
+/* —— Ações por linha —— */
 .fat-actions {
   display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
   align-items: center;
+  gap: 6px;
+  justify-content: flex-end;
 }
 
-.fat-actions form { display: inline; margin: 0; }
+.fat-act-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
 
-.fat-valor { font-weight: 800; color: #0b2f57; }
+.fat-act-audit {
+  background: #0b2f57;
+  color: #fff;
+}
+
+.fat-act-audit:hover {
+  background: #092847;
+  color: #fff;
+}
+
+.fat-act-menu {
+  position: relative;
+}
+
+.fat-act-toggle {
+  width: 30px;
+  height: 30px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  color: #475569;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.fat-act-toggle:hover,
+.fat-act-menu.open .fat-act-toggle {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+  color: #0b2f57;
+}
+
+.fat-act-dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 30;
+  min-width: 148px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  box-shadow: 0 10px 32px rgba(15, 23, 42, 0.14);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fat-act-dropdown[hidden] {
+  display: none !important;
+}
+
+.fat-act-menu form {
+  margin: 0;
+}
+
+.fat-act-item {
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+}
+
+.fat-act-item:hover {
+  background: #f1f5f9;
+  color: #0b2f57;
+}
+
+.fat-act-item.fat-act-ok {
+  color: #166534;
+}
+
+.fat-act-item.fat-act-ok:hover {
+  background: #f0fdf4;
+}
+
+/* —— Estado vazio —— */
+.fat-empty-row td {
+  padding: 0 !important;
+  border: none !important;
+}
 
 .fat-empty {
   text-align: center;
-  padding: 40px;
+  padding: 48px 24px;
   color: #64748b;
 }
 
-@media (max-width: 1100px) {
-  .fat-filters { grid-template-columns: repeat(2, 1fr); }
-  .fat-kpis { grid-template-columns: repeat(2, 1fr); }
+.fat-empty-icon {
+  display: block;
+  font-size: 36px;
+  margin-bottom: 12px;
+  opacity: 0.7;
+}
+
+.fat-empty p {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #475569;
+}
+
+/* —— Loading / skeleton —— */
+.fat-loading {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(238, 242, 247, 0.72);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fat-loading[hidden] {
+  display: none !important;
+}
+
+.fat-loading-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  background: #fff;
+  padding: 24px 32px;
+  border-radius: 14px;
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.12);
+  font-size: 14px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.fat-loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #e2e8f0;
+  border-top-color: #ff6b00;
+  border-radius: 50%;
+  animation: fat-spin 0.7s linear infinite;
+}
+
+@keyframes fat-spin {
+  to { transform: rotate(360deg); }
+}
+
+body.fat-skeleton .fat-kpi b,
+body.fat-skeleton .fat-table tbody tr:not(.fat-empty-row) td:not(.fat-col-check):not(.fat-col-actions) {
+  color: transparent !important;
+  background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+  background-size: 200% 100%;
+  animation: fat-shimmer 1.2s ease-in-out infinite;
+  border-radius: 6px;
+  min-height: 14px;
+}
+
+body.fat-skeleton .fat-kpi b {
+  min-height: 28px;
+  margin-top: 8px;
+}
+
+@keyframes fat-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* —— Responsivo —— */
+@media (max-width: 1280px) {
+  .fat-filters {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .fat-field-action {
+    grid-column: span 1;
+  }
+}
+
+@media (max-width: 900px) {
+  .fat-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .fat-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 640px) {
+  .fat-wrap {
+    padding: 16px 14px 32px;
+  }
+  .fat-header h1 {
+    font-size: 24px;
+  }
   .fat-filters,
-  .fat-kpis { grid-template-columns: 1fr; }
-  .fat-bulk-bar { flex-direction: column; align-items: stretch; }
+  .fat-kpis {
+    grid-template-columns: 1fr;
+  }
+  .fat-field-action {
+    grid-column: span 1;
+  }
+  .fat-bulk-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .fat-header-link {
+    width: 100%;
+    justify-content: center;
+  }
 }

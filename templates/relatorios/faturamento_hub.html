@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Relatórios de Faturamento — Essência</title>
+  {% include "partials/head_pages_v2.html" %}
+  <link rel="stylesheet" href="/static/cadastros.css">
+  <link rel="stylesheet" href="/static/relatorios_faturamento.css?v=20260529">
+</head>
+<body class="ess-app">
+{% include "partials/app_shell_start.html" %}
+<div class="full ess-page-inner relfat-wrap">
+  <header class="relfat-header">
+    <div>
+      <p class="relfat-breadcrumb"><a href="/">Início</a> / Relatórios / Faturamento</p>
+      <span class="relfat-badge">📊 Relatórios</span>
+      <h1>Faturamento</h1>
+      <p>Relatórios gerenciais com base nos serviços realizados na Central de Operações.</p>
+    </div>
+  </header>
+
+  <div class="relfat-hub-grid">
+    <a href="/relatorios/faturamento/clientes" class="relfat-hub-card">
+      <span class="relfat-hub-icon">🏢</span>
+      <h2>Faturamento por Clientes</h2>
+      <p>Totais, percentuais e pendências agrupados por cliente / seguradora.</p>
+      <span class="relfat-hub-link">Abrir relatório →</span>
+    </a>
+    <a href="/relatorios/faturamento/viaturas" class="relfat-hub-card">
+      <span class="relfat-hub-icon">🚛</span>
+      <h2>Faturamento por Viaturas</h2>
+      <p>Desempenho financeiro por viatura e placa utilizada na operação.</p>
+      <span class="relfat-hub-link">Abrir relatório →</span>
+    </a>
+    <a href="/relatorios/faturamento/profissionais" class="relfat-hub-card">
+      <span class="relfat-hub-icon">👤</span>
+      <h2>Faturamento por Profissionais</h2>
+      <p>Volume e valores por motorista / profissional e função.</p>
+      <span class="relfat-hub-link">Abrir relatório →</span>
+    </a>
+    <a href="/relatorios/faturamento/tipos" class="relfat-hub-card">
+      <span class="relfat-hub-icon">📋</span>
+      <h2>Faturamento por Tipos de Serviços</h2>
+      <p>Distribuição de faturamento por tipo de serviço operacional.</p>
+      <span class="relfat-hub-link">Abrir relatório →</span>
+    </a>
+  </div>
+</div>
+{% include "partials/app_shell_end.html" %}
+</body>
+</html>

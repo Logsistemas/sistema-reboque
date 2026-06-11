@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Multas — Frota</title>
+  {% include "partials/head_pages_v2.html" %}
+  <link rel="stylesheet" href="/static/cadastros.css">
+  <link rel="stylesheet" href="/static/frota.css?v=20260529c">
+</head>
+<body class="ess-app">
+{% include "partials/app_shell_start.html" %}
+<div class="full ess-page-inner ctrl-wrap">
+  <header class="ctrl-header">
+    <div>
+      <p class="ctrl-breadcrumb"><a href="/frota/multas">Frota</a> / Multas</p>
+      <span class="ctrl-badge frota-badge">🚨 Frota</span>
+      <h1>Multas</h1>
+      <p>Infrações de trânsito, condutores, vencimentos e situação de pagamento.</p>
+    </div>
+    <div class="ctrl-mod-actions">
+      <button type="button" class="ctrl-btn ctrl-btn-primary" id="btnNovaMulta">+ Cadastrar</button>
+    </div>
+  </header>
+
+  <div class="ctrl-kpis frota-kpis" id="frotaKpisMultas">
+    <div class="ctrl-kpi accent"><small>Total de multas</small><b id="kpiMuTotal">{{ kpis.total }}</b></div>
+    <div class="ctrl-kpi"><small>Valor total</small><b id="kpiMuValor">R$ {{ "%.2f"|format(kpis.valor_total) }}</b></div>
+    <div class="ctrl-kpi"><small>Valor pago</small><b id="kpiMuPago">R$ {{ "%.2f"|format(kpis.valor_pago) }}</b></div>
+    <div class="ctrl-kpi"><small>Valor em aberto</small><b id="kpiMuAberto">R$ {{ "%.2f"|format(kpis.valor_aberto) }}</b></div>
+    <div class="ctrl-kpi"><small>Multas vencidas</small><b id="kpiMuVencidas">{{ kpis.vencidas }}</b></div>
+    <div class="ctrl-kpi"><small>Multas no mês</small><b id="kpiMuMes">{{ kpis.mes }}</b></div>
+  </div>
+
+  <section class="ctrl-panel">
+    <h2>Filtros</h2>
+    <div class="ctrl-filters">
+      <div class="ctrl-field"><label>Data inicial</label><input type="date" id="filtroDataIniMu"></div>
+      <div class="ctrl-field"><label>Data final</label><input type="date" id="filtroDataFimMu"></div>
+      <div class="ctrl-field"><label>Viatura</label><select id="filtroViaturaMu"><option value="">Todas</option></select></div>
+      <div class="ctrl-field"><label>Condutor</label><select id="filtroCondutorMu"><option value="">Todos</option></select></div>
+      <div class="ctrl-field"><label>Município</label><input type="text" id="filtroMunicipioMu" list="listaMunicipiosFiltro" placeholder="Município"></div>
+      <datalist id="listaMunicipiosFiltro"></datalist>
+      <div class="ctrl-field"><label>Status</label>
+        <select id="filtroStatusMu">
+          <option value="">Todos</option>
+          {% for s in status_opcoes %}
+          <option value="{{ s }}">{{ s|capitalize }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="ctrl-field"><label>Busca rápida</label><input type="search" id="filtroBuscaMu" placeholder="Auto, placa, condutor..."></div>
+      <div class="ctrl-field ctrl-filter-actions">
+        <label>&nbsp;</label>
+        <div class="frota-filter-btns">
+          <button type="button" class="ctrl-btn ctrl-btn-primary" id="btnAplicarFiltrosMu">Aplicar</button>
+          <button type="button" class="ctrl-btn ctrl-btn-outline" id="btnLimparFiltrosMu">Limpar</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="ctrl-panel">
+    <h2>Registros</h2>
+    <div class="ctrl-table-wrap">
+      <table class="ctrl-table ctrl-table-frota-multas" id="tabelaMultas">
+        <thead>
+          <tr>
+            <th>Data Infração</th>
+            <th>Auto de Infração</th>
+            <th>Viatura</th>
+            <th>Placa</th>
+            <th>Município</th>
+            <th>Condutor</th>
+            <th>Natureza</th>
+            <th>Valor (R$)</th>
+            <th>Valor Pago (R$)</th>
+            <th>Vencimento</th>
+            <th>Status</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="tbodyMultas"></tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% include "partials/app_shell_end.html" %}
+
+<div id="modalMulta" class="cad-modal" aria-hidden="true">
+  <div class="cad-modal-shell cad-modal-prof frota-modal-multas">
+    <nav class="cad-modal-nav">
+      <h3>Multa</h3>
+      <button type="button" class="cad-nav-btn active" data-mu-tab="editar">✏️ Cadastrar/Editar</button>
+    </nav>
+    <main class="cad-modal-main">
+      <h2 class="cad-modal-title" id="modalMultaTitulo">Multa</h2>
+      <input type="hidden" id="multaId">
+
+      <div class="cad-panel active" data-mu-panel="editar">
+        <h3 class="cad-section-title">Informações gerais</h3>
+        <div class="cad-form-grid frota-form-multas">
+          <div class="full">
+            <label>Viatura *</label>
+            <input type="text" id="mu_viatura_busca" list="listaViaturasMu" placeholder="Exibição + placa" autocomplete="off">
+            <datalist id="listaViaturasMu"></datalist>
+            <input type="hidden" id="mu_viatura_id">
+          </div>
+          <div>
+            <label>Auto de Infração *</label>
+            <input type="text" id="mu_auto_infracao" placeholder="Número do auto">
+          </div>
+          <div>
+            <label>Data e Hora da Infração *</label>
+            <input type="datetime-local" id="mu_data_hora_infracao" required>
+          </div>
+          <div>
+            <label>Data Limite de Indicação</label>
+            <input type="date" id="mu_data_limite_indicacao">
+          </div>
+          <div>
+            <label>Município *</label>
+            <input type="text" id="mu_municipio" list="listaMunicipiosMu" placeholder="Município" autocomplete="off">
+            <datalist id="listaMunicipiosMu"></datalist>
+          </div>
+          <div class="full">
+            <label>Endereço *</label>
+            <input type="text" id="mu_endereco" placeholder="Local da infração">
+          </div>
+          <div class="full">
+            <label>Descrição da Multa *</label>
+            <input type="text" id="mu_descricao_multa" placeholder="Descrição / enquadramento">
+          </div>
+          <div>
+            <label>Natureza *</label>
+            <select id="mu_natureza" required>
+              <option value="">— Selecione —</option>
+              {% for n in naturezas %}<option value="{{ n }}">{{ n }}</option>{% endfor %}
+            </select>
+          </div>
+          <div>
+            <label>Condutor *</label>
+            <input type="text" id="mu_condutor_busca" list="listaCondutoresMu" placeholder="Profissional" autocomplete="off">
+            <datalist id="listaCondutoresMu"></datalist>
+            <input type="hidden" id="mu_condutor_id">
+          </div>
+          <div>
+            <label>Condutor Responsável *</label>
+            <input type="text" id="mu_responsavel_busca" list="listaResponsaveisMu" placeholder="Responsável" autocomplete="off">
+            <datalist id="listaResponsaveisMu"></datalist>
+            <input type="hidden" id="mu_responsavel_id">
+          </div>
+          <div>
+            <label>Parcelas *</label>
+            <input type="number" id="mu_parcelas" min="1" step="1" value="1">
+          </div>
+          <div>
+            <label>Data de Vencimento *</label>
+            <input type="date" id="mu_data_vencimento" required>
+          </div>
+          <div>
+            <label>Valor (R$) *</label>
+            <input type="number" id="mu_valor" step="0.01" min="0.01" placeholder="0,00">
+          </div>
+          <div>
+            <label>Valor Pago (R$)</label>
+            <input type="number" id="mu_valor_pago" step="0.01" min="0" value="0" placeholder="0,00">
+          </div>
+          <div class="full">
+            <label>Observação</label>
+            <textarea id="mu_observacao" rows="3" placeholder="Observações opcionais"></textarea>
+          </div>
+        </div>
+
+        <div class="frota-calc-box frota-calc-multa">
+          <div><small>Valor em aberto</small><b id="muValorAbertoPreview">R$ 0,00</b></div>
+          <div><small>Status calculado</small><b id="muStatusPreview">Pendente</b></div>
+        </div>
+
+        <div class="frota-opcoes-extras">
+          <label><input type="checkbox" id="mu_gerar_pagar"> Contas a Pagar</label>
+          <label><input type="checkbox" id="mu_gerar_extrato"> Extrato do Profissional</label>
+          <label><input type="checkbox" id="mu_continuar" checked> Continuar cadastrando</label>
+        </div>
+      </div>
+
+      <p id="cadErroMulta" class="cad-msg-erro" style="display:none"></p>
+    </main>
+    <footer class="cad-modal-foot">
+      <div class="cad-foot-actions" style="margin-left:auto">
+        <button type="button" class="ctrl-btn ctrl-btn-outline cad-btn-danger" id="btnExcluirMulta" style="display:none">Cancelar multa</button>
+        <button type="button" class="ctrl-btn ctrl-btn-outline" id="btnFecharMulta">Fechar</button>
+        <button type="button" class="ctrl-btn ctrl-btn-primary" id="btnSalvarMulta">Salvar</button>
+      </div>
+    </footer>
+  </div>
+</div>
+
+<script src="/static/frota_multas.js?v=20260529c"></script>
+</body>
+</html>

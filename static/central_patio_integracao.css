@@ -1,0 +1,147 @@
+/* Integração experimental Central ↔ Pátio (Fase 1) — removível sem impacto nos demais módulos */
+
+.sd-patio-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sd-patio-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #f8fafc 0%, #fff 48%);
+  padding: 20px 22px;
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.06);
+}
+
+.sd-patio-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.sd-patio-card-head h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: #0b2f57;
+}
+
+.sd-patio-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sd-patio-badge-no_patio {
+  background: #dbeafe;
+  color: #1d4ed8;
+  border: 1px solid #93c5fd;
+}
+
+.sd-patio-badge-pendente_saida {
+  background: #ffedd5;
+  color: #c2410c;
+  border: 1px solid #fdba74;
+}
+
+.sd-patio-badge-saiu {
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #86efac;
+}
+
+.sd-patio-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 20px;
+}
+
+.sd-patio-field label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 4px;
+}
+
+.sd-patio-field b {
+  display: block;
+  font-size: 14px;
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.sd-patio-actions {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sd-patio-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  transition: box-shadow 0.15s, transform 0.15s;
+}
+
+.sd-patio-btn-primary {
+  background: linear-gradient(135deg, #0b2f57 0%, #123f6e 100%);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(11, 47, 87, 0.25);
+}
+
+.sd-patio-btn-primary:hover {
+  box-shadow: 0 6px 18px rgba(11, 47, 87, 0.35);
+  transform: translateY(-1px);
+}
+
+.sd-patio-loading {
+  text-align: center;
+  color: #64748b;
+  padding: 32px 16px;
+}
+
+.sd-patio-empty {
+  text-align: center;
+  color: #64748b;
+  padding: 36px 20px;
+  background: #f8fafc;
+  border-radius: 10px;
+  border: 1px dashed #cbd5e1;
+  font-size: 14px;
+}
+
+.sd-patio-exp-tag {
+  font-size: 10px;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+@media (max-width: 720px) {
+  .sd-patio-grid { grid-template-columns: 1fr; }
+}

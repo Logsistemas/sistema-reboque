@@ -23,11 +23,14 @@
     </div>
   </header>
 
-  <div class="ctrl-kpis" id="cadKpisProf">
+  <div class="ctrl-kpis cad-kpis-profissionais" id="cadKpisProf">
     <div class="ctrl-kpi accent"><small>Total</small><b id="kpiPTotal">{{ kpis.total }}</b></div>
     <div class="ctrl-kpi"><small>Ativos</small><b id="kpiPAtivos">{{ kpis.ativos }}</b></div>
     <div class="ctrl-kpi"><small>Inativos</small><b id="kpiPInativos">{{ kpis.inativos }}</b></div>
     <div class="ctrl-kpi"><small>Motoristas</small><b id="kpiPMotoristas">{{ kpis.motoristas }}</b></div>
+    <div class="ctrl-kpi"><small>Operacionais</small><b id="kpiPOperacionais">{{ kpis.operacionais }}</b></div>
+    <div class="ctrl-kpi"><small>Contratados</small><b id="kpiPContratados">{{ kpis.contratados }}</b></div>
+    <div class="ctrl-kpi"><small>Terceiros</small><b id="kpiPTerceiros">{{ kpis.terceiros }}</b></div>
   </div>
 
   <section class="ctrl-panel">
@@ -38,16 +41,49 @@
         <select id="filtroStatusP"><option value="">Todos</option><option value="ativo">Ativo</option><option value="inativo">Inativo</option></select>
       </div>
       <div class="ctrl-field"><label>Função</label><input type="text" id="filtroFuncaoP" placeholder="Ex.: Motorista"></div>
-      <div class="ctrl-field"><label>&nbsp;</label><button type="button" class="ctrl-btn ctrl-btn-outline" style="width:100%" id="btnLimparFiltrosP">Limpar</button></div>
+      <div class="ctrl-field"><label>Tipo profissional</label>
+        <select id="filtroTipoP">
+          <option value="">Todos</option>
+          <option value="motorista">Motorista</option>
+          <option value="operacional">Operacional</option>
+        </select>
+      </div>
+      <div class="ctrl-field"><label>Vínculo</label>
+        <select id="filtroVinculoP">
+          <option value="">Todos</option>
+          <option value="contratado">Contratados</option>
+          <option value="terceiro">Terceiros</option>
+        </select>
+      </div>
+      <div class="ctrl-field ctrl-filter-actions">
+        <label>&nbsp;</label>
+        <div class="cad-filter-btns">
+          <button type="button" class="ctrl-btn ctrl-btn-primary" id="btnAplicarFiltrosP">Aplicar</button>
+          <button type="button" class="ctrl-btn ctrl-btn-outline" id="btnLimparFiltrosP">Limpar</button>
+        </div>
+      </div>
     </div>
   </section>
 
   <section class="ctrl-panel">
     <h2>Registros</h2>
     <div class="ctrl-table-wrap">
-      <table class="ctrl-table" id="tabelaProfissionais">
+      <table class="ctrl-table ctrl-table-profissionais" id="tabelaProfissionais">
+        <colgroup>
+          <col><col><col><col><col><col><col><col><col>
+        </colgroup>
         <thead>
-          <tr><th>Nome</th><th>CPF</th><th>Telefone</th><th>Função</th><th>Status</th><th>Ações</th></tr>
+          <tr>
+            <th>Nome de trabalho</th>
+            <th>Nome completo</th>
+            <th>CPF</th>
+            <th>Telefone</th>
+            <th>Função</th>
+            <th>Tipo profissional</th>
+            <th>Vínculo</th>
+            <th>Status</th>
+            <th>Ações</th>
+          </tr>
         </thead>
         <tbody id="tbodyProfissionais"></tbody>
       </table>
@@ -74,7 +110,7 @@
         <div class="cad-form-grid">
           <div><label>Filial / CNPJ</label><input id="p_filial_cnpj"></div>
           <div class="full"><label>Nome completo</label><input id="p_nome_completo" required></div>
-          <div><label>Nome de trabalho</label><input id="p_nome_trabalho"></div>
+          <div><label>Nome de trabalho / exibição</label><input id="p_nome_trabalho" placeholder="Nome exibido na Central"></div>
           <div><label>Data de nascimento</label><input type="date" id="p_data_nascimento"></div>
           <div><label>CPF</label><input id="p_cpf"></div>
           <div><label>RG</label><input id="p_rg"></div>
@@ -107,7 +143,18 @@
         <div class="cad-detalhes-box" id="detalhesConfig"></div>
         <h3 class="cad-section-title">Configurações</h3>
         <div class="cad-form-grid">
-          <div><label>Terceiro</label><select id="p_terceiro"><option value="false">Não</option><option value="true">Sim</option></select></div>
+          <div><label>Vínculo</label>
+            <select id="p_classificacao_vinculo">
+              <option value="contratado">Contratado</option>
+              <option value="terceiro">Terceiro</option>
+            </select>
+          </div>
+          <div><label>Tipo profissional</label>
+            <select id="p_tipo_profissional">
+              <option value="motorista">Motorista</option>
+              <option value="operacional">Operacional</option>
+            </select>
+          </div>
           <div><label>CNPJ</label><input id="p_cnpj"></div>
           <div><label>Função</label><input id="p_funcao" placeholder="Motorista"></div>
           <div><label>Remuneração</label><input id="p_remuneracao"></div>
@@ -182,6 +229,6 @@
   </div>
 </div>
 
-<script src="/static/cadastros_profissionais.js"></script>
+<script src="/static/cadastros_profissionais.js?v=20260529"></script>
 </body>
 </html>

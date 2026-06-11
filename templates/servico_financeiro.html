@@ -6,6 +6,7 @@
 <title>Serviço {{ s.protocolo }} — Auditoria</title>
   {% include "partials/head_pages_v2.html" %}
 <link rel="stylesheet" href="/static/servico_detalhe.css">
+<link rel="stylesheet" href="/static/central_patio_integracao.css?v=20260529">
 </head>
 <body class="ess-app">
 {% include "partials/app_shell_start.html" %}
@@ -41,6 +42,9 @@
       </button>
       <button type="button" class="sd-nav-item {% if aba_ativa == 'checklist' %}active{% endif %}" data-aba="checklist">
         <span class="sd-nav-icon">✓</span> Checklist
+      </button>
+      <button type="button" class="sd-nav-item {% if aba_ativa == 'patio' %}active{% endif %}" data-aba="patio">
+        <span class="sd-nav-icon">🅿</span> Pátio
       </button>
       <a href="/central" class="sd-nav-item voltar">
         <span class="sd-nav-icon">←</span> Voltar
@@ -369,6 +373,17 @@
           </div>
         </div>
       </div>
+
+      <!-- ABA PÁTIO — Integração experimental (Fase 1) -->
+      <div class="sd-panel {% if aba_ativa == 'patio' %}active{% endif %}" id="panel-patio" data-servico-id="{{ s.id }}">
+        <div class="sd-section">
+          <h3>Pátio</h3>
+          <p class="muted" style="margin:0 0 14px;font-size:13px">Consulta visual do Controle de Pátio vinculado a este atendimento.</p>
+          <div id="sdPatioContent">
+            <div class="sd-patio-loading">Selecione esta aba para carregar…</div>
+          </div>
+        </div>
+      </div>
     </main>
   </div>
 </div>
@@ -426,6 +441,7 @@ document.querySelectorAll('.sd-nav-item[data-aba]').forEach((btn) => {
 
 calcularTotal();
 </script>
+<script src="/static/central_patio_integracao.js?v=20260529"></script>
 {% include "partials/app_shell_end.html" %}
 </body>
 </html>

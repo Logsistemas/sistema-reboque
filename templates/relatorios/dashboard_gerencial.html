@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Dashboard Gerencial — Essência</title>
+  <link rel="stylesheet" href="/static/dashboard.css?v=20260530">
+  {% include "partials/head_pages_v2.html" %}
+</head>
+<body class="ess-app dash-body dash-gerencial">
+  {% include "partials/app_shell_start.html" %}
+  <div class="dash-wrap ess-page-inner">
+    <header class="dash-header">
+      <div>
+        <p class="dash-breadcrumb"><a href="/relatorios/faturamento">Relatórios</a> / Dashboard Gerencial</p>
+        <h1>Dashboard Gerencial</h1>
+        <p class="dash-sub">Indicadores financeiros e de produção — <span id="dash-ger-data-ref">carregando…</span></p>
+      </div>
+      <span class="live-badge" id="dash-ger-live">● Sincronizando</span>
+    </header>
+
+    <section class="dash-kpi-strip dash-ger-kpis">
+      <div class="dash-kpi skeleton"><small>Ticket médio</small><b data-kpi="ticket_medio_fmt">—</b></div>
+      <div class="dash-kpi skeleton"><small>Receita diária média</small><b data-kpi="receita_diaria_media_fmt">—</b></div>
+      <div class="dash-kpi skeleton accent"><small>Serviços / dia</small><b data-kpi="servicos_por_dia">—</b></div>
+      <div class="dash-kpi skeleton warn"><small>Valor pend. fat.</small><b data-kpi="valor_pendente_faturamento_fmt">—</b></div>
+      <div class="dash-kpi skeleton warn"><small>Qtd pend. fat.</small><b data-kpi="qtd_pendente_faturamento">—</b></div>
+    </section>
+
+    <div class="dash-tops-row">
+      <section class="dash-panel">
+        <h2>Top clientes do mês</h2>
+        <div id="dash-top-clientes" class="dash-top-list"><p class="muted">Carregando…</p></div>
+      </section>
+      <section class="dash-panel">
+        <h2>Top viaturas</h2>
+        <div id="dash-top-viaturas" class="dash-top-list"><p class="muted">Carregando…</p></div>
+      </section>
+      <section class="dash-panel">
+        <h2>Top profissionais</h2>
+        <div id="dash-top-profissionais" class="dash-top-list"><p class="muted">Carregando…</p></div>
+      </section>
+    </div>
+
+    <div class="dash-charts-row">
+      <section class="dash-panel">
+        <h2>Serviços por dia — 30 dias</h2>
+        <div class="dash-chart-wrap"><canvas id="chartServicos"></canvas></div>
+      </section>
+      <section class="dash-panel">
+        <h2>Receita diária — 30 dias</h2>
+        <div class="dash-chart-wrap"><canvas id="chartReceita"></canvas></div>
+      </section>
+    </div>
+
+    <div class="dash-charts-row">
+      <section class="dash-panel">
+        <h2>Evolução mensal</h2>
+        <div class="dash-chart-wrap"><canvas id="chartEvolucao"></canvas></div>
+      </section>
+      <section class="dash-panel">
+        <h2>Faturamento por cliente</h2>
+        <div class="dash-chart-wrap"><canvas id="chartClientes"></canvas></div>
+      </section>
+    </div>
+  </div>
+
+  {% include "partials/app_shell_end.html" %}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="/static/dashboard_gerencial.js?v=20260530"></script>
+</body>
+</html>

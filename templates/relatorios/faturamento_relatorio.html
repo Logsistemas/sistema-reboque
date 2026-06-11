@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{{ meta.titulo }} — Essência</title>
+  {% include "partials/head_pages_v2.html" %}
+  <link rel="stylesheet" href="/static/cadastros.css">
+  <link rel="stylesheet" href="/static/relatorios_faturamento.css?v=20260529">
+</head>
+<body class="ess-app relfat-print-root">
+{% include "partials/app_shell_start.html" %}
+<div class="full ess-page-inner relfat-wrap" id="relFatApp" data-tipo="{{ tipo }}">
+  <header class="relfat-header relfat-no-print">
+    <div>
+      <p class="relfat-breadcrumb">
+        <a href="/relatorios/faturamento">Faturamento</a> / {{ meta.titulo }}
+      </p>
+      <span class="relfat-badge">📊 Relatórios</span>
+      <h1>{{ meta.titulo }}</h1>
+      <p>{{ meta.subtitulo }}</p>
+    </div>
+    <div class="relfat-header-actions">
+      <a href="/relatorios/faturamento" class="ctrl-btn ctrl-btn-outline">← Voltar</a>
+    </div>
+  </header>
+
+  <div class="relfat-kpis relfat-no-print" id="relFatKpis" hidden>
+    <div class="relfat-kpi accent"><small>Total de serviços</small><b id="kpiTotalServicos">0</b></div>
+    <div class="relfat-kpi"><small>Valor total</small><b id="kpiValorTotal">R$ 0,00</b></div>
+    <div class="relfat-kpi warn"><small>Total a fechar</small><b id="kpiAFechar">R$ 0,00</b></div>
+    <div class="relfat-kpi ok"><small>Total a faturar</small><b id="kpiAFaturar">R$ 0,00</b></div>
+    <div class="relfat-kpi highlight"><small id="kpiMaiorLabel">{{ meta.maior_label }}</small><b id="kpiMaiorNome">—</b><span id="kpiMaiorValor" class="relfat-kpi-sub">R$ 0,00</span></div>
+  </div>
+
+  <section class="relfat-panel relfat-no-print">
+    <div class="relfat-toolbar">
+      <div class="relfat-toolbar-left">
+        <button type="button" class="ctrl-btn ctrl-btn-outline" id="btnRelAtualizar">↻ Atualizar</button>
+        <button type="button" class="ctrl-btn ctrl-btn-outline" id="btnRelImprimir">🖨 Imprimir</button>
+        <button type="button" class="ctrl-btn ctrl-btn-outline" id="btnRelExcel">⬇ Exportar Excel</button>
+        <button type="button" class="ctrl-btn ctrl-btn-outline" id="btnRelPdf">⬇ Exportar PDF</button>
+      </div>
+      <button type="button" class="ctrl-btn ctrl-btn-primary" id="btnRelFiltros">🔍 Procurar / Filtros</button>
+    </div>
+
+    <div class="relfat-periodo" id="relFatPeriodoResumo"></div>
+
+    <div class="relfat-table-wrap">
+      <table class="relfat-table" id="relFatTabela">
+        <thead id="relFatThead"></thead>
+        <tbody id="relFatTbody">
+          <tr><td colspan="8" class="relfat-empty">Utilize <b>Procurar / Filtros</b> para gerar o relatório.</td></tr>
+        </tbody>
+        <tfoot id="relFatTfoot" hidden></tfoot>
+      </table>
+    </div>
+  </section>
+
+  <section class="relfat-print-only relfat-print-header">
+    <h1>{{ meta.titulo }}</h1>
+    <p id="relFatPrintPeriodo"></p>
+  </section>
+</div>
+
+<!-- Modal Filtros -->
+<div id="modalRelFiltros" class="relfat-modal" aria-hidden="true">
+  <div class="relfat-modal-box">
+    <div class="relfat-modal-head">
+      <h2>Procurar — {{ meta.titulo }}</h2>
+      <button type="button" class="ctrl-btn ctrl-btn-outline" id="btnFecharFiltros">Fechar</button>
+    </div>
+    <form id="formRelFiltros" class="relfat-filtros-grid">
+      <div class="relfat-field">
+        <label>Período inicial</label>
+        <input type="date" name="data_ini" id="filtroDataIni">
+      </div>
+      <div class="relfat-field">
+        <label>Período final</label>
+        <input type="date" name="data_fim" id="filtroDataFim">
+      </div>
+      <div class="relfat-field">
+        <label>Cliente</label>
+        <input type="text" name="cliente" list="listaClientesRel" placeholder="Cliente / seguradora">
+        <datalist id="listaClientesRel">
+          {% for c in opcoes.clientes %}
+          <option value="{{ c }}"></option>
+          {% endfor %}
+        </datalist>
+      </div>
+      <div class="relfat-field">
+        <label>Viatura</label>
+        <input type="text" name="viatura" list="listaViaturasRel" placeholder="Viatura ou placa">
+        <datalist id="listaViaturasRel">
+          {% for v in opcoes.viaturas %}
+          <option value="{{ v.label or v.nome }}"></option>
+          {% endfor %}
+        </datalist>
+      </div>
+      <div class="relfat-field">
+        <label>Profissional</label>
+        <input type="text" name="profissional" list="listaProfRel" placeholder="Nome do profissional">
+        <datalist id="listaProfRel">
+          {% for p in opcoes.profissionais %}
+          <option value="{{ p.label_operacional or p.label or p.nome }}"></option>
+          {% endfor %}
+        </datalist>
+      </div>
+      <div class="relfat-field">
+        <label>Tipo de serviço</label>
+        <select name="tipo">
+          <option value="">Todos</option>
+          {% for t in opcoes.tipos %}
+          <option value="{{ t }}">{{ t }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="relfat-field">
+        <label>Seguradora / Empresa</label>
+        <input type="text" name="seguradora" list="listaClientesRel" placeholder="Empresa">
+      </div>
+      <div class="relfat-field relfat-checks">
+        <label class="relfat-check">
+          <input type="checkbox" name="exibir_cancelados" value="1">
+          Exibir cancelados
+        </label>
+        <label class="relfat-check">
+          <input type="checkbox" name="sem_pedagio" value="1">
+          Exibir valores sem pedágio
+        </label>
+      </div>
+      <div class="relfat-modal-foot">
+        <button type="button" class="ctrl-btn ctrl-btn-outline" id="btnResetFiltros">Resetar</button>
+        <button type="submit" class="ctrl-btn ctrl-btn-primary">Procurar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal Detalhamento -->
+<div id="modalRelDetalhe" class="relfat-modal relfat-modal-wide" aria-hidden="true">
+  <div class="relfat-modal-box">
+    <div class="relfat-modal-head">
+      <h2 id="detalheTitulo">Detalhamento</h2>
+      <button type="button" class="ctrl-btn ctrl-btn-outline" id="btnFecharDetalhe">Fechar</button>
+    </div>
+    <div class="relfat-detalhe-resumo" id="detalheResumo"></div>
+    <div class="relfat-table-wrap relfat-detalhe-table">
+      <table class="relfat-table relfat-table-detalhe">
+        <thead>
+          <tr>
+            <th>Nº serviço</th>
+            <th>Data</th>
+            <th>Cliente</th>
+            <th>Viatura</th>
+            <th>Profissional</th>
+            <th>Tipo</th>
+            <th>Origem</th>
+            <th>Destino</th>
+            <th>Valor</th>
+            <th>Pedágio</th>
+            <th>Status fin.</th>
+          </tr>
+        </thead>
+        <tbody id="detalheTbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="/static/relatorios_faturamento.js?v=20260529"></script>
+{% include "partials/app_shell_end.html" %}
+</body>
+</html>

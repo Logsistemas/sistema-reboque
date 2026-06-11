@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Manutenções — Frota</title>
+  {% include "partials/head_pages_v2.html" %}
+  <link rel="stylesheet" href="/static/cadastros.css">
+  <link rel="stylesheet" href="/static/frota.css?v=20260529">
+</head>
+<body class="ess-app">
+{% include "partials/app_shell_start.html" %}
+<div class="full ess-page-inner ctrl-wrap">
+  <header class="ctrl-header">
+    <div>
+      <p class="ctrl-breadcrumb"><a href="/frota/abastecimentos">Frota</a> / Manutenções</p>
+      <span class="ctrl-badge frota-badge">🔧 Frota</span>
+      <h1>Manutenções</h1>
+      <p>Ordens de serviço, itens, fornecedores e custos por viatura.</p>
+    </div>
+    <div class="ctrl-mod-actions">
+      <button type="button" class="ctrl-btn ctrl-btn-primary" id="btnNovaManutencao">+ Cadastrar</button>
+    </div>
+  </header>
+
+  <div class="ctrl-kpis frota-kpis" id="frotaKpisManut">
+    <div class="ctrl-kpi accent"><small>Total</small><b id="kpiMnTotal">{{ kpis.total }}</b></div>
+    <div class="ctrl-kpi"><small>Valor total</small><b id="kpiMnValor">R$ {{ "%.2f"|format(kpis.valor_total) }}</b></div>
+    <div class="ctrl-kpi"><small>Total produtos</small><b id="kpiMnProd">R$ {{ "%.2f"|format(kpis.total_produtos) }}</b></div>
+    <div class="ctrl-kpi"><small>Total serviços</small><b id="kpiMnServ">R$ {{ "%.2f"|format(kpis.total_servicos) }}</b></div>
+    <div class="ctrl-kpi"><small>Média / manutenção</small><b id="kpiMnMedia">R$ {{ "%.2f"|format(kpis.media_manutencao) }}</b></div>
+    <div class="ctrl-kpi"><small>No mês</small><b id="kpiMnMes">{{ kpis.mes }}</b></div>
+  </div>
+
+  <section class="ctrl-panel">
+    <h2>Filtros</h2>
+    <div class="ctrl-filters">
+      <div class="ctrl-field"><label>Data inicial</label><input type="date" id="filtroDataIniM"></div>
+      <div class="ctrl-field"><label>Data final</label><input type="date" id="filtroDataFimM"></div>
+      <div class="ctrl-field"><label>Viatura</label><select id="filtroViaturaM"><option value="">Todas</option></select></div>
+      <div class="ctrl-field"><label>Fornecedor</label><input type="text" id="filtroFornecedorM" placeholder="Nome do fornecedor"></div>
+      <div class="ctrl-field"><label>Documento</label><input type="text" id="filtroDocumentoM" placeholder="NF, OS..."></div>
+      <div class="ctrl-field"><label>Status</label>
+        <select id="filtroStatusM">
+          <option value="">Todos</option>
+          {% for s in status_opcoes %}
+          <option value="{{ s }}">{{ s|capitalize }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="ctrl-field"><label>Busca rápida</label><input type="search" id="filtroBuscaM" placeholder="Viatura, placa, fornecedor..."></div>
+      <div class="ctrl-field ctrl-filter-actions">
+        <label>&nbsp;</label>
+        <div class="frota-filter-btns">
+          <button type="button" class="ctrl-btn ctrl-btn-primary" id="btnAplicarFiltrosM">Aplicar</button>
+          <button type="button" class="ctrl-btn ctrl-btn-outline" id="btnLimparFiltrosM">Limpar</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="ctrl-panel">
+    <h2>Registros</h2>
+    <div class="ctrl-table-wrap">
+      <table class="ctrl-table ctrl-table-frota-manut" id="tabelaManutencoes">
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Documento</th>
+            <th>Viatura</th>
+            <th>Placa</th>
+            <th>Fornecedor</th>
+            <th>Hodômetro</th>
+            <th>Produtos</th>
+            <th>Serviços</th>
+            <th>Total</th>
+            <th>Status</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="tbodyManutencoes"></tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% include "partials/app_shell_end.html" %}
+
+<!-- Modal principal -->
+<div id="modalManutencao" class="cad-modal" aria-hidden="true">
+  <div class="cad-modal-shell cad-modal-prof frota-modal-manut">
+    <nav class="cad-modal-nav">
+      <h3>Manutenção</h3>
+      <button type="button" class="cad-nav-btn active" data-mn-tab="editar">✏️ Editar</button>
+      <button type="button" class="cad-nav-btn" data-mn-tab="arquivos">📎 Arquivos</button>
+    </nav>
+    <main class="cad-modal-main">
+      <h2 class="cad-modal-title" id="modalManutTitulo">Nova manutenção</h2>
+      <input type="hidden" id="manutencaoId">
+
+      <div class="cad-panel active" data-mn-panel="editar">
+        <h3 class="cad-section-title">Informações gerais</h3>
+        <div class="cad-form-grid">
+          <div class="full">
+            <label>Viatura *</label>
+            <input type="text" id="mn_viatura_busca" list="listaViaturasMn" placeholder="Exibição + placa" autocomplete="off">
+            <datalist id="listaViaturasMn"></datalist>
+            <input type="hidden" id="mn_viatura_id">
+          </div>
+          <div>
+            <label>Data *</label>
+            <input type="date" id="mn_data" required>
+          </div>
+          <div>
+            <label>Hodômetro (KM) *</label>
+            <input type="number" id="mn_hodometro" step="1" min="0">
+          </div>
+          <div>
+            <label>Documento</label>
+            <input type="text" id="mn_documento" placeholder="NF, OS, recibo...">
+          </div>
+          <div class="full">
+            <label>Fornecedor *</label>
+            <input type="text" id="mn_fornecedor_busca" list="listaFornecedoresMn" placeholder="Fornecedor cadastrado ou texto livre" autocomplete="off">
+            <datalist id="listaFornecedoresMn"></datalist>
+            <input type="hidden" id="mn_fornecedor_id">
+          </div>
+          <div class="full">
+            <label>OBS</label>
+            <textarea id="mn_observacao" rows="2"></textarea>
+          </div>
+          <div>
+            <label>Status</label>
+            <select id="mn_status">
+              {% for s in status_opcoes %}
+              <option value="{{ s }}" {% if s == 'finalizada' %}selected{% endif %}>{{ s|capitalize }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <div id="mnAlertaHodometro" class="frota-hodometro-card" style="display:none">
+          <p><strong>Último hodômetro: <span id="mnUltimoKmTxt">—</span> km</strong></p>
+          <p class="muted" id="mnAlertaHodometroTxt"></p>
+          <div class="frota-hodometro-actions">
+            <button type="button" class="ctrl-btn ctrl-btn-outline ctrl-btn-sm" id="btnUsarUltimoKm">Usar último hodômetro</button>
+            <button type="button" class="ctrl-btn ctrl-btn-outline ctrl-btn-sm" id="btnIgnorarUltimoKm">Ignorar</button>
+          </div>
+        </div>
+
+        <div class="frota-itens-head">
+          <h3 class="cad-section-title" style="margin:0">Itens da manutenção</h3>
+          <button type="button" class="ctrl-btn ctrl-btn-primary ctrl-btn-sm" id="btnAddItemManut">+ Item</button>
+        </div>
+        <div class="ctrl-table-wrap frota-itens-wrap">
+          <table class="ctrl-table" id="tabelaItensManut">
+            <thead>
+              <tr>
+                <th>Tipo</th>
+                <th>Descrição</th>
+                <th>V. Unit.</th>
+                <th>Qtd</th>
+                <th>V. Total</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="tbodyItensManut"></tbody>
+          </table>
+        </div>
+        <div class="frota-totais-box">
+          <div><small>Total Produtos (R$)</small><b id="mnTotalProdutos">R$ 0,00</b></div>
+          <div><small>Total Serviços (R$)</small><b id="mnTotalServicos">R$ 0,00</b></div>
+          <div class="accent"><small>Total (R$)</small><b id="mnTotalGeral">R$ 0,00</b></div>
+        </div>
+
+        <div class="frota-opcoes-extras">
+          <label><input type="checkbox" id="mn_gerar_pagar"> Gerar lançamento em contas a pagar</label>
+        </div>
+      </div>
+
+      <div class="cad-panel" data-mn-panel="arquivos">
+        <p class="cad-empty-box">Anexos em breve — NF, recibo e fotos poderão ser vinculados aqui.</p>
+      </div>
+
+      <p id="cadErroManut" class="cad-msg-erro" style="display:none"></p>
+    </main>
+    <footer class="cad-modal-foot">
+      <div class="cad-foot-actions" style="margin-left:auto">
+        <button type="button" class="ctrl-btn ctrl-btn-outline cad-btn-danger" id="btnExcluirManut" style="display:none">Cancelar</button>
+        <button type="button" class="ctrl-btn ctrl-btn-outline" id="btnFecharManut">Fechar</button>
+        <button type="button" class="ctrl-btn ctrl-btn-primary" id="btnSalvarManut">Salvar</button>
+      </div>
+    </footer>
+  </div>
+</div>
+
+<!-- Modal item -->
+<div id="modalItemManut" class="cad-modal frota-submodal" aria-hidden="true">
+  <div class="cad-modal-shell frota-modal-item">
+    <main class="cad-modal-main" style="padding:24px">
+      <h2 class="cad-modal-title" id="modalItemTitulo">Cadastrar item</h2>
+      <input type="hidden" id="itemManutIndex">
+
+      <div class="cad-form-grid">
+        <div>
+          <label>Tipo *</label>
+          <select id="it_tipo" required>
+            <option value="">—</option>
+            {% for t in tipos_item %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="full">
+          <label>Item *</label>
+          <input type="text" id="it_item" placeholder="Descrição do item" required>
+        </div>
+        <div>
+          <label>Valor Unitário (R$) *</label>
+          <input type="number" id="it_valor_unitario" step="0.01" min="0" value="0">
+        </div>
+        <div>
+          <label>Quantidade *</label>
+          <input type="number" id="it_quantidade" step="0.001" min="0.001" value="1">
+        </div>
+        <div>
+          <label>Valor Total (R$) *</label>
+          <input type="number" id="it_valor_total" step="0.01" min="0" value="0">
+        </div>
+        <div class="full">
+          <label>OBS</label>
+          <textarea id="it_observacao" rows="2"></textarea>
+        </div>
+      </div>
+      <label class="frota-continuar-item"><input type="checkbox" id="it_continuar" checked> Continuar cadastrando</label>
+      <p id="cadErroItem" class="cad-msg-erro" style="display:none"></p>
+    </main>
+    <footer class="cad-modal-foot">
+      <div class="cad-foot-actions" style="margin-left:auto">
+        <button type="button" class="ctrl-btn ctrl-btn-outline" id="btnFecharItem">Cancelar</button>
+        <button type="button" class="ctrl-btn ctrl-btn-primary" id="btnAddItemConfirm">Adicionar</button>
+      </div>
+    </footer>
+  </div>
+</div>
+
+<script src="/static/frota_manutencoes.js?v=20260529"></script>
+</body>
+</html>

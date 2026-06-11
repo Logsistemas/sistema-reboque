@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Faturamento — Essência Logística</title>
-<link rel="stylesheet" href="/static/faturamento.css">
+<link rel="stylesheet" href="/static/faturamento.css?v=20260531">
   {% include "partials/head_pages_v2.html" %}
 </head>
 <body class="ess-app fat-body">
@@ -12,33 +12,38 @@
 <div class="fat-wrap ess-page-inner">
   <header class="fat-header">
     <div>
+      <span class="fat-badge">💼 Módulo financeiro</span>
       <h1>Faturamento</h1>
       <p>Auditoria financeira, conferência e fechamento de serviços</p>
     </div>
+    <a href="/financeiro" class="fat-btn fat-btn-outline fat-header-link">← Hub Financeiro</a>
   </header>
 
-  <div class="fat-card">
-    <h2>Filtros</h2>
-    <form method="get" action="/faturamento" class="fat-filters">
+  <div class="fat-card fat-filters-card">
+    <div class="fat-card-head">
+      <span class="fat-card-icon">⚙</span>
+      <h2>Filtros</h2>
+    </div>
+    <form method="get" action="/faturamento" class="fat-filters" id="fat-form-filtros">
       <div class="fat-field">
-        <label>Data inicial</label>
-        <input type="date" name="data_ini" value="{{ filtros.data_ini or '' }}">
+        <label for="fat-data-ini">Data inicial</label>
+        <input type="date" id="fat-data-ini" name="data_ini" value="{{ filtros.data_ini or '' }}">
       </div>
       <div class="fat-field">
-        <label>Data final</label>
-        <input type="date" name="data_fim" value="{{ filtros.data_fim or '' }}">
+        <label for="fat-data-fim">Data final</label>
+        <input type="date" id="fat-data-fim" name="data_fim" value="{{ filtros.data_fim or '' }}">
       </div>
       <div class="fat-field">
-        <label>Seguradora</label>
-        <input name="seguradora" placeholder="Empresa..." value="{{ filtros.seguradora or '' }}">
+        <label for="fat-seguradora">Seguradora</label>
+        <input id="fat-seguradora" name="seguradora" placeholder="Empresa..." value="{{ filtros.seguradora or '' }}">
       </div>
       <div class="fat-field">
-        <label>Motorista</label>
-        <input name="motorista" placeholder="Nome..." value="{{ filtros.motorista or '' }}">
+        <label for="fat-motorista">Motorista</label>
+        <input id="fat-motorista" name="motorista" placeholder="Nome..." value="{{ filtros.motorista or '' }}">
       </div>
       <div class="fat-field">
-        <label>Status faturamento</label>
-        <select name="status_faturamento">
+        <label for="fat-status">Status faturamento</label>
+        <select id="fat-status" name="status_faturamento">
           <option value="">Todos</option>
           <option value="para_conferir" {% if filtros.status_faturamento == 'para_conferir' %}selected{% endif %}>Para conferir</option>
           <option value="para_faturar" {% if filtros.status_faturamento == 'para_faturar' %}selected{% endif %}>Para faturar</option>
@@ -46,31 +51,36 @@
           <option value="faturado" {% if filtros.status_faturamento == 'faturado' %}selected{% endif %}>Faturado</option>
         </select>
       </div>
-      <div class="fat-field">
+      <div class="fat-field fat-field-action">
         <label>&nbsp;</label>
-        <button type="submit" class="fat-btn fat-btn-primary" style="width:100%">Filtrar</button>
+        <button type="submit" class="fat-btn fat-btn-primary fat-btn-filter">Filtrar</button>
       </div>
     </form>
   </div>
 
-  <div class="fat-kpis">
+  <div class="fat-kpis" id="fat-kpis">
     <div class="fat-kpi">
+      <span class="fat-kpi-icon" aria-hidden="true">📋</span>
       <small>Serviços</small>
       <b>{{ kpis.total_servicos }}</b>
     </div>
     <div class="fat-kpi blue">
+      <span class="fat-kpi-icon" aria-hidden="true">💰</span>
       <small>Valor total</small>
       <b>{{ kpis.valor_total }}</b>
     </div>
     <div class="fat-kpi yellow">
+      <span class="fat-kpi-icon" aria-hidden="true">🔍</span>
       <small>Para conferir</small>
       <b>{{ kpis.para_conferir }}</b>
     </div>
     <div class="fat-kpi orange">
+      <span class="fat-kpi-icon" aria-hidden="true">📤</span>
       <small>Para faturar</small>
       <b>{{ kpis.para_faturar }}</b>
     </div>
     <div class="fat-kpi green">
+      <span class="fat-kpi-icon" aria-hidden="true">✓</span>
       <small>Faturados</small>
       <b>{{ kpis.faturado }}</b>
     </div>
@@ -95,8 +105,17 @@
     <input type="hidden" name="status_faturamento_filtro" value="{{ filtros.status_faturamento or '' }}">
   </form>
 
-  <div class="fat-card">
-    <h2>Serviços para faturamento</h2>
+  <div class="fat-card fat-table-card">
+    <div class="fat-card-head fat-table-head">
+      <div>
+        <span class="fat-card-icon">📑</span>
+        <h2>Serviços para faturamento</h2>
+      </div>
+      <div class="fat-table-head-tools">
+        <span class="fat-table-meta">{{ servicos|length }} registro(s)</span>
+        <button type="button" class="fat-btn fat-btn-outline fat-btn-export" id="btn-export-excel">Exportar Excel</button>
+      </div>
+    </div>
     <div class="fat-table-wrap">
       <table class="fat-table">
         <thead>
@@ -112,46 +131,58 @@
             <th>Status fat.</th>
             <th>Motorista</th>
             <th>Placa</th>
-            <th>Valor</th>
-            <th>Ações</th>
+            <th class="fat-col-num">Valor</th>
+            <th class="fat-col-actions">Ações</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody id="fat-tbody">
           {% for s in servicos %}
+          {% set fat_st = s.status_faturamento or 'para_conferir' %}
+          {% set fat_lbl = {'para_conferir': 'Para conferir', 'para_faturar': 'Para faturar', 'negociacao': 'Negociar', 'faturado': 'Faturado'}.get(fat_st, fat_st) %}
           <tr data-id="{{ s.id }}">
             <td class="fat-col-check">
               <input type="checkbox" class="chk-servico" value="{{ s.id }}">
             </td>
             <td class="fat-protocolo"><a href="/faturamento/{{ s.id }}">{{ s.protocolo or '-' }}</a></td>
-            <td>{{ s.created_at or '-' }}</td>
+            <td class="fat-col-date">{{ s.created_at or '-' }}</td>
             <td>{{ s.seguradora or '-' }}</td>
             <td>{{ s.tipo or '-' }}</td>
             <td><span class="fat-badge-op">{{ s.status or '-' }}</span></td>
-            <td><span class="fat-badge-fat {{ s.status_faturamento or 'para_conferir' }}">{{ s.status_faturamento or 'para_conferir' }}</span></td>
+            <td><span class="fat-badge-fat {{ fat_st }}">{{ fat_lbl }}</span></td>
             <td>{{ s.motorista_nome or '-' }}</td>
-            <td><b>{{ s.placa_veiculo_removido or s.placa_removida or '-' }}</b></td>
-            <td class="fat-valor">{{ s.valor_total_fmt }}</td>
-            <td>
+            <td class="fat-col-placa"><b>{{ s.placa_veiculo_removido or s.placa_removida or '-' }}</b></td>
+            <td class="fat-valor fat-col-num">{{ s.valor_total_fmt }}</td>
+            <td class="fat-col-actions">
               <div class="fat-actions">
-                <a class="fat-btn fat-btn-dark fat-btn-sm" href="/faturamento/{{ s.id }}">Auditar</a>
-                <form method="post" action="/faturamento/{{ s.id }}/status">
-                  <input type="hidden" name="status_faturamento" value="para_faturar">
-                  <button type="submit" class="fat-btn fat-btn-primary fat-btn-sm">Para faturar</button>
-                </form>
-                <form method="post" action="/faturamento/{{ s.id }}/status">
-                  <input type="hidden" name="status_faturamento" value="negociacao">
-                  <button type="submit" class="fat-btn fat-btn-outline fat-btn-sm">Negociar</button>
-                </form>
-                <form method="post" action="/faturamento/{{ s.id }}/status">
-                  <input type="hidden" name="status_faturamento" value="faturado">
-                  <button type="submit" class="fat-btn fat-btn-outline fat-btn-sm">Faturado</button>
-                </form>
+                <a class="fat-act-btn fat-act-audit" href="/faturamento/{{ s.id }}" title="Auditar serviço">Auditar</a>
+                <div class="fat-act-menu">
+                  <button type="button" class="fat-act-toggle" aria-label="Mais ações" aria-expanded="false">⋯</button>
+                  <div class="fat-act-dropdown" hidden>
+                    <form method="post" action="/faturamento/{{ s.id }}/status">
+                      <input type="hidden" name="status_faturamento" value="para_faturar">
+                      <button type="submit" class="fat-act-item">Para faturar</button>
+                    </form>
+                    <form method="post" action="/faturamento/{{ s.id }}/status">
+                      <input type="hidden" name="status_faturamento" value="negociacao">
+                      <button type="submit" class="fat-act-item">Negociar</button>
+                    </form>
+                    <form method="post" action="/faturamento/{{ s.id }}/status">
+                      <input type="hidden" name="status_faturamento" value="faturado">
+                      <button type="submit" class="fat-act-item fat-act-ok">Faturado</button>
+                    </form>
+                  </div>
+                </div>
               </div>
             </td>
           </tr>
           {% else %}
-          <tr>
-            <td colspan="11" class="fat-empty">Nenhum serviço encontrado com os filtros atuais.</td>
+          <tr class="fat-empty-row">
+            <td colspan="11">
+              <div class="fat-empty">
+                <span class="fat-empty-icon" aria-hidden="true">📭</span>
+                <p>Nenhum serviço encontrado para os filtros selecionados.</p>
+              </div>
+            </td>
           </tr>
           {% endfor %}
         </tbody>
@@ -160,78 +191,14 @@
   </div>
 </div>
 
-<script>
-const chkAll = document.getElementById('chk-all');
-const bulkBar = document.getElementById('bulk-bar');
-const bulkCount = document.getElementById('bulk-count');
+<div class="fat-loading" id="fat-loading" hidden aria-live="polite">
+  <div class="fat-loading-inner">
+    <div class="fat-loading-spinner"></div>
+    <span>Carregando serviços…</span>
+  </div>
+</div>
 
-function getCheckboxes() {
-  return Array.from(document.querySelectorAll('.chk-servico'));
-}
-
-function atualizarBarra() {
-  const checked = getCheckboxes().filter((c) => c.checked);
-  const n = checked.length;
-  if (n > 0) {
-    bulkBar.classList.add('visible');
-    bulkCount.textContent = n + (n === 1 ? ' serviço selecionado' : ' serviço(s) selecionado(s)');
-  } else {
-    bulkBar.classList.remove('visible');
-  }
-  getCheckboxes().forEach((c) => {
-    c.closest('tr')?.classList.toggle('selected', c.checked);
-  });
-  if (chkAll) {
-    const all = getCheckboxes();
-    chkAll.checked = all.length > 0 && all.every((c) => c.checked);
-    chkAll.indeterminate = n > 0 && n < all.length;
-  }
-}
-
-if (chkAll) {
-  chkAll.addEventListener('change', () => {
-    const marcar = chkAll.checked;
-    getCheckboxes().forEach((c) => { c.checked = marcar; });
-    atualizarBarra();
-  });
-}
-
-getCheckboxes().forEach((c) => {
-  c.addEventListener('change', atualizarBarra);
-  c.addEventListener('click', (e) => e.stopPropagation());
-});
-
-function limparSelecao() {
-  getCheckboxes().forEach((c) => { c.checked = false; });
-  if (chkAll) { chkAll.checked = false; chkAll.indeterminate = false; }
-  atualizarBarra();
-}
-
-function acaoMassa(status) {
-  const checked = getCheckboxes().filter((c) => c.checked);
-  if (!checked.length) return;
-  const n = checked.length;
-  const labels = {
-    para_faturar: 'para faturar',
-    faturado: 'faturado',
-    negociacao: 'para negociar',
-    para_conferir: 'para conferir',
-  };
-  if (!confirm('Confirmar alteração de ' + n + ' serviço(s) para "' + (labels[status] || status) + '"?')) return;
-
-  const form = document.getElementById('form-acao-massa');
-  form.querySelectorAll('input[name="servico_ids"]').forEach((el) => el.remove());
-  checked.forEach((ch) => {
-    const inp = document.createElement('input');
-    inp.type = 'hidden';
-    inp.name = 'servico_ids';
-    inp.value = ch.value;
-    form.appendChild(inp);
-  });
-  document.getElementById('massa-status').value = status;
-  form.submit();
-}
-</script>
+<script src="/static/faturamento.js?v=20260532"></script>
 {% include "partials/app_shell_end.html" %}
 </body>
 </html>

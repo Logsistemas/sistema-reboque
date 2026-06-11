@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Abastecimentos — Frota</title>
+  {% include "partials/head_pages_v2.html" %}
+  <link rel="stylesheet" href="/static/cadastros.css">
+  <link rel="stylesheet" href="/static/frota.css?v=20260529b">
+</head>
+<body class="ess-app">
+{% include "partials/app_shell_start.html" %}
+<div class="full ess-page-inner ctrl-wrap">
+  <header class="ctrl-header">
+    <div>
+      <p class="ctrl-breadcrumb"><a href="/frota/abastecimentos">Frota</a> / Abastecimentos</p>
+      <span class="ctrl-badge frota-badge">⛽ Frota</span>
+      <h1>Abastecimentos</h1>
+      <p>Controle de combustível, custos, hodômetro e média KM/L por viatura.</p>
+    </div>
+    <div class="ctrl-mod-actions">
+      <button type="button" class="ctrl-btn ctrl-btn-primary" id="btnNovoAbastecimento">+ Cadastrar</button>
+    </div>
+  </header>
+
+  <div class="ctrl-kpis frota-kpis" id="frotaKpisAbast">
+    <div class="ctrl-kpi accent"><small>Total</small><b id="kpiAbTotal">{{ kpis.total }}</b></div>
+    <div class="ctrl-kpi"><small>Litros no período</small><b id="kpiAbLitros">{{ kpis.litros }}</b></div>
+    <div class="ctrl-kpi"><small>Valor total</small><b id="kpiAbValor">R$ {{ "%.2f"|format(kpis.valor_total) }}</b></div>
+    <div class="ctrl-kpi"><small>Média KM/L</small><b id="kpiAbMedia">{{ kpis.media_km_litro }}</b></div>
+    <div class="ctrl-kpi"><small>Internos</small><b id="kpiAbInternos">{{ kpis.internos }}</b></div>
+    <div class="ctrl-kpi"><small>Externos</small><b id="kpiAbExternos">{{ kpis.externos }}</b></div>
+  </div>
+
+  <section class="ctrl-panel">
+    <h2>Filtros</h2>
+    <div class="ctrl-filters">
+      <div class="ctrl-field"><label>Data inicial</label><input type="date" id="filtroDataIni"></div>
+      <div class="ctrl-field"><label>Data final</label><input type="date" id="filtroDataFim"></div>
+      <div class="ctrl-field"><label>Viatura</label>
+        <select id="filtroViatura"><option value="">Todas</option></select>
+      </div>
+      <div class="ctrl-field"><label>Profissional</label>
+        <select id="filtroProfissional"><option value="">Todos</option></select>
+      </div>
+      <div class="ctrl-field"><label>Posto</label>
+        <select id="filtroPosto">
+          <option value="">Todos</option>
+          {% for p in postos %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="ctrl-field"><label>Combustível</label>
+        <select id="filtroCombustivel">
+          <option value="">Todos</option>
+          {% for c in combustiveis %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="ctrl-field"><label>Busca rápida</label><input type="search" id="filtroBuscaAb" placeholder="Viatura, placa, profissional..."></div>
+      <div class="ctrl-field ctrl-filter-actions">
+        <label>&nbsp;</label>
+        <div class="frota-filter-btns">
+          <button type="button" class="ctrl-btn ctrl-btn-primary" id="btnAplicarFiltrosAb">Aplicar</button>
+          <button type="button" class="ctrl-btn ctrl-btn-outline" id="btnLimparFiltrosAb">Limpar</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="ctrl-panel">
+    <h2>Registros</h2>
+    <div class="ctrl-table-wrap">
+      <table class="ctrl-table ctrl-table-frota-abast" id="tabelaAbastecimentos">
+        <colgroup>
+          <col><col><col><col><col><col><col><col><col><col><col><col><col><col>
+        </colgroup>
+        <thead>
+          <tr>
+            <th>Data/Hora</th>
+            <th>Viatura</th>
+            <th>Placa</th>
+            <th>Profissional</th>
+            <th>Posto</th>
+            <th>Combustível</th>
+            <th>Litros</th>
+            <th>V. Unit.</th>
+            <th>V. Total</th>
+            <th>Hodômetro</th>
+            <th>KM Rodado</th>
+            <th>Média KM/L</th>
+            <th>Status</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="tbodyAbastecimentos"></tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% include "partials/app_shell_end.html" %}
+
+<div id="modalAbastecimento" class="cad-modal" aria-hidden="true">
+  <div class="cad-modal-shell frota-modal-shell">
+    <main class="cad-modal-main">
+      <h2 class="cad-modal-title" id="modalAbastTitulo">Novo abastecimento</h2>
+      <input type="hidden" id="abastecimentoId">
+
+      <h3 class="cad-section-title">Informações gerais</h3>
+      <div class="cad-form-grid frota-form-abast">
+        <div class="full">
+          <label>Viatura *</label>
+          <input type="text" id="ab_viatura_busca" list="listaViaturasAb" placeholder="Busque por exibição ou placa..." autocomplete="off">
+          <datalist id="listaViaturasAb"></datalist>
+          <input type="hidden" id="ab_viatura_id">
+        </div>
+        <div>
+          <label>Data e Hora *</label>
+          <input type="datetime-local" id="ab_data_hora" required>
+        </div>
+        <div>
+          <label>Posto *</label>
+          <select id="ab_posto" required>
+            <option value="">— Selecione —</option>
+            {% for p in postos %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label>Profissional *</label>
+          <input type="text" id="ab_profissional_busca" list="listaProfissionaisAb" placeholder="Nome de trabalho do profissional..." autocomplete="off">
+          <datalist id="listaProfissionaisAb"></datalist>
+          <input type="hidden" id="ab_profissional_id">
+        </div>
+        <div>
+          <label>Combustível *</label>
+          <select id="ab_combustivel" required>
+            <option value="">— Selecione —</option>
+            {% for c in combustiveis %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label>Litros Abastecidos *</label>
+          <input type="number" id="ab_litros" step="0.001" min="0" placeholder="0,000">
+        </div>
+        <div>
+          <label>Valor Unitário (R$) *</label>
+          <input type="number" id="ab_valor_unitario" step="0.01" min="0" placeholder="0,00">
+        </div>
+        <div>
+          <label>Valor Total (R$) *</label>
+          <input type="number" id="ab_valor_total" step="0.01" min="0" placeholder="0,00">
+        </div>
+        <div>
+          <label>Hodômetro (KM) *</label>
+          <input type="number" id="ab_hodometro" step="1" min="0" placeholder="KM atual">
+        </div>
+        <div class="full">
+          <label>Observação</label>
+          <textarea id="ab_observacao" rows="3" placeholder="Observações opcionais"></textarea>
+        </div>
+      </div>
+
+      <div id="abAlertaKm" class="frota-alerta-km" style="display:none"></div>
+
+      <div class="frota-calc-box">
+        <div><small>KM Rodado</small><b id="abKmRodadoPreview">—</b></div>
+        <div><small>Média KM/L</small><b id="abMediaPreview">—</b></div>
+        <div><small>Último KM</small><b id="abUltimoKmPreview">—</b></div>
+      </div>
+
+      <div class="frota-opcoes-extras">
+        <label><input type="checkbox" id="ab_desconsiderar_km"> Desconsiderar Último KM</label>
+        <label><input type="checkbox" id="ab_gerar_pagar"> Gerar lançamento em contas a pagar</label>
+        <label><input type="checkbox" id="ab_continuar" checked> Continuar cadastrando</label>
+      </div>
+
+      <p id="cadErroAbast" class="cad-msg-erro" style="display:none"></p>
+    </main>
+    <footer class="cad-modal-foot">
+      <div class="cad-foot-actions" style="margin-left:auto">
+        <button type="button" class="ctrl-btn ctrl-btn-outline cad-btn-danger" id="btnExcluirAbast" style="display:none">Excluir</button>
+        <button type="button" class="ctrl-btn ctrl-btn-outline" id="btnFecharAbast">Cancelar</button>
+        <button type="button" class="ctrl-btn ctrl-btn-primary" id="btnSalvarAbast">Salvar</button>
+      </div>
+    </footer>
+  </div>
+</div>
+
+<script src="/static/frota_abastecimentos.js?v=20260529b"></script>
+</body>
+</html>

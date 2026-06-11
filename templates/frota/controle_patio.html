@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Controle de Pátio — Frota</title>
+  {% include "partials/head_pages_v2.html" %}
+  <link rel="stylesheet" href="/static/cadastros.css">
+  <link rel="stylesheet" href="/static/frota.css?v=20260611c">
+</head>
+<body class="ess-app">
+{% include "partials/app_shell_start.html" %}
+<div class="full ess-page-inner ctrl-wrap">
+  <header class="ctrl-header">
+    <div>
+      <p class="ctrl-breadcrumb"><a href="/frota/controle-patio">Frota</a> / Controle de Pátio</p>
+      <span class="ctrl-badge frota-badge">🅿️ Frota</span>
+      <h1>Controle de Pátio</h1>
+      <p>Entrada e saída de veículos no pátio/garagem.</p>
+    </div>
+    <div class="ctrl-mod-actions">
+      <button type="button" class="ctrl-btn ctrl-btn-primary" id="btnNovaEntrada">+ Cadastrar entrada</button>
+    </div>
+  </header>
+
+  <div class="ctrl-kpis frota-kpis" id="frotaKpisPatio">
+    <div class="ctrl-kpi accent"><small>Veículos no pátio</small><b id="kpiPtNoPatio">{{ kpis.no_patio }}</b></div>
+    <div class="ctrl-kpi"><small>Entradas hoje</small><b id="kpiPtEntradas">{{ kpis.entradas_hoje }}</b></div>
+    <div class="ctrl-kpi"><small>Saídas hoje</small><b id="kpiPtSaidas">{{ kpis.saidas_hoje }}</b></div>
+    <div class="ctrl-kpi"><small>Pendentes de saída</small><b id="kpiPtPendentes">{{ kpis.pendentes_saida }}</b></div>
+    <div class="ctrl-kpi"><small>Tempo médio no pátio</small><b id="kpiPtTempo">{{ kpis.tempo_medio_fmt }}</b></div>
+    <div class="ctrl-kpi"><small>Total no período</small><b id="kpiPtTotal">{{ kpis.total_periodo }}</b></div>
+  </div>
+
+  <section class="ctrl-panel">
+    <h2>Filtros</h2>
+    <div class="ctrl-filters">
+      <div class="ctrl-field"><label>Data inicial</label><input type="date" id="filtroDataIniPt"></div>
+      <div class="ctrl-field"><label>Data final</label><input type="date" id="filtroDataFimPt"></div>
+      <div class="ctrl-field"><label>Status</label>
+        <select id="filtroStatusPt">
+          <option value="">Todos</option>
+          {% for s in status_opcoes %}
+          <option value="{{ s }}">{{ s.replace('_', ' ')|title }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="ctrl-field"><label>Seguradora</label>
+        <input type="text" id="filtroSeguradoraPt" list="listaSeguradorasFiltro" placeholder="Seguradora">
+        <datalist id="listaSeguradorasFiltro"></datalist>
+      </div>
+      <div class="ctrl-field"><label>Placa</label><input type="text" id="filtroPlacaPt" placeholder="ABC1D23"></div>
+      <div class="ctrl-field"><label>Motorista</label><input type="text" id="filtroMotoristaPt" placeholder="Motorista"></div>
+      <div class="ctrl-field"><label>Responsável</label><input type="text" id="filtroResponsavelPt" placeholder="Responsável"></div>
+      <div class="ctrl-field"><label>Busca rápida</label><input type="search" id="filtroBuscaPt" placeholder="Placa, modelo, seguradora..."></div>
+      <div class="ctrl-field ctrl-filter-actions">
+        <label>&nbsp;</label>
+        <div class="frota-filter-btns">
+          <button type="button" class="ctrl-btn ctrl-btn-primary" id="btnAplicarFiltrosPt">Aplicar</button>
+          <button type="button" class="ctrl-btn ctrl-btn-outline" id="btnLimparFiltrosPt">Limpar</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="ctrl-panel frota-patio-records">
+    <h2>Registros</h2>
+    <div id="listaPatioCards" class="frota-patio-cards"></div>
+  </section>
+</div>
+{% include "partials/app_shell_end.html" %}
+
+<!-- Modal entrada/edição -->
+<div id="modalEntradaPatio" class="cad-modal" aria-hidden="true">
+  <div class="cad-modal-shell frota-modal-shell frota-modal-patio">
+    <main class="cad-modal-main">
+      <h2 class="cad-modal-title" id="modalEntradaTitulo">Entrada no Pátio</h2>
+      <input type="hidden" id="patioId">
+
+      <h3 class="cad-section-title">Dados da entrada</h3>
+      <div class="cad-form-grid frota-form-patio">
+        <div>
+          <label>Data *</label>
+          <input type="date" id="pt_data_entrada" required>
+        </div>
+        <div>
+          <label>Hora chegada *</label>
+          <input type="time" id="pt_hora_chegada" required>
+        </div>
+        <div>
+          <label>Motorista</label>
+          <input type="text" id="pt_motorista" list="listaMotoristasPt" placeholder="Nome do motorista" autocomplete="off">
+          <datalist id="listaMotoristasPt"></datalist>
+        </div>
+        <div>
+          <label>Placa *</label>
+          <input type="text" id="pt_placa" placeholder="ABC1D23" required style="text-transform:uppercase">
+        </div>
+        <div>
+          <label>Modelo</label>
+          <input type="text" id="pt_modelo" placeholder="Modelo do veículo">
+        </div>
+        <div>
+          <label>Cor</label>
+          <input type="text" id="pt_cor" placeholder="Cor">
+        </div>
+        <div class="full">
+          <label>Seguradora</label>
+          <input type="text" id="pt_seguradora" list="listaSeguradorasPt" placeholder="Seguradora / cliente" autocomplete="off">
+          <datalist id="listaSeguradorasPt"></datalist>
+        </div>
+        <div class="full">
+          <label>Responsável *</label>
+          <input type="text" id="pt_responsavel_entrada" value="{{ responsavel_padrao }}" required>
+        </div>
+        <div class="full">
+          <label>Observação</label>
+          <textarea id="pt_observacao" rows="3" placeholder="Observações da entrada"></textarea>
+        </div>
+      </div>
+
+      <div id="ptBlocoSaidaEdicao" style="display:none">
+        <h3 class="cad-section-title">Dados da saída</h3>
+        <div class="cad-form-grid frota-form-patio">
+          <div>
+            <label>Data saída</label>
+            <input type="date" id="pt_data_saida">
+          </div>
+          <div>
+            <label>Hora saída</label>
+            <input type="time" id="pt_hora_saida">
+          </div>
+          <div class="full">
+            <label>Responsável saída</label>
+            <input type="text" id="pt_responsavel_saida">
+          </div>
+          <div class="full">
+            <label>Observação saída</label>
+            <textarea id="pt_observacao_saida" rows="2"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <p id="cadErroEntrada" class="cad-msg-erro" style="display:none"></p>
+    </main>
+    <footer class="cad-modal-foot">
+      <div class="cad-foot-actions" style="margin-left:auto">
+        <button type="button" class="ctrl-btn ctrl-btn-outline cad-btn-danger" id="btnCancelarRegistroPt" style="display:none">Cancelar registro</button>
+        <button type="button" class="ctrl-btn ctrl-btn-outline" id="btnFecharEntrada">Fechar</button>
+        <button type="button" class="ctrl-btn ctrl-btn-primary" id="btnSalvarEntrada">Salvar</button>
+      </div>
+    </footer>
+  </div>
+</div>
+
+<!-- Modal saída -->
+<div id="modalSaidaPatio" class="cad-modal frota-submodal" aria-hidden="true">
+  <div class="cad-modal-shell frota-modal-saida">
+    <main class="cad-modal-main" style="padding:24px">
+      <h2 class="cad-modal-title">Registrar saída do veículo</h2>
+      <input type="hidden" id="patioSaidaId">
+      <p class="frota-saida-resumo" id="patioSaidaResumo"></p>
+      <div class="cad-form-grid frota-form-patio">
+        <div>
+          <label>Hora saída *</label>
+          <input type="time" id="pt_saida_hora" required>
+        </div>
+        <div>
+          <label>Data saída</label>
+          <input type="date" id="pt_saida_data">
+        </div>
+        <div class="full">
+          <label>Responsável saída *</label>
+          <input type="text" id="pt_saida_responsavel" value="{{ responsavel_padrao }}" required>
+        </div>
+        <div class="full">
+          <label>Observação de saída</label>
+          <textarea id="pt_saida_observacao" rows="2"></textarea>
+        </div>
+      </div>
+      <p id="cadErroSaida" class="cad-msg-erro" style="display:none"></p>
+    </main>
+    <footer class="cad-modal-foot">
+      <div class="cad-foot-actions" style="margin-left:auto">
+        <button type="button" class="ctrl-btn ctrl-btn-outline" id="btnFecharSaida">Cancelar</button>
+        <button type="button" class="ctrl-btn ctrl-btn-primary" id="btnConfirmarSaida">Registrar saída</button>
+      </div>
+    </footer>
+  </div>
+</div>
+
+<script src="/static/frota_controle_patio.js?v=20260529"></script>
+</body>
+</html>

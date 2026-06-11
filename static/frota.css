@@ -1,0 +1,577 @@
+.frota-badge {
+  background: linear-gradient(135deg, #ede9fe, #dbeafe);
+  color: #4338ca;
+  border: 1px solid #c7d2fe;
+}
+
+.frota-kpis {
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+}
+
+.frota-badge-posto-interno {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+
+.frota-badge-posto-externo {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+.frota-badge-combustivel {
+  background: #fff7ed;
+  color: #9a3412;
+  border: 1px solid #fdba74;
+}
+
+.frota-filter-btns {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.frota-filter-btns .ctrl-btn {
+  flex: 1;
+}
+
+.frota-modal-shell.cad-modal-shell {
+  display: flex;
+  flex-direction: column;
+  grid-template-columns: unset;
+  grid-template-rows: unset;
+  width: min(860px, 92vw);
+  max-width: 92vw;
+  max-height: 90vh;
+  overflow: hidden;
+}
+
+.frota-modal-shell .cad-modal-main {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.frota-modal-shell .cad-modal-foot {
+  grid-column: unset;
+  flex-shrink: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.frota-form-abast {
+  width: 100%;
+}
+
+.frota-form-abast label {
+  display: block;
+  line-height: 1.35;
+  white-space: normal;
+}
+
+.frota-form-abast input,
+.frota-form-abast select,
+.frota-form-abast textarea {
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+@media (max-width: 720px) {
+  .frota-form-abast {
+    grid-template-columns: 1fr;
+  }
+
+  .frota-form-abast .full {
+    grid-column: 1;
+  }
+}
+
+.frota-alerta-km {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fff7ed;
+  border: 1px solid #fdba74;
+  color: #9a3412;
+  font-size: 13px;
+}
+
+.frota-calc-box {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-top: 8px;
+  padding: 12px;
+  background: #f8fafc;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+}
+
+.frota-calc-box small {
+  display: block;
+  color: #64748b;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.frota-calc-box b {
+  font-size: 15px;
+  color: #0f172a;
+}
+
+.frota-opcoes-extras {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.frota-opcoes-extras label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.frota-placeholder-box {
+  text-align: center;
+  padding: 48px 24px;
+}
+
+.frota-placeholder-msg {
+  color: #64748b;
+  font-size: 15px;
+}
+
+.ctrl-table-frota-abast {
+  min-width: 1200px;
+}
+
+.ctrl-table-frota-abast td.cad-col-acoes {
+  white-space: nowrap;
+  text-align: right;
+}
+
+.frota-modal-manut {
+  max-width: 920px;
+  width: 100%;
+}
+
+.frota-modal-multas {
+  max-width: 920px;
+  width: 100%;
+}
+
+.frota-form-multas label {
+  line-height: 1.35;
+  white-space: normal;
+}
+
+.frota-form-multas input,
+.frota-form-multas select,
+.frota-form-multas textarea {
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.frota-calc-multa {
+  grid-template-columns: repeat(2, 1fr);
+  margin-top: 12px;
+}
+
+.frota-badge-status-pago {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+
+.frota-badge-status-vencido {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.ctrl-table-frota-multas {
+  min-width: 1300px;
+}
+
+.frota-modal-patio.cad-modal-shell {
+  width: min(860px, 92vw);
+}
+
+.frota-form-patio label {
+  line-height: 1.35;
+  white-space: normal;
+}
+
+.frota-form-patio input,
+.frota-form-patio select,
+.frota-form-patio textarea {
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.frota-modal-saida.cad-modal-shell {
+  display: flex;
+  flex-direction: column;
+  grid-template-columns: unset;
+  max-width: 480px;
+  width: 100%;
+}
+
+.frota-modal-saida .cad-modal-main,
+.frota-modal-saida .cad-modal-foot {
+  grid-column: unset;
+}
+
+.frota-saida-resumo {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  font-size: 13px;
+  color: #334155;
+}
+
+.frota-patio-records {
+  overflow: visible;
+}
+
+.frota-patio-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 8px;
+  width: 100%;
+}
+
+.frota-patio-empty {
+  margin: 0;
+}
+
+.frota-patio-card {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px 20px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.06);
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.frota-patio-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+
+.frota-patio-card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.frota-patio-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+  margin-bottom: 8px;
+}
+
+.frota-patio-placa {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  background: linear-gradient(135deg, #0b2f57 0%, #1e4a7a 100%);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  border-radius: 8px;
+  line-height: 1;
+}
+
+.frota-patio-tempo {
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 700;
+  color: #4338ca;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  padding: 5px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.frota-patio-veiculo {
+  font-size: 15px;
+  font-weight: 600;
+  color: #0f172a;
+  margin-bottom: 12px;
+}
+
+.frota-patio-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 20px;
+  font-size: 13px;
+  color: #475569;
+  line-height: 1.45;
+}
+
+.frota-patio-meta strong {
+  color: #64748b;
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-right: 4px;
+}
+
+.frota-patio-obs {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed #e2e8f0;
+  font-size: 13px;
+  color: #64748b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.frota-patio-obs strong {
+  color: #94a3b8;
+  font-size: 11px;
+  text-transform: uppercase;
+  margin-right: 6px;
+}
+
+.frota-patio-card-acoes {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: stretch;
+  gap: 8px;
+  flex-shrink: 0;
+  min-width: 112px;
+}
+
+.frota-btn-saida-card {
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.frota-patio-card-acoes .ctrl-btn-outline {
+  padding: 8px 14px;
+  font-size: 13px;
+}
+
+.frota-btn-cancel-card {
+  padding: 6px 12px !important;
+  font-size: 12px !important;
+}
+
+.frota-badge-patio {
+  display: inline-block;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  line-height: 1.2;
+}
+
+.frota-badge-patio-no_patio {
+  background: #fff7ed;
+  color: #c2410c;
+  border: 1px solid #fdba74;
+}
+
+.frota-badge-patio-saiu {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+
+.frota-badge-patio-cancelado {
+  background: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+}
+
+@media (max-width: 900px) {
+  .frota-patio-card {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .frota-patio-card-acoes {
+    flex-direction: row;
+    flex-wrap: wrap;
+    min-width: 0;
+    justify-content: flex-start;
+  }
+
+  .frota-patio-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .frota-patio-tempo {
+    margin-left: 0;
+  }
+}
+
+.frota-modal-item.cad-modal-shell {
+  display: flex;
+  flex-direction: column;
+  grid-template-columns: unset;
+  max-width: 520px;
+  width: 100%;
+}
+
+.frota-modal-item .cad-modal-main {
+  flex: 1;
+  overflow: auto;
+}
+
+.frota-modal-item .cad-modal-foot {
+  grid-column: unset;
+}
+
+.frota-submodal {
+  z-index: 10100;
+  pointer-events: auto;
+}
+
+.frota-submodal.open {
+  display: flex;
+}
+
+.frota-itens-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 20px 0 10px;
+  gap: 12px;
+}
+
+.frota-itens-wrap {
+  max-height: 220px;
+  overflow: auto;
+}
+
+.frota-totais-box {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-top: 12px;
+  padding: 12px;
+  background: #f8fafc;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+}
+
+.frota-totais-box small {
+  display: block;
+  color: #64748b;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.frota-totais-box b {
+  font-size: 16px;
+}
+
+.frota-totais-box .accent b {
+  color: #4338ca;
+}
+
+.frota-hodometro-card {
+  margin: 14px 0;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #eff6ff, #ede9fe);
+  border: 1px solid #c7d2fe;
+}
+
+.frota-hodometro-card .muted {
+  font-size: 13px;
+  color: #64748b;
+  margin: 6px 0 10px;
+}
+
+.frota-hodometro-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ctrl-btn-sm {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.frota-badge-status-pendente {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.frota-badge-status-finalizada {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+
+.frota-badge-status-cancelada {
+  background: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+}
+
+.frota-badge-tipo {
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #e5e7eb;
+  font-size: 11px;
+}
+
+.frota-continuar-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 13px;
+}
+
+.ctrl-table-frota-manut {
+  min-width: 1100px;
+}
+
+@media (max-width: 768px) {
+  .frota-totais-box {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .frota-calc-box {
+    grid-template-columns: 1fr;
+  }
+}
