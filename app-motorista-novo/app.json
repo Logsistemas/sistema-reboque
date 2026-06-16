@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "Essência Motorista",
+    "slug": "essencia-motorista",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "essencia-motorista",
+    "userInterfaceStyle": "light",
+    "plugins": [
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Permitir câmera para fotos do checklist."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Permitir GPS para enviar localização à Central."
+        }
+      ]
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#f97316"
+      }
+    },
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

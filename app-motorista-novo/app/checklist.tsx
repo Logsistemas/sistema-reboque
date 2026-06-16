@@ -12,7 +12,7 @@ import {
 
 import * as ImagePicker from 'expo-image-picker';
 
-const API_BASE = 'http://192.168.15.58:8000';
+import { API_BASE, debugLog } from '../config/api';
 
 const CHAVES_META = [
   'assinatura',
@@ -78,9 +78,9 @@ export default function ChecklistScreen() {
         const servicoId = String(params.servico_id || '');
 
         if (servicoId && servicoId !== 'undefined') {
-          const response = await fetch(
-            `${API_BASE}/api/checklist-dados/${servicoId}`
-          );
+          const url = `${API_BASE}/api/checklist-dados/${servicoId}`;
+          debugLog('checklist', 'GET', url);
+          const response = await fetch(url);
 
           if (response.ok) {
             const texto = await response.text();
@@ -275,7 +275,9 @@ export default function ChecklistScreen() {
         payload.assinatura_destino = assinaturaDestino;
       }
 
-      const response = await fetch(`${API_BASE}/api/checklist/salvar`, {
+      const url = `${API_BASE}/api/checklist/salvar`;
+      debugLog('checklist', 'POST', url, 'servico_id', params.servico_id);
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

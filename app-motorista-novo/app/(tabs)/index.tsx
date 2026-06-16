@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert,
+  ActivityIndicator,
   Linking,
   ScrollView,
   StyleSheet,
@@ -12,7 +13,14 @@ import {
   Vibration,
   View
 } from 'react-native';
-const API_BASE = 'http://192.168.15.58:8000';
+import { API_BASE, DEBUG_API, debugLog, formatFetchError } from '../../config/api';
+import {
+  clearMotoristaSession,
+  loadMotoristaSession,
+  parseLoginResponse,
+  saveMotoristaSession,
+  type MotoristaSessao,
+} from '../../lib/auth';
 
 const PLACA_CLIENTE_RE = /^[A-Z]{3}(\d{4}|\d[A-Z]\d{2})$/;
 
@@ -134,23 +142,16 @@ export default function HomeScreen() {
   const [login, setLogin] = useState('');
   const [senha, setSenha] = useState('');
   const [placa, setPlaca] = useState('');
-  const [motorista, setMotorista] = useState<any>(null);
+  const [motorista, setMotorista] = useState<MotoristaSessao | null>(null);
   const [servicos, setServicos] = useState<any[]>([]);
+  const [entrando, setEntrando] = useState(false);
+  const [restaurandoSessao, setRestaurandoSessao] = useState(true);
 
   const idsAnteriores = useRef<string[]>([]);
+
   async function tocarSomNovoServico() {
-  try {
-    const { Audio } = await import('expo-av');
-
-    const { sound } = await Audio.Sound.createAsync(
-      require('../../assets/images/sounds/notificacao.mp3')
-    );
-
-    await sound.playAsync();
-  } catch (e) {
-    console.log('Erro ao tocar som:', e);
+    debugLog('som', 'novo serviço — vibracao ativa; som opcional indisponivel no dev');
   }
-}
 
   async function enviarLocalizacao(mid: string) {
     try {
@@ -177,37 +178,80 @@ export default function HomeScreen() {
   }
 
   async function entrar() {
+    if (entrando) return;
+
+    const payload = { login, senha, placa };
+    const url = `${API_BASE}/api/app/motorista/login`;
+    debugLog('login', 'API_BASE', API_BASE);
+    debugLog('login', 'payload', payload);
+    debugLog('login', 'URL', url);
+
+    setEntrando(true);
     try {
-      const response = await fetch(`${API_BASE}/api/app/motorista/login`, {
+      const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ login, senha, placa }),
+        body: JSON.stringify(payload),
       });
 
-      const data = await response.json();
+      const raw = await response.text();
+      debugLog('login', 'status', response.status);
+      debugLog('login', 'raw', raw);
 
-      if (!data.ok) {
-        Alert.alert('Erro', data.erro || 'Login inválido');
+      const parsed = parseLoginResponse(raw, response.status);
+      debugLog('login', 'parsed', parsed);
+
+      if (!parsed.ok) {
+        Alert.alert('Erro', parsed.erro);
         return;
       }
 
-      setMotorista(data.motorista);
-      setLogado(true);
+      const mot = parsed.motorista;
+      debugLog('login', 'motorista', mot);
 
-      enviarLocalizacao(data.motorista.id);
-      carregarServicos(data.motorista.id, true);
-    } catch {
-      Alert.alert('Erro', 'Não foi possível conectar ao servidor.');
+      await saveMotoristaSession(mot);
+      setMotorista(mot);
+      setLogado(true);
+      debugLog('login', 'estado', { logado: true, motoristaId: mot.id });
+      debugLog('login', 'navegação', 'tela serviços (condicional logado=true)');
+
+      void enviarLocalizacao(mot.id).catch((err) =>
+        debugLog('login', 'GPS pós-login (ignorado)', err)
+      );
+      void carregarServicos(mot.id, true).catch((err) =>
+        debugLog('login', 'servicos pós-login (ignorado)', err)
+      );
+    } catch (err) {
+      const detalhe = formatFetchError(err);
+      debugLog('login', 'ERRO', { API_BASE, url, payload, err, detalhe });
+      Alert.alert(
+        'Erro',
+        DEBUG_API
+          ? `Não foi possível conectar ao servidor.\n\nAPI: ${API_BASE}\nURL: ${url}\n\n${detalhe}`
+          : 'Não foi possível conectar ao servidor.'
+      );
+    } finally {
+      setEntrando(false);
     }
   }
 
   async function carregarServicos(mid: string, primeiraCarga = false) {
+    const url = `${API_BASE}/api/app/motorista/${mid}/servicos`;
+    debugLog('servicos', 'GET', url);
     try {
-      const response = await fetch(`${API_BASE}/api/app/motorista/${mid}/servicos`);
+      const response = await fetch(url);
       const data = await response.json();
+      debugLog('servicos', 'status', response.status, 'qtd', data.servicos?.length ?? 0);
 
       if (data.ok) {
         const lista = data.servicos || [];
+        if (lista[0]) {
+          debugLog('servicos', 'primeiro', {
+            protocolo: lista[0].protocolo,
+            status: lista[0].status,
+            seguradora: lista[0].seguradora,
+          });
+        }
         const novosIds = lista.map((s: any) => s.id);
 
         if (!primeiraCarga) {
@@ -222,10 +266,36 @@ export default function HomeScreen() {
         idsAnteriores.current = novosIds;
         setServicos(lista);
       }
-    } catch {
+    } catch (err) {
+      debugLog('servicos', 'ERRO conexao', err);
       Alert.alert('Erro', 'Falha ao carregar serviços.');
     }
   }
+
+  useEffect(() => {
+    let ativo = true;
+
+    (async () => {
+      try {
+        const salvo = await loadMotoristaSession();
+        debugLog('session', 'restaurar', salvo);
+        if (!ativo || !salvo?.id) return;
+
+        setMotorista(salvo);
+        setLogado(true);
+        debugLog('session', 'navegação=tela serviços (sessão restaurada)');
+        await carregarServicos(salvo.id, true);
+      } catch (err) {
+        debugLog('session', 'ERRO restaurar', err);
+      } finally {
+        if (ativo) setRestaurandoSessao(false);
+      }
+    })();
+
+    return () => {
+      ativo = false;
+    };
+  }, []);
 
   async function enviarPlacaServico(servicoId: string, placa: string): Promise<boolean> {
     const servico = servicos.find((s) => s.id === servicoId);
@@ -313,10 +383,20 @@ export default function HomeScreen() {
   }, [logado, motorista]);
 
   function sair() {
+    void clearMotoristaSession();
     setLogado(false);
     setMotorista(null);
     setServicos([]);
     idsAnteriores.current = [];
+    debugLog('session', 'logout', 'voltou tela login');
+  }
+
+  if (restaurandoSessao) {
+    return (
+      <View style={[styles.container, styles.centralizado]}>
+        <ActivityIndicator size="large" color="#f97316" />
+      </View>
+    );
   }
 
   if (!logado) {
@@ -329,8 +409,22 @@ export default function HomeScreen() {
         <TextInput style={styles.input} placeholder="Senha" secureTextEntry value={senha} onChangeText={setSenha} />
         <TextInput style={styles.input} placeholder="Placa do reboque" value={placa} onChangeText={setPlaca} />
 
-        <TouchableOpacity style={styles.botaoEntrar} onPress={entrar}>
-          <Text style={styles.botaoTexto}>Entrar</Text>
+        {DEBUG_API ? (
+          <Text style={styles.debugApi} selectable>
+            API: {API_BASE}
+          </Text>
+        ) : null}
+
+        <TouchableOpacity
+          style={[styles.botaoEntrar, entrando && styles.botaoEntrarDisabled]}
+          onPress={entrar}
+          disabled={entrando}
+        >
+          {entrando ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.botaoTexto}>Entrar</Text>
+          )}
         </TouchableOpacity>
       </View>
     );
@@ -366,6 +460,9 @@ export default function HomeScreen() {
           <Text style={styles.linha}>Seguradora: {servico.seguradora || '-'}</Text>
           <Text style={styles.linha}>Origem: {servico.origem || '-'}</Text>
           <Text style={styles.linha}>Destino: {servico.destino || '-'}</Text>
+          {servico.observacao ? (
+            <Text style={styles.linha}>Obs: {servico.observacao}</Text>
+          ) : null}
           <Text style={styles.status}>Status: {servico.status || '-'}</Text>
 
           <CampoPlacaVeiculo
@@ -431,11 +528,14 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff', padding: 20 },
+  centralizado: { justifyContent: 'center', alignItems: 'center' },
   titulo: { fontSize: 30, fontWeight: 'bold', marginTop: 80, textAlign: 'center' },
   tituloTopo: { fontSize: 26, fontWeight: 'bold', marginTop: 40, textAlign: 'center' },
   subtitulo: { fontSize: 18, color: '#666', marginBottom: 40, textAlign: 'center' },
+  debugApi: { fontSize: 11, color: '#64748b', marginBottom: 12, textAlign: 'center' },
   input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 15, marginBottom: 15 },
   botaoEntrar: { backgroundColor: '#f97316', padding: 16, borderRadius: 10 },
+  botaoEntrarDisabled: { opacity: 0.7 },
   botaoAtualizar: { backgroundColor: '#2563eb', padding: 14, borderRadius: 10, marginTop: 20 },
   botaoSair: { backgroundColor: '#dc2626', padding: 14, borderRadius: 10, marginTop: 10 },
   botaoTexto: { color: '#fff', fontWeight: 'bold', textAlign: 'center' },
