@@ -487,6 +487,8 @@ export default function HomeScreen() {
   pathname: '/checklist',
   params: {
     servico_id: servico.id,
+    tipo_servico: servico.tipo || '',
+    observacao: servico.observacao || '',
   },
 } as any);
   }}

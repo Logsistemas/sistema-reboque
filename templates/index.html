@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Central de Serviços — Essência Logística</title>
   <link rel="stylesheet" href="/static/dashboard.css">
-  <link rel="stylesheet" href="/static/central.css">
   {% include "partials/head_pages_v2.html" %}
+  <link rel="stylesheet" href="/static/central.css?v=20260529d">
 </head>
 <body class="ess-app central-body">
   {% include "partials/app_shell_start.html" %}
@@ -68,12 +68,12 @@
               <td><b>{{ s.placa_veiculo_removido or s.placa_removida or '-' }}</b></td>
               <td>{{ s.motorista_nome or '-' }}</td>
               <td class="col-valor">{{ s.valor_total_fmt or 'R$ 0,00' }}</td>
-              <td class="col-acoes" onclick="event.stopPropagation()">
-                <a class="central-link-rota" target="_blank" href="https://www.google.com/maps/dir/?api=1&origin={{ s.origem|urlencode }}&destination={{ s.destino|urlencode }}">Rota</a>
+              <td class="col-acoes">
+                <a class="central-link-rota" target="_blank" href="https://www.google.com/maps/dir/?api=1&origin={{ s.origem|urlencode }}&destination={{ s.destino|urlencode }}" onclick="event.stopPropagation()">Rota</a>
                 {% if s.status == 'finalizado' %}
                 <button type="button" class="central-btn-acao muted" disabled>Finalizado</button>
                 {% else %}
-                <button type="button" class="central-btn-acao primary" onclick="abrirModalMotorista('{{ s.id }}')">Enviar / trocar</button>
+                <button type="button" class="central-btn-acao primary" data-cmm-open="1" data-servico-id="{{ s.id }}" onclick="event.stopPropagation(); window.cmmAbrirEnviar && window.cmmAbrirEnviar(this); return false;">Enviar / trocar</button>
                 {% endif %}
               </td>
             </tr>
@@ -208,22 +208,109 @@
     </div>
   </div>
 
-  <div id="modalMotorista" class="modal-motorista" style="display:none;">
-    <div class="modal-motorista-box">
-      <div class="modal-motorista-head">
-        <h2>Enviar / trocar motorista</h2>
-        <button type="button" class="central-btn central-btn-outline" onclick="fecharModalMotorista()">Fechar</button>
+{% include "partials/app_shell_end.html" %}
+
+  <div id="modalMotorista" class="cmm-backdrop" data-cmm-modal="1" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="cmmTitle">
+    <div class="cmm-panel" id="cmmPanel">
+      <header class="cmm-header">
+        <div>
+          <h2 id="cmmTitle">Enviar serviço para motorista</h2>
+          <p class="cmm-subtitle">Selecione um motorista disponível para receber este serviço.</p>
+        </div>
+        <button type="button" class="cmm-close" id="cmmBtnClose" aria-label="Fechar">×</button>
+      </header>
+
+      <div class="cmm-body">
+        <div class="cmm-main">
+          <section class="cmm-servico-card">
+            <h3>Detalhes do serviço</h3>
+            <div class="cmm-servico-grid" id="cmmServicoDetalhes"></div>
+          </section>
+
+          <section class="cmm-motoristas-section">
+            <div class="cmm-toolbar">
+              <input type="search" id="cmmSearch" class="cmm-search" placeholder="Buscar por nome, placa ou CPF..." autocomplete="off">
+              <div class="cmm-filters-row">
+                <label>Status
+                  <select id="cmmStatusFilter">
+                    <option value="online" selected>Online</option>
+                    <option value="offline">Offline</option>
+                    <option value="todos">Todos</option>
+                  </select>
+                </label>
+                <label>Tipo
+                  <select id="cmmTipoFilter">
+                    <option value="todos" selected>Todos</option>
+                    <option value="leve">Leve</option>
+                    <option value="pesado">Pesado</option>
+                    <option value="apoio">Apoio</option>
+                    <option value="carretinha">Carretinha</option>
+                  </select>
+                </label>
+                <label>Ordenação
+                  <select id="cmmSortBy">
+                    <option value="proximo" selected>Mais próximo</option>
+                    <option value="nome">Nome</option>
+                    <option value="atividade">Última atividade</option>
+                  </select>
+                </label>
+              </div>
+              <div class="cmm-quick-filters" id="cmmQuickFilters">
+                <button type="button" class="cmm-chip active" data-quick="todos-online">Todos Online</button>
+                <button type="button" class="cmm-chip" data-quick="gps-ativo">GPS Ativo</button>
+                <button type="button" class="cmm-chip" data-quick="sem-gps">Sem GPS</button>
+                <button type="button" class="cmm-chip" data-quick="leve">Leve</button>
+                <button type="button" class="cmm-chip" data-quick="pesado">Pesado</button>
+                <button type="button" class="cmm-chip" data-quick="apoio">Apoio</button>
+                <button type="button" class="cmm-chip" data-quick="carretinha">Carretinha</button>
+              </div>
+            </div>
+
+            <div class="cmm-list-wrap" id="cmmListWrap">
+              <p class="cmm-list-empty" id="cmmListEmpty" hidden>Nenhum motorista online no momento.</p>
+              <div class="cmm-list-viewport" id="cmmListViewport">
+                <div class="cmm-loading" id="cmmLoading" hidden aria-busy="true">
+                  <div class="cmm-skeleton"></div>
+                  <div class="cmm-skeleton"></div>
+                  <div class="cmm-skeleton"></div>
+                </div>
+                <div class="cmm-list-inner" id="cmmListInner"></div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <aside class="cmm-aside">
+          <div class="cmm-aside-card">
+            <h3>Painel operacional</h3>
+            <dl class="cmm-stats">
+              <div><dt>Motoristas online</dt><dd id="cmmStatOnline">0</dd></div>
+              <div><dt>Motorista mais próximo</dt><dd id="cmmStatProximo">—</dd></div>
+              <div><dt>Taxa média de aceitação</dt><dd id="cmmStatTaxa">N/D</dd></div>
+              <div><dt>Última atualização GPS</dt><dd id="cmmStatUltima">—</dd></div>
+            </dl>
+            <p class="cmm-stat-sub" id="cmmStatLivres">0 livre(s)</p>
+          </div>
+          <ul class="cmm-indicators">
+            <li><span>⚡</span> Atualização em tempo real</li>
+            <li><span>🎯</span> Atribuição inteligente</li>
+            <li><span>🔔</span> Notificação instantânea</li>
+            <li><span>📍</span> Monitoramento GPS</li>
+          </ul>
+        </aside>
       </div>
-      <p class="muted">Selecione o motorista mais próximo e disponível para receber este serviço.</p>
-      <form id="formEnviarMotorista" method="post">
-        <div id="listaMotoristasModal"></div>
-        <br>
-        <button type="submit" class="central-btn central-btn-primary">Confirmar envio</button>
-      </form>
+
+      <footer class="cmm-footer">
+        <form id="formEnviarMotorista" method="post">
+          <input type="hidden" name="motorista_id" id="cmmMotoristaId" value="">
+          <button type="button" class="cmm-btn cmm-btn-secondary" id="cmmBtnCancelar">Cancelar</button>
+          <button type="submit" class="cmm-btn cmm-btn-primary" id="cmmBtnEnviar" disabled>Selecione um motorista</button>
+        </form>
+      </footer>
     </div>
   </div>
 
-{% include "partials/app_shell_end.html" %}
+<script src="/static/central_modal_motorista.js?v=20260529d"></script>
 <script>
 function abrirModal(id) {
   const el = document.getElementById(id);
@@ -238,6 +325,7 @@ let somAtivo = false;
 let ultimoEstado = {};
 let motoristasCache = [];
 let ultimosServicos = [];
+window.ultimosServicos = ultimosServicos;
 
 const FILTER_KEYS = [
   'statuses', 'status', 'data_ini', 'data_fim', 'protocolo', 'placa',
@@ -374,12 +462,21 @@ function calcularTotalServico() {
   totalEl.innerText = brMoney(total);
 }
 
+function botaoEnviarTrocarHtml(sid) {
+  const id = escapeHtml(String(sid || '').trim());
+  if (!id) {
+    return '<button type="button" class="central-btn-acao muted" disabled title="ID do serviço ausente">Sem ID</button>';
+  }
+  return `<button type="button" class="central-btn-acao primary" data-cmm-open="1" data-servico-id="${id}" onclick="event.stopPropagation(); window.cmmAbrirEnviar && window.cmmAbrirEnviar(this); return false;">Enviar / trocar</button>`;
+}
+
 function renderServicos(ss) {
   const tbody = document.getElementById('servicos-body');
   const contador = document.getElementById('central-contador');
   if (!tbody) return;
 
   ultimosServicos = ss || [];
+  window.ultimosServicos = ultimosServicos;
 
   if (contador) {
     contador.innerHTML = `<b>${ultimosServicos.length}</b> serviço(s) exibido(s)`;
@@ -395,15 +492,16 @@ function renderServicos(ss) {
   }
 
   tbody.innerHTML = ultimosServicos.map((s) => {
+    const sid = String(s.id || '').trim();
     const placa = s.placa_veiculo_removido || s.placa_removida || '';
     const rota = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(s.origem || '')}&destination=${encodeURIComponent(s.destino || '')}`;
     const st = (s.status || '').toLowerCase();
     const btnAcao = st === 'finalizado'
       ? '<button type="button" class="central-btn-acao muted" disabled>Finalizado</button>'
-      : `<button type="button" class="central-btn-acao primary" onclick="abrirModalMotorista('${s.id}')">Enviar / trocar</button>`;
+      : botaoEnviarTrocarHtml(sid);
 
     return `
-      <tr data-id="${escapeHtml(s.id)}" onclick="irParaServico('${s.id}')">
+      <tr data-id="${escapeHtml(sid)}" onclick="irParaServico('${escapeHtml(sid)}')">
         <td class="col-data">${escapeHtml(formatarDataHoraCentral(s.data_hora_central))}</td>
         <td><span class="${statusBadgeClass(s.status)}">${escapeHtml(s.status)}</span></td>
         <td>${escapeHtml(s.seguradora)}</td>
@@ -416,8 +514,8 @@ function renderServicos(ss) {
         <td><b>${escapeHtml(placa || '-')}</b></td>
         <td>${escapeHtml(s.motorista_nome)}</td>
         <td class="col-valor">${escapeHtml(s.valor_total_fmt || brMoney(s.valor_total))}</td>
-        <td class="col-acoes" onclick="event.stopPropagation()">
-          <a class="central-link-rota" target="_blank" href="${rota}">Rota</a>
+        <td class="col-acoes">
+          <a class="central-link-rota" target="_blank" href="${rota}" onclick="event.stopPropagation()">Rota</a>
           ${btnAcao}
         </td>
       </tr>
@@ -428,6 +526,10 @@ function renderServicos(ss) {
     const st = el.getAttribute('data-status');
     el.className = statusBadgeClass(st);
   });
+
+  if (typeof window.CMM_rebindTable === 'function') {
+    window.CMM_rebindTable();
+  }
 }
 
 async function atualizarCentral() {
@@ -441,6 +543,7 @@ async function atualizarCentral() {
     const ss = await servicosRes.json();
 
     motoristasCache = ms || [];
+    window.motoristasCache = motoristasCache;
     renderServicos(ss);
 
     (ss || []).forEach((s) => {
@@ -468,101 +571,6 @@ function formatarDistanciaMotorista(m) {
     return `${m.distancia_texto} | ${m.duracao_texto}`;
   }
   return m.distancia_texto || 'Distância indisponível';
-}
-
-async function abrirModalMotorista(servicoId) {
-  const modal = document.getElementById('modalMotorista');
-  const form = document.getElementById('formEnviarMotorista');
-  const lista = document.getElementById('listaMotoristasModal');
-
-  if (!modal || !form || !lista) {
-    alert('Janela de motoristas não encontrada. Atualize com Ctrl + Shift + R.');
-    return;
-  }
-
-  form.action = `/servicos/${servicoId}/enviar`;
-  lista.innerHTML = '<p class="muted">Calculando distância e tempo até a origem do serviço...</p>';
-  modal.style.display = 'flex';
-
-  try {
-    const resp = await fetch(`/api/servicos/${servicoId}/motoristas?ts=` + Date.now(), { cache: 'no-store' });
-    if (resp.ok) motoristasCache = await resp.json();
-  } catch (e) {
-    console.log('Erro ao carregar motoristas:', e);
-  }
-
-  const ms = motoristasCache || [];
-  if (!ms.length) {
-    lista.innerHTML = '<p class="muted">Nenhum motorista cadastrado.</p>';
-    return;
-  }
-
-  const primeiroLivre = ms.findIndex((x) => x.online && !x.ocupado);
-
-  lista.innerHTML = `
-    <div class="ranking-header">
-      <span>Profissionais</span>
-      <span class="muted">livres primeiro, menor tempo/distância</span>
-    </div>
-  ` + ms.map((m, idx) => {
-    const online = !!m.online;
-    const ocupado = !!m.ocupado;
-    const placaAtual = m.viatura_placa || m.placa_atual || m.placa || '';
-    const exibicao = m.viatura_exibicao || m.nome || '';
-    const origemLabel = m.viatura_origem_label || '';
-    const personalizacao = m.viatura_personalizacao || '';
-    const distancia = formatarDistanciaMotorista(m);
-    const disabled = (!online || ocupado) ? 'disabled' : '';
-    const checked = (!disabled && idx === primeiroLivre) ? 'checked' : '';
-    const statusTxt = !online ? 'Offline' : ocupado ? `Ocupado${m.servico_ocupado ? ' - ' + m.servico_ocupado : ''}` : 'Livre';
-    const cls = !online ? 'offline' : ocupado ? 'ocupado' : 'online';
-    const alertaPers = !!m.alerta_personalizacao;
-    const badgePers = personalizacao
-      ? `<span class="central-badge-viatura central-badge-pers">Personalizada: ${escapeHtml(personalizacao)}</span>`
-      : '';
-    const badgeOrigem = origemLabel
-      ? `<span class="central-badge-viatura central-badge-origem">${escapeHtml(origemLabel)}</span>`
-      : '';
-    const alertaHtml = alertaPers
-      ? `<div class="central-alerta-personalizacao">${escapeHtml(m.alerta_personalizacao_msg || 'Viatura personalizada incompatível com a seguradora do serviço.')}</div>`
-      : '';
-
-    return `
-      <label class="motorista-opcao ranking ${disabled ? 'bloqueado' : ''} ${alertaPers ? 'alerta-personalizacao' : ''}">
-        <span class="rank-num">${idx + 1}</span>
-        <span class="rank-main">
-          <input type="radio" name="motorista_id" value="${m.id}" ${checked} ${disabled}>
-          <b>${safe(m.nome_exibicao || m.nome)}</b>
-          <div class="rank-prof-line muted">${safe(m.nome_completo || '')}</div>
-          <div class="rank-viatura-line">
-            <span><strong>${safe(exibicao)}</strong></span>
-            <span class="muted">Placa: ${safe(placaAtual || '-')}</span>
-          </div>
-          <span class="rank-badges">
-            <span class="badge-dist">📍 ${safe(distancia)}</span>
-            ${m.funcao ? `<span class="central-badge-prof">${escapeHtml(m.funcao)}</span>` : ''}
-            ${m.tipo_profissional_label ? `<span class="central-badge-prof central-badge-tipo">${escapeHtml(m.tipo_profissional_label)}</span>` : ''}
-            ${badgeOrigem}
-            ${badgePers}
-          </span>
-          ${alertaHtml}
-        </span>
-        <span class="status-dot ${cls}">${statusTxt}</span>
-      </label>
-    `;
-  }).join('');
-
-  const temLivre = ms.some((m) => m.online && !m.ocupado);
-  const btn = form.querySelector('button[type="submit"]');
-  if (btn) {
-    btn.disabled = !temLivre;
-    btn.innerText = temLivre ? 'Confirmar envio' : 'Nenhum motorista livre online';
-  }
-}
-
-function fecharModalMotorista() {
-  const modal = document.getElementById('modalMotorista');
-  if (modal) modal.style.display = 'none';
 }
 
 async function exportarCsvCentral() {
@@ -611,8 +619,6 @@ async function exportarCsvCentral() {
 }
 
 document.addEventListener('click', (e) => {
-  const modal = document.getElementById('modalMotorista');
-  if (modal && e.target === modal) fecharModalMotorista();
   const modalProc = document.getElementById('modalProcurar');
   if (modalProc && e.target === modalProc) fecharModal('modalProcurar');
 });

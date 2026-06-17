@@ -23,7 +23,7 @@ from pydantic import BaseModel
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import pandas as pd
-import io, socket, shutil, uuid, json, math, re
+import io, socket, shutil, uuid, json, math, re, base64
 import psycopg2
 from psycopg2.extras import RealDictCursor, Json
 
@@ -43,6 +43,8 @@ CADASTROS_UPLOAD_DIR = os.path.join('static', 'uploads', 'cadastros')
 os.makedirs(CADASTROS_UPLOAD_DIR, exist_ok=True)
 FINANCEIRO_UPLOAD_DIR = os.path.join('static', 'uploads', 'financeiro')
 os.makedirs(FINANCEIRO_UPLOAD_DIR, exist_ok=True)
+CHECKLIST_UPLOAD_DIR = os.path.join('static', 'uploads', 'checklist')
+os.makedirs(CHECKLIST_UPLOAD_DIR, exist_ok=True)
 
 MODULOS_CONTROLE_HUB = [
     {"titulo": "Danos", "icone": "💥", "descricao": "Registro e acompanhamento de danos em viaturas, objetos e operações.", "indicador": "Frota", "rota": "/controle/danos"},
@@ -1498,32 +1500,66 @@ def coletar_arquivos_servico(servico_id, servico=None):
     for f in s.get("fotos") or []:
         add(f.get("url"), "Foto do serviço", f.get("filename") or "Foto")
     for parte, dados in partes_checklist_dict(servico_id).items():
-        for foto in dados.get("fotos") or []:
-            add(foto, f"Checklist — {parte}", parte)
+        for foto in dados.get('fotos') or []:
+            info = resolver_url_foto_checklist(foto)
+            add(info.get('url') or foto, f'Checklist — {parte}', parte)
     return arquivos
 
 
-def checklist_resumo_servico(servico_id):
-    partes = partes_checklist_dict(servico_id)
-    checklist = [
-        {"parte": parte, "marcacoes": dados.get("marcacoes") or [], "fotos": dados.get("fotos") or []}
-        for parte, dados in partes.items()
-    ]
-    assinaturas = obter_assinaturas_checklist(servico_id)
-    total_avarias = sum(len(c.get("marcacoes") or []) for c in checklist)
-    total_fotos = sum(len(c.get("fotos") or []) for c in checklist)
-    status = "Concluído" if assinaturas.get("assinatura_origem_salva") else "Pendente"
-    if assinaturas.get("assinatura_destino_salva"):
-        status = "Origem e destino assinados"
-    elif assinaturas.get("assinatura_origem_salva"):
-        status = "Origem assinada"
+def enriquecer_foto_checklist(foto, request=None, protocolo='', parte='', index=0, servico_id=''):
+    info = resolver_url_foto_checklist(foto, request)
+    slug = _slug_parte_checklist(parte)
+    prot = _protocolo_checklist_slug(protocolo, servico_id)
     return {
-        "checklist": checklist,
-        "assinaturas": assinaturas,
-        "total_partes": len(checklist),
-        "total_avarias": total_avarias,
-        "total_fotos_checklist": total_fotos,
-        "status": status,
+        'raw': info['raw'],
+        'url': info['url'],
+        'valid': info['valid'],
+        'erro': info['erro'],
+        'download_nome': f"checklist_{prot}_{slug}_{index + 1}.jpg",
+        'parte': parte,
+        'index': index + 1,
+    }
+
+
+def checklist_resumo_servico(servico_id, request=None, servico=None):
+    partes = partes_checklist_dict(servico_id)
+    s = servico or servico_by_id(servico_id) or {}
+    protocolo = s.get('protocolo') or servico_id
+    tipo_veiculo = inferir_tipo_veiculo(s)
+    mapa_imagens = mapa_imagens_checklist_central(tipo_veiculo)
+    checklist = []
+    for parte, dados in partes.items():
+        fotos_raw = dados.get('fotos') or []
+        fotos_resolvidas = [
+            enriquecer_foto_checklist(f, request, protocolo, parte, i, servico_id)
+            for i, f in enumerate(fotos_raw)
+        ]
+        checklist.append({
+            'parte': parte,
+            'marcacoes': dados.get('marcacoes') or [],
+            'fotos': fotos_raw,
+            'fotos_resolvidas': fotos_resolvidas,
+            'imagem_url': imagem_checklist_parte(parte, tipo_veiculo),
+        })
+    assinaturas = obter_assinaturas_checklist(servico_id)
+    total_avarias = sum(len(c.get('marcacoes') or []) for c in checklist)
+    total_fotos = sum(len(c.get('fotos') or []) for c in checklist)
+    status = 'Concluído' if assinaturas.get('assinatura_origem_salva') else 'Pendente'
+    if assinaturas.get('assinatura_destino_salva'):
+        status = 'Origem e destino assinados'
+    elif assinaturas.get('assinatura_origem_salva'):
+        status = 'Origem assinada'
+    return {
+        'checklist': checklist,
+        'assinaturas': assinaturas,
+        'total_partes': len(checklist),
+        'total_avarias': total_avarias,
+        'total_fotos_checklist': total_fotos,
+        'status': status,
+        'protocolo': protocolo,
+        'tipo_veiculo': tipo_veiculo,
+        'tipo_veiculo_label': label_tipo_veiculo_checklist(tipo_veiculo),
+        'mapa_imagens': mapa_imagens,
     }
 
 
@@ -6807,6 +6843,293 @@ async def salvar_usuario(request: Request):
     return RedirectResponse('/central', 303)
 
 
+def _slug_parte_checklist(parte):
+    txt = re.sub(r'[^a-zA-Z0-9]+', '_', (parte or 'parte').strip().lower())
+    return txt.strip('_') or 'parte'
+
+
+CAMPOS_TIPO_SERVICO_CHECKLIST = (
+    'tipo_servico', 'tipo', 'categoria', 'descricao_servico', 'descricao',
+    'tipo_veiculo', 'observacao', 'obs',
+)
+
+_MAPA_ARQUIVOS_CHECKLIST = {
+    'leve': {
+        'Frente': 'carro-frente.png',
+        'Traseira': 'carro-traseira.png',
+        'Lateral esquerda': 'carro-lateral-esquerda.png',
+        'Lateral direita': 'carro-lateral-direita.png',
+        'Teto': 'carro-frente.png',
+        'Rodas': 'carro-lateral-esquerda.png',
+        'Vidros': 'carro-frente.png',
+        'Parachoque': 'carro-traseira.png',
+        'Faróis': 'carro-frente.png',
+        'Lanternas': 'carro-traseira.png',
+    },
+    'utilitario': {
+        'Frente': 'utilitario_frente.png',
+        'Traseira': 'utilitario_traseira.png',
+        'Lateral esquerda': 'utilitario_lateral_esquerda.png',
+        'Lateral direita': 'utilitario_lateral_direita.png',
+        'Teto': 'utilitario_frente.png',
+        'Rodas': 'utilitario_lateral_esquerda.png',
+        'Vidros': 'utilitario_frente.png',
+        'Parachoque': 'utilitario_traseira.png',
+        'Faróis': 'utilitario_frente.png',
+        'Lanternas': 'utilitario_traseira.png',
+    },
+    'pesado': {
+        'Frente': 'pesado_frente.png',
+        'Traseira': 'pesado_traseira.png',
+        'Lateral esquerda': 'pesado_lateral_esquerda.png',
+        'Lateral direita': 'pesado_lateral_direita.png',
+        'Teto': 'pesado_frente.png',
+        'Rodas': 'pesado_lateral_esquerda.png',
+        'Vidros': 'pesado_frente.png',
+        'Parachoque': 'pesado_traseira.png',
+        'Faróis': 'pesado_frente.png',
+        'Lanternas': 'pesado_traseira.png',
+    },
+    'moto': {
+        'Frente': 'moto_frente.png',
+        'Traseira': 'moto_traseira.png',
+        'Lateral esquerda': 'moto_lateral_esquerda.png',
+        'Lateral direita': 'moto_lateral_direita.png',
+        'Teto': 'moto_frente.png',
+        'Rodas': 'moto_lateral_esquerda.png',
+        'Vidros': 'moto_frente.png',
+        'Parachoque': 'moto_traseira.png',
+        'Faróis': 'moto_frente.png',
+        'Lanternas': 'moto_traseira.png',
+    },
+}
+
+
+def normalizar_texto_tipo(raw):
+    import unicodedata
+    txt = unicodedata.normalize('NFD', str(raw or ''))
+    txt = ''.join(c for c in txt if unicodedata.category(c) != 'Mn')
+    txt = txt.upper()
+    txt = re.sub(r'[—–\-_/|\.]+', ' ', txt)
+    txt = re.sub(r'\s+', ' ', txt).strip()
+    return txt
+
+
+def coletar_texto_tipo_servico(*fontes):
+    partes = []
+    for fonte in fontes:
+        if not fonte:
+            continue
+        if isinstance(fonte, str):
+            txt = fonte.strip()
+            if txt:
+                partes.append(txt)
+            continue
+        if isinstance(fonte, dict):
+            for campo in CAMPOS_TIPO_SERVICO_CHECKLIST:
+                valor = fonte.get(campo)
+                if valor is not None and str(valor).strip():
+                    partes.append(str(valor))
+    return normalizar_texto_tipo(' '.join(partes))
+
+
+def inferir_tipo_veiculo(*fontes):
+    """Ordem: pesado → moto → utilitário → leve (espelha app motorista)."""
+    t = coletar_texto_tipo_servico(*fontes)
+    if not t:
+        return 'leve'
+
+    if re.search(
+        r'\bEXTRA\s+PESAD|\bPESAD(O|S)?\b|\bPESAD\b|CAMINHAO|PRANCHAO|BITREM|RODOTREM|CARRETA|'
+        r'\bTRUCK\b|R\s*E\s*PES|R\s*L\s*PES|REBOQUE\s+PES|GUINCHO\s+PES|'
+        r'\bR\s+E\s+PES|\bR\s+L\s+PES',
+        t,
+    ):
+        return 'pesado'
+
+    if re.search(r'\bMOTO(CICLETA)?S?\b', t):
+        return 'moto'
+
+    if re.search(
+        r'UTILIT|\bSUV\b|\bVAN\b|PICK\s*UP|PICKUP|FURG|SPRINTER|MASTER|DUCATO|GUINAUTO',
+        t,
+    ):
+        return 'utilitario'
+
+    if re.search(
+        r'\bLEVE\b|C\s*MEC|MECANICA\s*LEVE|AUTOMOVEL|REBOQUE\s*LEVE|\bPATIN',
+        t,
+    ):
+        return 'leve'
+
+    if re.search(r'\bPES\b', t):
+        return 'pesado'
+
+    return 'leve'
+
+
+def label_tipo_veiculo_checklist(tipo):
+    if tipo == 'pesado':
+        return 'Veículo pesado'
+    if tipo == 'utilitario':
+        return 'Utilitário / SUV / Van'
+    if tipo == 'moto':
+        return 'Motocicleta'
+    return 'Veículo leve'
+
+
+def mapa_imagens_checklist_central(tipo):
+    arquivos = _MAPA_ARQUIVOS_CHECKLIST.get(tipo) or _MAPA_ARQUIVOS_CHECKLIST['leve']
+    return {parte: f'/static/checklist/{nome}' for parte, nome in arquivos.items()}
+
+
+def imagem_checklist_parte(parte, tipo):
+    mapa = mapa_imagens_checklist_central(tipo)
+    return mapa.get(parte) or mapa.get('Frente')
+
+
+def _protocolo_checklist_slug(protocolo, servico_id):
+    base = (protocolo or servico_id or 'servico').strip()
+    return re.sub(r'[^\w\-]+', '_', base) or 'servico'
+
+
+def resolver_url_foto_checklist(foto, request=None):
+    """
+    Normaliza referência de foto do checklist para uso em img src / href.
+    Aceita base64, data URI, caminhos relativos e URLs absolutas.
+    """
+    raw = (foto if isinstance(foto, str) else str(foto or '')).strip()
+    if not raw:
+        return {'url': '', 'valid': False, 'raw': raw, 'erro': 'vazio'}
+
+    if raw.startswith('data:image'):
+        return {'url': raw, 'valid': True, 'raw': raw, 'erro': ''}
+
+    low = raw.lower()
+    if low.startswith('file://') or low.startswith('content://') or low.startswith('ph://'):
+        return {'url': '', 'valid': False, 'raw': raw, 'erro': 'uri_local_dispositivo'}
+
+    if low.startswith('http://') or low.startswith('https://'):
+        return {'url': raw, 'valid': True, 'raw': raw, 'erro': ''}
+
+    if raw.startswith('/static/'):
+        url = raw
+        if request is not None:
+            url = str(request.base_url).rstrip('/') + raw
+        return {'url': url, 'valid': True, 'raw': raw, 'erro': ''}
+
+    if raw.startswith('/uploads/'):
+        path = '/static' + raw
+        url = path
+        if request is not None:
+            url = str(request.base_url).rstrip('/') + path
+        return {'url': url, 'valid': True, 'raw': raw, 'erro': ''}
+
+    if raw.startswith('uploads/'):
+        path = '/static/' + raw.lstrip('/')
+        url = path
+        if request is not None:
+            url = str(request.base_url).rstrip('/') + path
+        return {'url': url, 'valid': True, 'raw': raw, 'erro': ''}
+
+    if raw.startswith('/'):
+        path = raw if raw.startswith('/static/') else '/static' + raw
+        url = path
+        if request is not None:
+            url = str(request.base_url).rstrip('/') + path
+        return {'url': url, 'valid': True, 'raw': raw, 'erro': ''}
+
+    if len(raw) > 200 and not raw.startswith('/'):
+        try:
+            base64.b64decode(raw[:200] + '==', validate=False)
+            return {'url': f'data:image/jpeg;base64,{raw}', 'valid': True, 'raw': raw, 'erro': ''}
+        except Exception:
+            pass
+
+    path = '/static/' + raw.lstrip('/')
+    url = path
+    if request is not None:
+        url = str(request.base_url).rstrip('/') + path
+    return {'url': url, 'valid': True, 'raw': raw, 'erro': ''}
+
+
+def _bytes_foto_checklist(foto_raw):
+    raw = (foto_raw or '').strip()
+    if not raw:
+        return None, None
+
+    if raw.startswith('data:image'):
+        match = re.match(r'^data:image/([\w+.-]+);base64,(.+)$', raw, re.DOTALL | re.IGNORECASE)
+        if match:
+            ext = match.group(1).lower().replace('jpeg', 'jpg')
+            try:
+                return base64.b64decode(match.group(2)), ext
+            except Exception:
+                return None, None
+
+    if len(raw) > 500 and not raw.startswith(('file://', 'http://', 'https://', '/')):
+        try:
+            return base64.b64decode(raw), 'jpg'
+        except Exception:
+            pass
+
+    return None, None
+
+
+def persistir_fotos_checklist_lista(servico_id, parte, fotos, protocolo=''):
+    """Converte base64/data URI em arquivos servidos em /static/uploads/checklist/."""
+    persistidas = []
+    slug = _slug_parte_checklist(parte)
+    prot = _protocolo_checklist_slug(protocolo, servico_id)
+
+    for i, foto in enumerate(fotos or []):
+        raw = (foto if isinstance(foto, str) else str(foto or '')).strip()
+        if not raw:
+            continue
+
+        if raw.startswith('/static/uploads/checklist/'):
+            persistidas.append(raw)
+            continue
+
+        resolved = resolver_url_foto_checklist(raw)
+        if resolved['valid'] and resolved['url'].startswith(('http://', 'https://')):
+            persistidas.append(resolved['url'])
+            continue
+
+        img_bytes, ext = _bytes_foto_checklist(raw)
+        if img_bytes:
+            dir_path = os.path.join(CHECKLIST_UPLOAD_DIR, str(servico_id))
+            os.makedirs(dir_path, exist_ok=True)
+            ext = (ext or 'jpg').replace('jpeg', 'jpg')
+            fname = f"checklist_{prot}_{slug}_{i + 1}.{ext}"
+            fpath = os.path.join(dir_path, fname)
+            with open(fpath, 'wb') as fh:
+                fh.write(img_bytes)
+            persistidas.append(f"/static/uploads/checklist/{servico_id}/{fname}")
+            continue
+
+        if resolved['valid'] and resolved['url']:
+            if resolved['url'].startswith('data:image'):
+                img_bytes2, ext2 = _bytes_foto_checklist(resolved['url'])
+                if img_bytes2:
+                    dir_path = os.path.join(CHECKLIST_UPLOAD_DIR, str(servico_id))
+                    os.makedirs(dir_path, exist_ok=True)
+                    ext2 = (ext2 or 'jpg').replace('jpeg', 'jpg')
+                    fname = f"checklist_{prot}_{slug}_{i + 1}.{ext2}"
+                    fpath = os.path.join(dir_path, fname)
+                    with open(fpath, 'wb') as fh:
+                        fh.write(img_bytes2)
+                    persistidas.append(f"/static/uploads/checklist/{servico_id}/{fname}")
+                    continue
+            if resolved['raw'].startswith('/static/'):
+                persistidas.append(resolved['raw'])
+                continue
+
+        persistidas.append(raw)
+
+    return persistidas
+
+
 def partes_checklist_dict(servico_id):
     """Retorna { parte: { marcacoes, fotos } } para um serviço."""
     rows = q(
@@ -6970,41 +7293,22 @@ def resposta_checklist_dados(servico_id):
 
 @app.get("/servicos/{servico_id}/checklist", response_class=HTMLResponse)
 async def pagina_checklist(servico_id: str, request: Request):
-
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-
-            cur.execute("""
-                select parte, marcacoes, fotos
-                from checklist_avarias
-                where servico_id = %s
-                order by parte
-            """, (servico_id,))
-
-            rows = cur.fetchall()
-
-    checklist = []
-
-    for row in rows:
-
-        checklist.append({
-            "parte": row["parte"],
-            "marcacoes": row["marcacoes"] or [],
-            "fotos": row["fotos"] or []
-        })
-
-    assinaturas = obter_assinaturas_checklist(servico_id)
+    s = servico_by_id(servico_id) or {}
+    chk = checklist_resumo_servico(servico_id, request, s)
+    assinaturas = chk.get('assinaturas') or obter_assinaturas_checklist(servico_id)
 
     return templates.TemplateResponse(
-        "checklist_visualizar.html",
+        'checklist_visualizar.html',
         {
-            "request": request,
-            "checklist": checklist,
-            "servico_id": servico_id,
-            "assinatura": assinaturas.get("assinatura_origem"),
-            "assinatura_origem": assinaturas.get("assinatura_origem"),
-            "assinatura_destino": assinaturas.get("assinatura_destino"),
-        }
+            'request': request,
+            'checklist': chk.get('checklist') or [],
+            'checklist_resumo': chk,
+            'servico_id': servico_id,
+            'servico': s,
+            'assinatura': assinaturas.get('assinatura_origem'),
+            'assinatura_origem': assinaturas.get('assinatura_origem'),
+            'assinatura_destino': assinaturas.get('assinatura_destino'),
+        },
     )
 
 
@@ -7031,13 +7335,18 @@ async def salvar_checklist(request: Request):
     if not isinstance(checklist, dict):
         return JSONResponse({"ok": False, "erro": "checklist deve ser um objeto"}, status_code=400)
 
+    servico = servico_by_id(servico_id) or {}
+    protocolo = servico.get('protocolo') or servico_id
+
     with get_conn() as conn:
         with conn.cursor() as cur:
             for parte, info in checklist.items():
                 info = info or {}
 
                 marcacoes = info.get("marcacoes", [])
-                fotos = info.get("fotos", [])
+                fotos = persistir_fotos_checklist_lista(
+                    servico_id, parte, info.get("fotos", []), protocolo
+                )
 
                 cur.execute("""
                     delete from checklist_avarias
@@ -8483,7 +8792,7 @@ def faturamento_detalhe(sid: str, request: Request, aba: str = "editar", ok: str
         itens = itens_do_servico(sid)
     end_origem = desmontar_endereco_servico(s.get("origem"))
     end_destino = desmontar_endereco_servico(s.get("destino"))
-    chk = checklist_resumo_servico(sid)
+    chk = checklist_resumo_servico(sid, request, s)
     abas_validas = {"editar", "financeiro", "comentarios", "arquivos", "checklist", "patio"}
     aba_ativa = aba if aba in abas_validas else "editar"
     return templates.TemplateResponse(

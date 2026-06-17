@@ -1,0 +1,44 @@
+{% if fotos_resolvidas and fotos_resolvidas|length > 0 %}
+<div class="chk-fotos-grid">
+  {% for foto in fotos_resolvidas %}
+  <div class="chk-foto-card{% if not foto.valid %} chk-foto-card-erro{% endif %}">
+    <div class="chk-foto-thumb-wrap">
+      {% if foto.valid and foto.url %}
+      <img
+        src="{{ foto.url }}"
+        alt="Foto {{ foto.parte or parte_label }}"
+        class="chk-foto-thumb"
+        data-chk-foto
+        loading="lazy"
+      >
+      {% else %}
+      <div class="chk-foto-placeholder">Foto não carregada</div>
+      {% endif %}
+    </div>
+    <div class="chk-foto-meta">
+      <b>{{ foto.parte or parte_label }}</b>
+      <span>Foto {{ foto.index }}</span>
+    </div>
+    {% if not foto.valid and foto.raw %}
+    <div class="chk-foto-debug" title="{{ foto.raw }}">{{ foto.erro or 'indisponível' }} · {{ foto.raw|truncate(72, True, '…') }}</div>
+    {% endif %}
+    <div class="chk-foto-acoes chk-no-print">
+      <button
+        type="button"
+        class="chk-btn-foto chk-btn-abrir"
+        data-chk-abrir
+        data-url="{{ foto.url if foto.valid else foto.raw }}"
+        data-titulo="{{ foto.parte or parte_label }} — foto {{ foto.index }}"
+      >Abrir</button>
+      <button
+        type="button"
+        class="chk-btn-foto chk-btn-baixar"
+        data-chk-baixar
+        data-url="{{ foto.url if foto.valid else foto.raw }}"
+        data-nome="{{ foto.download_nome }}"
+      >Baixar</button>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}

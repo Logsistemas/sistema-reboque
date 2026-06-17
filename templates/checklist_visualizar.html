@@ -2,160 +2,92 @@
 <html lang="pt-br">
 <head>
 <meta charset="UTF-8">
-<title>Checklist</title>
-
-<style>
-body{
-    font-family: Arial;
-    background:#f4f4f4;
-    padding:20px;
-}
-
-.bloco{
-    background:white;
-    border-radius:10px;
-    padding:20px;
-    margin-bottom:30px;
-    box-shadow:0 2px 8px rgba(0,0,0,0.1);
-}
-
-h2{
-    margin-bottom:20px;
-}
-
-.carro-area{
-    position: relative;
-    width: 600px;
-    max-width: 100%;
-}
-
-.carro-img{
-    width: 100%;
-    display: block;
-    border-radius: 10px;
-}
-
-.x-avaria{
-    position: absolute;
-    color: #ff3366;
-    font-size: 34px;
-    font-weight: bold;
-    transform: translate(-50%, -50%);
-    z-index: 10;
-}
-
-.fotos{
-    margin-top:20px;
-}
-
-.foto-link{
-    display:inline-block;
-    margin-right:10px;
-    margin-top:10px;
-    padding:8px 12px;
-    background:#1976d2;
-    color:white;
-    text-decoration:none;
-    border-radius:6px;
-}
-
-.foto-link:hover{
-    background:#1259a7;
-}
-
-.assinatura-bloco{
-    margin-top: 12px;
-    padding-top: 12px;
-    border-top: 1px solid #eee;
-}
-
-.assinatura-img{
-    max-width: 100%;
-    height: auto;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    margin-top: 10px;
-}
-
-.sem-assinatura{
-    color: #666;
-    font-style: italic;
-}
-</style>
-
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Checklist — {{ servico.protocolo or servico_id }}</title>
+<link rel="stylesheet" href="/static/checklist_central.css?v=20260529">
 </head>
-<body>
+<body class="chk-page">
 
-<h1>Checklist do serviço</h1>
+<div class="chk-print-header">
+  <p class="chk-print-brand">🚛 Essência Logística</p>
+  <h1 style="margin:0 0 12px;font-size:20px">Checklist do serviço</h1>
+  <div class="chk-print-meta">
+    <div><strong>Protocolo:</strong> {{ servico.protocolo or servico_id }}</div>
+    <div><strong>Cliente:</strong> {{ servico.seguradora or '—' }}</div>
+    <div><strong>Tipo:</strong> {{ servico.tipo or '—' }}</div>
+    <div><strong>Veículo checklist:</strong> {{ checklist_resumo.tipo_veiculo_label or 'Veículo leve' }}</div>
+    <div><strong>Placa:</strong> {{ servico.placa or '—' }}</div>
+    <div><strong>Motorista:</strong> {{ servico.motorista_nome or servico.motorista or '—' }}</div>
+    <div><strong>Status checklist:</strong> {{ checklist_resumo.status or '—' }}</div>
+    <div><strong>Resumo:</strong> {{ checklist_resumo.total_avarias or 0 }} avaria(s) · {{ checklist_resumo.total_fotos_checklist or 0 }} foto(s)</div>
+  </div>
+</div>
+
+<div class="chk-toolbar chk-no-print">
+  <button type="button" class="chk-btn-print" data-chk-imprimir>Imprimir Checklist</button>
+  <button type="button" class="chk-btn-print" style="background:#64748b" onclick="window.close()">Fechar</button>
+</div>
 
 {% for item in checklist %}
+<div class="chk-bloco">
+  <h2>{{ item.parte }}</h2>
 
-<div class="bloco">
+  {% if item.marcacoes %}
+  <p style="margin:0 0 10px;color:#64748b;font-size:13px">{{ item.marcacoes|length }} avaria(s) marcada(s)</p>
+  {% endif %}
 
-    <h2>{{ item.parte }}</h2>
+  {% if item.imagem_url %}
+  <div class="chk-carro-area">
+    <img src="{{ item.imagem_url }}" class="chk-carro-img" alt="Diagrama {{ item.parte }}">
+    {% for marcacao in item.marcacoes %}
+    <div class="chk-x-avaria" style="left: {{ marcacao['x'] }}%; top: {{ marcacao['y'] }}%;">X</div>
+    {% endfor %}
+  </div>
+  {% elif item.marcacoes %}
+  <div class="chk-carro-area" style="min-height:80px">
+    {% for marcacao in item.marcacoes %}
+    <span class="chk-x-avaria" style="position:static;display:inline-block;margin:4px;">X {{ marcacao['x'] }}%, {{ marcacao['y'] }}%</span>
+    {% endfor %}
+  </div>
+  {% endif %}
 
-    <div class="carro-area">
-
-        {% if item.parte == 'Frente' %}
-            <img src="/static/checklist/carro-frente.png" class="carro-img">
-        {% elif item.parte == 'Traseira' %}
-            <img src="/static/checklist/carro-traseira.png" class="carro-img">
-        {% elif item.parte == 'Lateral direita' %}
-            <img src="/static/checklist/carro-lateral-direita.png" class="carro-img">
-        {% elif item.parte == 'Lateral esquerda' %}
-            <img src="/static/checklist/carro-lateral-esquerda.png" class="carro-img">
-        {% endif %}
-
-       {% for marcacao in item.marcacoes %}
-<div
-    class="x-avaria"
-    style="left: {{ marcacao['x'] }}%; top: {{ marcacao['y'] }}%;"
->
-    X
+  {% if item.fotos_resolvidas %}
+  <h3 style="margin:18px 0 8px;font-size:15px">Fotos anexadas</h3>
+  {% with fotos_resolvidas=item.fotos_resolvidas, parte_label=item.parte %}
+  {% include "partials/checklist_fotos_galeria.html" %}
+  {% endwith %}
+  {% elif item.fotos %}
+  <p class="chk-foto-placeholder">Fotos registradas, porém indisponíveis neste navegador (URI local do dispositivo).</p>
+  {% endif %}
+</div>
+{% else %}
+<div class="chk-bloco">
+  <p>Nenhuma parte do checklist registrada.</p>
 </div>
 {% endfor %}
 
+<div class="chk-bloco">
+  <h2>Assinaturas</h2>
+
+  <div style="margin-top:12px">
+    <h3>Assinatura de Origem</h3>
+    {% if assinatura_origem %}
+    <img src="{{ assinatura_origem }}" alt="Assinatura de origem" class="chk-assinatura-img">
+    {% else %}
+    <p style="color:#666;font-style:italic">Pendente</p>
+    {% endif %}
+  </div>
+
+  <div style="margin-top:16px">
+    <h3>Assinatura de Destino</h3>
+    {% if assinatura_destino %}
+    <img src="{{ assinatura_destino }}" alt="Assinatura de destino" class="chk-assinatura-img">
+    {% else %}
+    <p style="color:#666;font-style:italic">Pendente</p>
+    {% endif %}
+  </div>
 </div>
 
-<div class="fotos">
-
-        {% for foto in item.fotos %}
-            <a
-                href="{{ foto }}"
-                target="_blank"
-                class="foto-link"
-            >
-                Abrir foto
-            </a>
-        {% endfor %}
-
-    </div>
-
-</div>
-
-{% endfor %}
-
-<div class="bloco">
-    <h2>Assinaturas</h2>
-
-    <div class="assinatura-bloco">
-        <h3>Assinatura de Origem</h3>
-        {% if assinatura_origem %}
-            <img src="{{ assinatura_origem }}" alt="Assinatura de origem" class="assinatura-img">
-        {% else %}
-            <p class="sem-assinatura">Pendente</p>
-        {% endif %}
-    </div>
-
-    <div class="assinatura-bloco">
-        <h3>Assinatura de Destino</h3>
-        {% if assinatura_destino %}
-            <img src="{{ assinatura_destino }}" alt="Assinatura de destino" class="assinatura-img">
-        {% else %}
-            <p class="sem-assinatura">Pendente</p>
-        {% endif %}
-    </div>
-</div>
-
+<script src="/static/checklist_central.js?v=20260529"></script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
@@ -13,6 +13,14 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 
 import { API_BASE, debugLog } from '../config/api';
+import {
+  PARTES_CHECKLIST,
+  carregarRascunhoChecklist,
+  checklistFotosParaEnvio,
+  limparRascunhoChecklist,
+  resumoParte,
+  salvarRascunhoChecklist,
+} from '../lib/checklist_avarias';
 
 const CHAVES_META = [
   'assinatura',
@@ -55,10 +63,11 @@ type TipoAssinatura = 'origem' | 'destino';
 export default function ChecklistScreen() {
   const params = useLocalSearchParams();
 
-  const [avarias, setAvarias] = useState<string[]>([]);
   const [marcacoes, setMarcacoes] = useState<any>({});
   const [fotosAvarias, setFotosAvarias] = useState<any>({});
   const [fotoVeiculo, setFotoVeiculo] = useState<string | null>(null);
+  const [tipoServico, setTipoServico] = useState(String(params.tipo_servico || ''));
+  const [observacaoServico, setObservacaoServico] = useState(String(params.observacao || ''));
 
   const [assinaturaOrigem, setAssinaturaOrigem] = useState<string | null>(null);
   const [assinaturaDestino, setAssinaturaDestino] = useState<string | null>(null);
@@ -76,6 +85,13 @@ export default function ChecklistScreen() {
         let destinoNoServidor = false;
 
         const servicoId = String(params.servico_id || '');
+
+        if (params.tipo_servico) {
+          setTipoServico(String(params.tipo_servico));
+        }
+        if (params.observacao) {
+          setObservacaoServico(String(params.observacao));
+        }
 
         if (servicoId && servicoId !== 'undefined') {
           const url = `${API_BASE}/api/checklist-dados/${servicoId}`;
@@ -119,18 +135,14 @@ export default function ChecklistScreen() {
           }
         }
 
-        if (params.todasMarcacoes) {
-          Object.assign(
-            novasMarcacoes,
-            JSON.parse(String(params.todasMarcacoes))
-          );
-        }
-
-        if (params.fotosAvarias) {
-          Object.assign(
-            novasFotos,
-            JSON.parse(String(params.fotosAvarias))
-          );
+        const rascunho = servicoId ? await carregarRascunhoChecklist(servicoId) : null;
+        if (rascunho) {
+          Object.keys(rascunho.marcacoes || {}).forEach((parte) => {
+            novasMarcacoes[parte] = rascunho.marcacoes[parte] || [];
+          });
+          Object.keys(rascunho.fotos || {}).forEach((parte) => {
+            novasFotos[parte] = rascunho.fotos[parte] || [];
+          });
         }
 
         if (assinaturaValida(params.assinatura_origem)) {
@@ -141,20 +153,8 @@ export default function ChecklistScreen() {
           destinoAtual = String(params.assinatura_destino);
         }
 
-        const partesComAvaria = Array.from(
-          new Set([
-            ...Object.keys(novasMarcacoes).filter(
-              (parte) => (novasMarcacoes[parte] || []).length > 0
-            ),
-            ...Object.keys(novasFotos).filter(
-              (parte) => (novasFotos[parte] || []).length > 0
-            ),
-          ])
-        );
-
         setMarcacoes(novasMarcacoes);
         setFotosAvarias(novasFotos);
-        setAvarias(partesComAvaria);
         setAssinaturaOrigem(origemAtual);
         setAssinaturaDestino(destinoAtual);
         setOrigemPersistida(origemNoServidor);
@@ -167,31 +167,37 @@ export default function ChecklistScreen() {
     carregarChecklist();
   }, [
     params.servico_id,
-    params.todasMarcacoes,
-    params.fotosAvarias,
+    params.tipo_servico,
+    params.observacao,
     params.assinatura_origem,
     params.assinatura_destino,
   ]);
 
-  const itens = [
-    'Frente',
-    'Traseira',
-    'Lateral esquerda',
-    'Lateral direita',
-    'Teto',
-    'Rodas',
-    'Vidros',
-    'Parachoque',
-    'Faróis',
-    'Lanternas',
-  ];
+  useFocusEffect(
+    React.useCallback(() => {
+      const servicoId = String(params.servico_id || '');
+      if (!servicoId) return;
 
-  function marcar(item: string) {
-    if (avarias.includes(item)) {
-      setAvarias(avarias.filter((i) => i !== item));
-    } else {
-      setAvarias([...avarias, item]);
-    }
+      carregarRascunhoChecklist(servicoId).then((rascunho) => {
+        if (!rascunho) return;
+        setMarcacoes((atual) => ({ ...atual, ...(rascunho.marcacoes || {}) }));
+        setFotosAvarias((atual) => ({ ...atual, ...(rascunho.fotos || {}) }));
+      });
+    }, [params.servico_id])
+  );
+
+  const itens = [...PARTES_CHECKLIST];
+
+  function abrirParte(item: string) {
+    router.push({
+      pathname: '/avaria',
+      params: {
+        servico_id: params.servico_id,
+        tipo_servico: tipoServico,
+        observacao: observacaoServico,
+        parte: item,
+      },
+    } as any);
   }
 
   async function tirarFoto() {
@@ -237,8 +243,8 @@ export default function ChecklistScreen() {
       params: {
         servico_id: params.servico_id,
         tipo,
-        todasMarcacoes: JSON.stringify(marcacoes),
-        fotosAvarias: JSON.stringify(fotosAvarias),
+        tipo_servico: tipoServico,
+        observacao: observacaoServico,
       },
     } as any);
   }
@@ -253,12 +259,13 @@ export default function ChecklistScreen() {
     }
 
     try {
+      const fotosEnvio = await checklistFotosParaEnvio(fotosAvarias);
       const checklistCompleto: any = {};
 
       Object.keys(marcacoes).forEach((parte) => {
         checklistCompleto[parte] = {
           marcacoes: marcacoes[parte] || [],
-          fotos: fotosAvarias[parte] || [],
+          fotos: fotosEnvio[parte] || [],
         };
       });
 
@@ -298,6 +305,12 @@ export default function ChecklistScreen() {
       if (dados.assinatura_destino_salva) {
         setDestinoPersistida(true);
       }
+
+      await limparRascunhoChecklist(String(params.servico_id));
+      await salvarRascunhoChecklist(String(params.servico_id), {
+        marcacoes,
+        fotos: fotosAvarias,
+      });
 
       Alert.alert('Sucesso', 'Checklist salvo com sucesso!', [
         {
@@ -371,50 +384,42 @@ export default function ChecklistScreen() {
         <Image source={{ uri: fotoVeiculo }} style={styles.fotoVeiculo} />
       )}
 
-      {itens.map((item) => (
+      {itens.map((item) => {
+        const qtdMarc = marcacoes[item]?.length || 0;
+        const qtdFotos = fotosAvarias[item]?.length || 0;
+        return (
         <TouchableOpacity
           key={item}
           style={[
             styles.item,
-            marcacoes[item]?.length > 0 && styles.itemMarcado,
+            qtdMarc > 0 && styles.itemMarcado,
           ]}
-          onPress={() => {
-            marcar(item);
-
-            router.push({
-              pathname: '/avaria',
-              params: {
-                servico_id: params.servico_id,
-                parte: item,
-                marcacoes: JSON.stringify(marcacoes[item] || []),
-                todasMarcacoes: JSON.stringify(marcacoes),
-                fotos: JSON.stringify(fotosAvarias[item] || []),
-                fotosAvarias: JSON.stringify(fotosAvarias),
-              },
-            } as any);
-          }}
+          onPress={() => abrirParte(item)}
         >
           <Text style={styles.texto}>
-            {marcacoes[item]?.length > 0 ? '⚠️ ' : '✅ '}
+            {qtdMarc > 0 ? '⚠️ ' : '✅ '}
             {item}
           </Text>
+          <Text style={styles.itemSub}>
+            {qtdMarc > 0
+              ? `${qtdMarc} avaria(s) · ${qtdFotos} foto(s)`
+              : 'Toque para inspecionar'}
+          </Text>
         </TouchableOpacity>
-      ))}
+      );
+      })}
 
       <View style={styles.resumo}>
         <Text style={styles.resumoTitulo}>Resumo das avarias</Text>
 
-        {Object.keys(marcacoes).length === 0 ? (
-          <Text>Nenhuma avaria marcada.</Text>
-        ) : (
-          Object.keys(marcacoes).map((parte) => (
-            <Text key={parte} style={{ marginBottom: 5 }}>
-              🚨 {parte}: {marcacoes[parte]?.length || 0} avaria(s)
-              {' | '}
-              📸 {fotosAvarias[parte]?.length || 0} foto(s)
+        {itens.map((parte) => (
+          <View key={parte} style={styles.resumoItem}>
+            <Text style={styles.resumoParte}>{parte}</Text>
+            <Text style={styles.resumoDetalhe}>
+              {resumoParte(marcacoes[parte], fotosAvarias[parte])}
             </Text>
-          ))
-        )}
+          </View>
+        ))}
       </View>
 
       <Text style={styles.secaoAssinaturas}>Assinaturas</Text>
@@ -468,6 +473,13 @@ const styles = StyleSheet.create({
 
   texto: {
     fontSize: 16,
+    fontWeight: '700',
+  },
+
+  itemSub: {
+    fontSize: 13,
+    color: '#64748b',
+    marginTop: 4,
   },
 
   botao: {
@@ -510,6 +522,24 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 10,
+  },
+
+  resumoItem: {
+    marginBottom: 10,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+  },
+
+  resumoParte: {
+    fontWeight: '800',
+    color: '#0f172a',
+    marginBottom: 2,
+  },
+
+  resumoDetalhe: {
+    color: '#475569',
+    fontSize: 14,
   },
 
   secaoAssinaturas: {

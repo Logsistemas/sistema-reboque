@@ -6,6 +6,7 @@
 <title>Serviço {{ s.protocolo }} — Auditoria</title>
   {% include "partials/head_pages_v2.html" %}
 <link rel="stylesheet" href="/static/servico_detalhe.css">
+<link rel="stylesheet" href="/static/checklist_central.css?v=20260529">
 <link rel="stylesheet" href="/static/central_patio_integracao.css?v=20260529">
 </head>
 <body class="ess-app">
@@ -312,12 +313,27 @@
       <!-- ABA CHECKLIST -->
       <div class="sd-panel {% if aba_ativa == 'checklist' %}active{% endif %}" id="panel-checklist">
         <div class="sd-section">
+          <div class="chk-print-header" style="display:none" id="chkPrintHeaderServico">
+            <p class="chk-print-brand">🚛 Essência Logística</p>
+            <div class="chk-print-meta">
+              <div><strong>Protocolo:</strong> {{ s.protocolo or s.id }}</div>
+              <div><strong>Cliente:</strong> {{ s.seguradora or '—' }}</div>
+              <div><strong>Tipo:</strong> {{ s.tipo or '—' }}</div>
+              <div><strong>Placa:</strong> {{ s.placa or '—' }}</div>
+              <div><strong>Motorista:</strong> {{ s.motorista_nome or '—' }}</div>
+              <div><strong>Status checklist:</strong> {{ checklist_resumo.status }}</div>
+            </div>
+          </div>
           <h3>Checklist do motorista</h3>
           <div class="sd-checklist-tags">
             <span class="sd-tag">Status: {{ checklist_resumo.status }}</span>
             <span class="sd-tag">{{ checklist_resumo.total_partes }} partes</span>
             <span class="sd-tag">{{ checklist_resumo.total_avarias }} avarias</span>
             <span class="sd-tag">{{ checklist_resumo.total_fotos_checklist }} fotos</span>
+          </div>
+
+          <div class="sd-actions chk-no-print" style="margin:12px 0">
+            <button type="button" class="sd-btn sd-btn-dark" data-chk-imprimir>Imprimir Checklist</button>
           </div>
 
           {% if checklist_resumo.checklist %}
@@ -328,15 +344,12 @@
                 <span class="sd-tag">{{ item.marcacoes|length }} avaria(s)</span>
                 <span class="sd-tag">{{ item.fotos|length }} foto(s)</span>
               </div>
-              {% if item.fotos %}
-              <div class="sd-arquivos-grid" style="margin-top:10px">
-                {% for foto in item.fotos %}
-                <a href="{{ foto }}" target="_blank" class="sd-arquivo-card">
-                  <img src="{{ foto }}" alt="Foto {{ item.parte }}">
-                  <div class="sd-arquivo-meta"><b>{{ item.parte }}</b></div>
-                </a>
-                {% endfor %}
-              </div>
+              {% if item.fotos_resolvidas %}
+              {% with fotos_resolvidas=item.fotos_resolvidas, parte_label=item.parte %}
+              {% include "partials/checklist_fotos_galeria.html" %}
+              {% endwith %}
+              {% elif item.fotos %}
+              <p class="muted" style="font-size:12px;margin-top:8px">Fotos registradas, porém indisponíveis (URI local do app). Reenvie o checklist pelo motorista.</p>
               {% endif %}
             </div>
             {% endfor %}
@@ -441,6 +454,7 @@ document.querySelectorAll('.sd-nav-item[data-aba]').forEach((btn) => {
 
 calcularTotal();
 </script>
+<script src="/static/checklist_central.js?v=20260529"></script>
 <script src="/static/central_patio_integracao.js?v=20260529"></script>
 {% include "partials/app_shell_end.html" %}
 </body>
