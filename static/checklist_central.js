@@ -70,10 +70,17 @@
     return el;
   }
 
+  function mensagemFotoIndisponivel(info) {
+    if (info.erro === 'uri_local_dispositivo') {
+      return 'Foto antiga do dispositivo — reenviar checklist para visualizar na Central.';
+    }
+    return 'Foto não disponível para visualização.';
+  }
+
   function abrirFotoChecklist(url, titulo) {
     const info = resolverUrlFotoChecklist(url);
     if (!info.valid || !info.url) {
-      alert('Foto não disponível para visualização.');
+      alert(mensagemFotoIndisponivel(info));
       return;
     }
     const box = ensureLightbox();
@@ -95,7 +102,11 @@
   function baixarFotoChecklist(url, nomeArquivo) {
     const info = resolverUrlFotoChecklist(url);
     if (!info.valid || !info.url) {
-      alert('Foto não disponível para download.');
+      alert(
+        info.erro === 'uri_local_dispositivo'
+          ? 'Foto antiga do dispositivo — reenviar checklist para visualizar na Central.'
+          : 'Foto não disponível para download.'
+      );
       return;
     }
 

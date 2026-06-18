@@ -96,6 +96,12 @@
   background: #dbeafe;
 }
 
+.chk-btn-disabled,
+.chk-btn-foto:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .chk-foto-card-erro .chk-foto-thumb-wrap {
   background: #fef2f2;
 }

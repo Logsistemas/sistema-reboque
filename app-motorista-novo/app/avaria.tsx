@@ -15,6 +15,8 @@ import {
 } from 'react-native';
 
 import { debugLog } from '../config/api';
+import { AppButton } from '../components/ui/AppButton';
+import { colors, radius, shadow, spacing } from '../lib/ui/theme';
 import {
   type MarcacaoAvaria,
   type TipoVeiculo,
@@ -23,6 +25,7 @@ import {
   inferirTipoVeiculo,
   labelTipoVeiculo,
   nomeAssetChecklist,
+  fotoAssetParaChecklist,
   carregarRascunhoChecklist,
   salvarRascunhoChecklist,
   tituloParte,
@@ -192,9 +195,10 @@ export default function AvariaScreen() {
     const resultado = await ImagePicker.launchCameraAsync({
       quality: 0.45,
       allowsEditing: false,
+      base64: true,
     });
     if (!resultado.canceled && resultado.assets[0]) {
-      setFotos((lista) => [...lista, resultado.assets[0].uri]);
+      setFotos((lista) => [...lista, fotoAssetParaChecklist(resultado.assets[0])]);
       debugLog('avaria', 'foto capturada', parte);
     }
   }
@@ -210,9 +214,10 @@ export default function AvariaScreen() {
       quality: 0.45,
       allowsMultipleSelection: false,
       allowsEditing: false,
+      base64: true,
     });
     if (!resultado.canceled && resultado.assets[0]) {
-      setFotos((lista) => [...lista, resultado.assets[0].uri]);
+      setFotos((lista) => [...lista, fotoAssetParaChecklist(resultado.assets[0])]);
     }
   }
 
@@ -237,12 +242,15 @@ export default function AvariaScreen() {
 
   return (
     <ScrollView ref={scrollRef} style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.titulo}>Checklist de Avarias</Text>
-      <Text style={styles.subtitulo}>{tituloParte(parte)}</Text>
-      <Text style={styles.tipo}>{labelTipoVeiculo(tipoVeiculo)}</Text>
-      <Text style={styles.instrucao}>Toque na imagem para marcar um X vermelho no local da avaria.</Text>
+      <View style={styles.headerCard}>
+        <Text style={styles.titulo}>Marcar avaria</Text>
+        <Text style={styles.subtitulo}>{tituloParte(parte)}</Text>
+        <Text style={styles.tipo}>{labelTipoVeiculo(tipoVeiculo)}</Text>
+        <Text style={styles.instrucao}>Toque na imagem para marcar um X vermelho no local da avaria.</Text>
+      </View>
 
-      <View style={styles.imagemWrap} onLayout={onLayoutImagem}>
+      <View style={styles.imagemCard}>
+        <View style={styles.imagemWrap} onLayout={onLayoutImagem}>
         {imagemFonte ? (
           <Image source={imagemFonte} style={styles.imagemVeiculo} resizeMode="contain" />
         ) : (
@@ -278,28 +286,25 @@ export default function AvariaScreen() {
             );
           })}
         </Pressable>
+        </View>
       </View>
 
-      <Text style={styles.contador}>
-        {marcacoes.length} marcação(ões) · {fotos.length} foto(s)
-      </Text>
+      <View style={styles.contadorCard}>
+        <Text style={styles.contador}>
+          {marcacoes.length} marcação(ões) · {fotos.length} foto(s)
+        </Text>
+      </View>
 
       <View style={styles.acoesFoto}>
-        <TouchableOpacity style={styles.botaoFoto} onPress={tirarFotoAvaria}>
-          <Text style={styles.botaoTexto}>Tirar Foto</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.botaoFotoSec} onPress={abrirVerFotos}>
-          <Text style={styles.botaoTexto}>Ver Fotos</Text>
-        </TouchableOpacity>
+        <AppButton label="Tirar Foto" onPress={tirarFotoAvaria} variant="orange" style={styles.btnFlex} />
+        <AppButton label="Ver Fotos" onPress={abrirVerFotos} variant="secondary" style={styles.btnFlex} />
       </View>
 
-      <TouchableOpacity style={styles.botaoAnexar} onPress={anexarFotoAvaria}>
-        <Text style={styles.botaoAnexarTxt}>Anexar foto da galeria</Text>
-      </TouchableOpacity>
+      <AppButton label="Anexar foto da galeria" onPress={anexarFotoAvaria} variant="primary" style={styles.btnAnexar} />
 
       {fotos.length > 0 && (
         <View style={styles.galeria}>
-          <Text style={styles.galeriaTitulo}>Fotos desta parte</Text>
+          <Text style={styles.galeriaTitulo}>Fotos anexadas</Text>
           {fotos.map((uri, idx) => (
             <View key={`${uri}-${idx}`} style={styles.fotoItem}>
               <Image source={{ uri }} style={styles.foto} />
@@ -311,9 +316,7 @@ export default function AvariaScreen() {
         </View>
       )}
 
-      <TouchableOpacity style={styles.botaoSalvar} onPress={voltarChecklist}>
-        <Text style={styles.botaoTexto}>Salvar</Text>
-      </TouchableOpacity>
+      <AppButton label="Salvar" onPress={voltarChecklist} variant="navy" style={styles.botaoSalvar} />
 
       <Modal visible={verFotosAberto} animationType="slide" transparent>
         <View style={styles.modalFundo}>
@@ -329,9 +332,7 @@ export default function AvariaScreen() {
                 </View>
               ))}
             </ScrollView>
-            <TouchableOpacity style={styles.modalFechar} onPress={() => setVerFotosAberto(false)}>
-              <Text style={styles.botaoTexto}>Fechar</Text>
-            </TouchableOpacity>
+            <AppButton label="Fechar" onPress={() => setVerFotosAberto(false)} variant="navy" />
           </View>
         </View>
       </Modal>
@@ -340,20 +341,38 @@ export default function AvariaScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
-  content: { padding: 20, paddingBottom: 36 },
-  titulo: { fontSize: 24, fontWeight: '800', color: '#0f2744', marginBottom: 4 },
-  subtitulo: { fontSize: 18, fontWeight: '700', color: '#1e293b', marginBottom: 4 },
-  tipo: { fontSize: 13, color: '#64748b', marginBottom: 8 },
-  instrucao: { fontSize: 14, color: '#475569', marginBottom: 14 },
+  container: { flex: 1, backgroundColor: colors.bg },
+  content: { padding: spacing.lg, paddingBottom: 36 },
+  headerCard: {
+    backgroundColor: colors.bgCard,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadow,
+  },
+  titulo: { fontSize: 22, fontWeight: '800', color: colors.navy, marginBottom: 4 },
+  subtitulo: { fontSize: 17, fontWeight: '800', color: colors.text, marginBottom: 4 },
+  tipo: { fontSize: 13, color: colors.textMuted, marginBottom: 6, fontWeight: '600' },
+  instrucao: { fontSize: 14, color: colors.textSoft, lineHeight: 20 },
+  imagemCard: {
+    backgroundColor: colors.bgCard,
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: spacing.md,
+    ...shadow,
+  },
   imagemWrap: {
     width: '100%',
     aspectRatio: 1.35,
-    borderRadius: 14,
+    borderRadius: radius.sm,
     overflow: 'hidden',
     backgroundColor: '#fff',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: colors.borderLight,
     position: 'relative',
   },
   imagemVeiculo: { width: '100%', height: '100%' },
@@ -361,9 +380,9 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#eef2ff',
+    backgroundColor: colors.borderLight,
   },
-  imagemFallbackTxt: { color: '#64748b', fontWeight: '600' },
+  imagemFallbackTxt: { color: colors.textMuted, fontWeight: '600' },
   imagemOverlay: {
     ...StyleSheet.absoluteFillObject,
   },
@@ -390,62 +409,51 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 18,
   },
-  contador: {
-    marginTop: 10,
-    marginBottom: 12,
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#334155',
-    textAlign: 'center',
-  },
-  acoesFoto: { flexDirection: 'row', gap: 10, marginBottom: 12 },
-  botaoFoto: {
-    flex: 1,
-    backgroundColor: '#2563eb',
-    padding: 14,
-    borderRadius: 10,
-  },
-  botaoFotoSec: {
-    flex: 1,
-    backgroundColor: '#475569',
-    padding: 14,
-    borderRadius: 10,
-  },
-  botaoAnexar: {
+  contadorCard: {
+    backgroundColor: colors.bgCard,
+    borderRadius: radius.sm,
     paddingVertical: 10,
-    marginBottom: 12,
+    paddingHorizontal: 14,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  botaoAnexarTxt: {
-    textAlign: 'center',
-    color: '#2563eb',
-    fontWeight: '700',
+  contador: {
     fontSize: 14,
+    fontWeight: '700',
+    color: colors.textSoft,
+    textAlign: 'center',
   },
+  acoesFoto: { flexDirection: 'row', gap: 10, marginBottom: spacing.sm },
+  btnFlex: { flex: 1 },
+  btnAnexar: { marginBottom: spacing.md },
   modalFundo: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.55)',
     justifyContent: 'flex-end',
   },
   modalCaixa: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
+    backgroundColor: colors.bgCard,
+    borderTopLeftRadius: radius.lg,
+    borderTopRightRadius: radius.lg,
     maxHeight: '85%',
-    padding: 18,
+    padding: spacing.lg,
   },
-  modalTitulo: { fontSize: 18, fontWeight: '800', marginBottom: 12, color: '#0f172a' },
+  modalTitulo: { fontSize: 18, fontWeight: '800', marginBottom: 12, color: colors.navy },
   modalScroll: { maxHeight: 420 },
-  fotoModal: { width: '100%', height: 240, borderRadius: 10, backgroundColor: '#e2e8f0' },
-  modalFechar: {
-    backgroundColor: '#111827',
-    padding: 14,
-    borderRadius: 10,
-    marginTop: 12,
+  fotoModal: { width: '100%', height: 240, borderRadius: radius.sm, backgroundColor: colors.border },
+  galeria: {
+    marginBottom: spacing.md,
+    backgroundColor: colors.bgCard,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadow,
   },
-  galeria: { marginBottom: 12 },
-  galeriaTitulo: { fontWeight: '700', marginBottom: 8, color: '#0f172a' },
+  galeriaTitulo: { fontWeight: '800', marginBottom: 10, color: colors.navy, fontSize: 16 },
   fotoItem: { marginBottom: 10 },
-  foto: { width: '100%', height: 180, borderRadius: 10, backgroundColor: '#e2e8f0' },
+  foto: { width: '100%', height: 180, borderRadius: radius.sm, backgroundColor: colors.border },
   fotoRemover: {
     marginTop: 6,
     alignSelf: 'flex-start',
@@ -454,12 +462,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#fee2e2',
     borderRadius: 8,
   },
-  fotoRemoverTxt: { color: '#b91c1c', fontWeight: '700', fontSize: 13 },
-  botaoSalvar: {
-    backgroundColor: '#111827',
-    padding: 16,
-    borderRadius: 12,
-    marginTop: 4,
-  },
-  botaoTexto: { color: '#fff', textAlign: 'center', fontWeight: '800', fontSize: 16 },
+  fotoRemoverTxt: { color: colors.dangerDark, fontWeight: '700', fontSize: 13 },
+  botaoSalvar: { marginTop: 4 },
 });

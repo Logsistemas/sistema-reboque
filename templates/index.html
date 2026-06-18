@@ -6,6 +6,7 @@
   <title>Central de Serviços — Essência Logística</title>
   <link rel="stylesheet" href="/static/dashboard.css">
   {% include "partials/head_pages_v2.html" %}
+<link rel="stylesheet" href="/static/central_mobile_chat.css?v=20260601">
   <link rel="stylesheet" href="/static/central.css?v=20260529d">
 </head>
 <body class="ess-app central-body">
@@ -644,6 +645,53 @@ if (window.Notification && Notification.permission !== 'granted') {
 
 setInterval(atualizarCentral, 5000);
 atualizarCentral();
+
+let ultimoMobileCentralTs = null;
+
+function beepMsgMobile(freq = 1040, duration = 220) {
+  if (!somAtivo) return;
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.frequency.value = freq;
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + duration / 1000);
+    osc.stop(ctx.currentTime + duration / 1000);
+  } catch (e) {}
+}
+
+function mostrarToastMobile(msg) {
+  const el = document.createElement('div');
+  el.className = 'sd-mobile-toast';
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 5000);
+}
+
+async function checarMensagensMobileCentral() {
+  try {
+    const res = await fetch('/api/central/mobile/unread-summary', { cache: 'no-store' });
+    const data = await res.json();
+    if (!data.ok) return;
+    if (ultimoMobileCentralTs !== null && data.latest_at && data.latest_at > ultimoMobileCentralTs) {
+      const item = (data.itens && data.itens[0]) || {};
+      beepMsgMobile();
+      mostrarToastMobile(`Nova mensagem do motorista no protocolo ${item.protocolo || ''}`);
+      if (window.Notification && Notification.permission === 'granted') {
+        new Notification('Nova mensagem Mobile', {
+          body: `Protocolo ${item.protocolo || ''} — ${item.qtd || 1} não lida(s)`,
+        });
+      }
+    }
+    ultimoMobileCentralTs = data.latest_at || ultimoMobileCentralTs;
+  } catch (e) {}
+}
+
+setInterval(checarMensagensMobileCentral, 5000);
+checarMensagensMobileCentral();
 </script>
 
 </body>

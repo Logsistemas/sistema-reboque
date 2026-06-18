@@ -3,12 +3,14 @@ import {
   Alert,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import SignatureScreen from 'react-native-signature-canvas';
+
+import { AppButton } from '../components/ui/AppButton';
+import { colors, radius, shadow, spacing } from '../lib/ui/theme';
 
 function paramsParaChecklist(
   raw: Record<string, string | string[] | undefined>
@@ -106,11 +108,12 @@ export default function AssinaturaScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.titulo}>{titulo}</Text>
-
-      <Text style={styles.subtitulo}>
-        Após salvar, esta assinatura não poderá ser refeita ou alterada.
-      </Text>
+      <View style={styles.headerCard}>
+        <Text style={styles.titulo}>{titulo}</Text>
+        <Text style={styles.subtitulo}>
+          Após salvar, esta assinatura não poderá ser refeita ou alterada.
+        </Text>
+      </View>
 
       <View style={styles.assinaturaContainer}>
         <SignatureScreen
@@ -130,24 +133,16 @@ export default function AssinaturaScreen() {
       </View>
 
       <View style={styles.botoes}>
-        <TouchableOpacity style={styles.botaoLimpar} onPress={limpar}>
-          <Text style={styles.textoBotao}>Limpar</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.botaoSalvar}
+        <AppButton label="Limpar" onPress={limpar} variant="secondary" style={styles.botaoMetade} />
+        <AppButton
+          label="Salvar assinatura"
           onPress={() => ref.current?.readSignature?.()}
-        >
-          <Text style={styles.textoBotao}>Salvar assinatura</Text>
-        </TouchableOpacity>
+          variant="primary"
+          style={styles.botaoMetade}
+        />
       </View>
 
-      <TouchableOpacity
-        style={styles.botaoVoltar}
-        onPress={() => voltarChecklist()}
-      >
-        <Text style={styles.textoBotao}>Voltar sem assinar</Text>
-      </TouchableOpacity>
+      <AppButton label="Voltar sem assinar" onPress={() => voltarChecklist()} variant="navy" style={styles.botaoVoltar} />
     </View>
   );
 }
@@ -155,68 +150,58 @@ export default function AssinaturaScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
-    paddingTop: 50,
+    backgroundColor: colors.bg,
+    paddingTop: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
+
+  headerCard: {
+    backgroundColor: colors.bgCard,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadow,
   },
 
   titulo: {
     fontSize: 22,
-    fontWeight: 'bold',
+    fontWeight: '800',
     textAlign: 'center',
+    color: colors.navy,
     marginBottom: 8,
   },
 
   subtitulo: {
     fontSize: 14,
-    color: '#475569',
+    color: colors.textSoft,
     textAlign: 'center',
-    marginHorizontal: 15,
-    marginBottom: 12,
+    lineHeight: 20,
   },
 
   assinaturaContainer: {
     flex: 1,
     borderWidth: 2,
-    borderColor: '#ccc',
-    marginHorizontal: 15,
-    borderRadius: 10,
+    borderColor: colors.border,
+    borderRadius: radius.md,
     overflow: 'hidden',
+    backgroundColor: '#fff',
+    ...shadow,
   },
 
   botoes: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    padding: 15,
+    gap: 12,
+    paddingVertical: spacing.md,
   },
 
-  botaoLimpar: {
-    backgroundColor: '#999',
-    padding: 15,
-    borderRadius: 10,
-    width: '45%',
-    alignItems: 'center',
-  },
-
-  botaoSalvar: {
-    backgroundColor: '#1976d2',
-    padding: 15,
-    borderRadius: 10,
-    width: '45%',
-    alignItems: 'center',
+  botaoMetade: {
+    flex: 1,
   },
 
   botaoVoltar: {
-    backgroundColor: '#64748b',
-    marginHorizontal: 15,
-    marginBottom: 20,
-    padding: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-
-  textoBotao: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
+    marginBottom: spacing.lg,
   },
 });

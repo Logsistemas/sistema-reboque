@@ -13,6 +13,8 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 
 import { API_BASE, debugLog } from '../config/api';
+import { AppButton } from '../components/ui/AppButton';
+import { colors, radius, shadow, spacing } from '../lib/ui/theme';
 import {
   PARTES_CHECKLIST,
   carregarRascunhoChecklist,
@@ -260,6 +262,7 @@ export default function ChecklistScreen() {
 
     try {
       const fotosEnvio = await checklistFotosParaEnvio(fotosAvarias);
+      console.log('[CHECKLIST FOTO] envio finalizado partes=', Object.keys(fotosEnvio).length);
       const checklistCompleto: any = {};
 
       Object.keys(marcacoes).forEach((parte) => {
@@ -312,12 +315,7 @@ export default function ChecklistScreen() {
         fotos: fotosAvarias,
       });
 
-      Alert.alert('Sucesso', 'Checklist salvo com sucesso!', [
-        {
-          text: 'OK',
-          onPress: () => (router as any).dismissAll(),
-        },
-      ]);
+      router.replace('/checklist-sucesso' as any);
     } catch (err) {
       console.log(err);
       Alert.alert('Erro ao conectar com servidor');
@@ -359,26 +357,36 @@ export default function ChecklistScreen() {
             />
           </>
         ) : (
-          <TouchableOpacity
-            style={styles.botao}
+          <AppButton
+            label={tipo === 'origem' ? 'Assinar origem' : 'Assinar destino'}
             onPress={() => abrirAssinatura(tipo)}
-          >
-            <Text style={styles.botaoTexto}>
-              {tipo === 'origem' ? 'Assinar origem' : 'Assinar destino'}
-            </Text>
-          </TouchableOpacity>
+            variant="primary"
+          />
         )}
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.titulo}>Checklist Veicular</Text>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <View style={styles.headerCard}>
+        <Text style={styles.titulo}>Checklist veicular</Text>
+        <Text style={styles.subHeader}>Inspeção por parte do veículo</Text>
+        <View style={styles.progressRow}>
+          <View style={[styles.progressPill, styles.progressOk]}>
+            <Text style={styles.progressTxt}>
+              {itens.filter((p) => !(marcacoes[p]?.length || 0)).length} sem avaria
+            </Text>
+          </View>
+          <View style={[styles.progressPill, styles.progressWarn]}>
+            <Text style={styles.progressTxt}>
+              {itens.filter((p) => (marcacoes[p]?.length || 0) > 0).length} com avaria
+            </Text>
+          </View>
+        </View>
+      </View>
 
-      <TouchableOpacity style={styles.botao} onPress={tirarFoto}>
-        <Text style={styles.botaoTexto}>📸 Tirar foto do veículo</Text>
-      </TouchableOpacity>
+      <AppButton label="Tirar foto do veículo" onPress={tirarFoto} variant="orange" />
 
       {fotoVeiculo && (
         <Image source={{ uri: fotoVeiculo }} style={styles.fotoVeiculo} />
@@ -392,34 +400,48 @@ export default function ChecklistScreen() {
           key={item}
           style={[
             styles.item,
-            qtdMarc > 0 && styles.itemMarcado,
+            qtdMarc > 0 ? styles.itemMarcado : styles.itemOk,
           ]}
           onPress={() => abrirParte(item)}
         >
-          <Text style={styles.texto}>
-            {qtdMarc > 0 ? '⚠️ ' : '✅ '}
-            {item}
-          </Text>
+          <View style={styles.itemHeader}>
+            <Text style={styles.texto}>
+              {qtdMarc > 0 ? '⚠ ' : '✔ '}
+              {item}
+            </Text>
+            <View style={[styles.badgeMini, qtdMarc > 0 ? styles.badgeWarn : styles.badgeOk]}>
+              <Text style={styles.badgeMiniTxt}>{qtdMarc > 0 ? 'Avaria' : 'OK'}</Text>
+            </View>
+          </View>
           <Text style={styles.itemSub}>
             {qtdMarc > 0
-              ? `${qtdMarc} avaria(s) · ${qtdFotos} foto(s)`
-              : 'Toque para inspecionar'}
+              ? `${qtdMarc} marcação(ões) · ${qtdFotos} foto(s)`
+              : qtdFotos > 0
+                ? `${qtdFotos} foto(s) anexada(s)`
+                : 'Toque para inspecionar'}
           </Text>
         </TouchableOpacity>
       );
       })}
 
       <View style={styles.resumo}>
-        <Text style={styles.resumoTitulo}>Resumo das avarias</Text>
+        <Text style={styles.resumoTitulo}>Resumo executivo</Text>
+        <Text style={styles.resumoSub}>Checklist em andamento</Text>
 
-        {itens.map((parte) => (
-          <View key={parte} style={styles.resumoItem}>
+        {itens.map((parte) => {
+          const qtd = marcacoes[parte]?.length || 0;
+          return (
+          <View
+            key={parte}
+            style={[styles.resumoItem, qtd > 0 ? styles.resumoItemWarn : styles.resumoItemOk]}
+          >
             <Text style={styles.resumoParte}>{parte}</Text>
             <Text style={styles.resumoDetalhe}>
               {resumoParte(marcacoes[parte], fotosAvarias[parte])}
             </Text>
           </View>
-        ))}
+          );
+        })}
       </View>
 
       <Text style={styles.secaoAssinaturas}>Assinaturas</Text>
@@ -438,9 +460,7 @@ export default function ChecklistScreen() {
         destinoPersistida
       )}
 
-      <TouchableOpacity style={styles.botaoFinalizar} onPress={finalizarChecklist}>
-        <Text style={styles.botaoTexto}>Finalizar Checklist</Text>
-      </TouchableOpacity>
+      <AppButton label="Finalizar Checklist" onPress={finalizarChecklist} variant="navy" style={styles.botaoFinalizar} />
     </ScrollView>
   );
 }
@@ -448,141 +468,175 @@ export default function ChecklistScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
-    padding: 20,
+    backgroundColor: colors.bg,
   },
-
+  content: {
+    padding: spacing.lg,
+    paddingBottom: 32,
+  },
+  headerCard: {
+    backgroundColor: colors.bgCard,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadow,
+  },
   titulo: {
     fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
+    fontWeight: '800',
+    color: colors.navy,
   },
-
-  item: {
-    padding: 15,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 10,
-    marginBottom: 10,
-  },
-
-  itemMarcado: {
-    backgroundColor: '#ffe5e5',
-    borderColor: 'red',
-  },
-
-  texto: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-
-  itemSub: {
-    fontSize: 13,
-    color: '#64748b',
+  subHeader: {
+    fontSize: 14,
+    color: colors.textMuted,
     marginTop: 4,
   },
-
-  botao: {
-    backgroundColor: '#1d4ed8',
-    padding: 15,
-    borderRadius: 10,
-    marginTop: 6,
+  progressRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  progressPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
   },
-
-  botaoFinalizar: {
-    backgroundColor: '#1d4ed8',
-    padding: 15,
-    borderRadius: 10,
-    marginTop: 16,
-    marginBottom: 24,
+  progressOk: { backgroundColor: '#DCFCE7' },
+  progressWarn: { backgroundColor: '#FEE2E2' },
+  progressTxt: { fontSize: 12, fontWeight: '800', color: colors.navy },
+  item: {
+    padding: 16,
+    borderWidth: 1,
+    borderRadius: radius.sm,
+    marginBottom: 10,
+    backgroundColor: colors.bgCard,
+    ...shadow,
   },
-
-  botaoTexto: {
-    color: '#fff',
-    textAlign: 'center',
-    fontWeight: 'bold',
+  itemOk: {
+    borderColor: '#BBF7D0',
+    backgroundColor: '#F0FDF4',
+  },
+  itemMarcado: {
+    backgroundColor: colors.marcadoBg,
+    borderColor: colors.marcadoBorder,
+  },
+  itemHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  badgeMini: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+  },
+  badgeOk: { backgroundColor: colors.success },
+  badgeWarn: { backgroundColor: colors.danger },
+  badgeMiniTxt: { color: '#fff', fontSize: 10, fontWeight: '800' },
+  texto: {
     fontSize: 16,
+    fontWeight: '800',
+    color: colors.navy,
   },
-
+  itemSub: {
+    fontSize: 13,
+    color: colors.textMuted,
+    marginTop: 4,
+  },
+  botaoFinalizar: {
+    marginTop: 16,
+    marginBottom: 8,
+  },
   fotoVeiculo: {
     width: '100%',
     height: 200,
-    borderRadius: 10,
-    marginBottom: 20,
+    borderRadius: radius.sm,
+    marginVertical: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-
   resumo: {
-    backgroundColor: '#f5f5f5',
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 20,
+    backgroundColor: colors.bgCard,
+    padding: 16,
+    borderRadius: radius.md,
+    marginVertical: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadow,
   },
-
   resumoTitulo: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
+    fontSize: 17,
+    fontWeight: '800',
+    marginBottom: 4,
+    color: colors.navy,
   },
-
+  resumoSub: {
+    fontSize: 13,
+    color: colors.textMuted,
+    marginBottom: 12,
+    fontWeight: '600',
+  },
   resumoItem: {
     marginBottom: 10,
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    padding: 12,
+    borderRadius: radius.sm,
+    borderWidth: 1,
   },
-
+  resumoItemOk: {
+    backgroundColor: '#F0FDF4',
+    borderColor: '#BBF7D0',
+  },
+  resumoItemWarn: {
+    backgroundColor: '#FFF1F2',
+    borderColor: '#FECACA',
+  },
   resumoParte: {
     fontWeight: '800',
-    color: '#0f172a',
+    color: colors.navy,
     marginBottom: 2,
   },
-
   resumoDetalhe: {
-    color: '#475569',
+    color: colors.textSoft,
     fontSize: 14,
   },
-
   secaoAssinaturas: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 18,
+    fontWeight: '800',
     marginBottom: 12,
+    color: colors.navy,
   },
-
   assinaturaBloco: {
-    backgroundColor: '#f8fafc',
-    borderColor: '#cbd5e1',
+    backgroundColor: colors.bgCard,
+    borderColor: colors.border,
     borderWidth: 1,
-    borderRadius: 10,
-    padding: 12,
+    borderRadius: radius.md,
+    padding: 14,
     marginBottom: 14,
+    ...shadow,
   },
-
   assinaturaTitulo: {
-    fontSize: 17,
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: '800',
     marginBottom: 8,
-    color: '#0f172a',
+    color: colors.navy,
   },
-
   assinaturaSalvaTexto: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#166534',
+    fontSize: 14,
+    fontWeight: '800',
+    color: colors.successDark,
     marginBottom: 8,
   },
-
   assinaturaPendenteTexto: {
     fontSize: 14,
-    color: '#854d0e',
+    color: colors.warningText,
     marginBottom: 8,
+    fontWeight: '600',
   },
-
   assinaturaPreview: {
     width: '100%',
     height: 120,
     backgroundColor: '#fff',
-    borderRadius: 8,
+    borderRadius: radius.sm,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: colors.border,
   },
 });

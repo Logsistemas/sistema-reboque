@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="/static/servico_detalhe.css">
 <link rel="stylesheet" href="/static/checklist_central.css?v=20260529">
 <link rel="stylesheet" href="/static/central_patio_integracao.css?v=20260529">
+<link rel="stylesheet" href="/static/central_mobile_chat.css?v=20260601">
 </head>
 <body class="ess-app">
 {% include "partials/app_shell_start.html" %}
@@ -37,6 +38,9 @@
       </button>
       <button type="button" class="sd-nav-item {% if aba_ativa == 'comentarios' %}active{% endif %}" data-aba="comentarios">
         <span class="sd-nav-icon">💬</span> Comentários
+      </button>
+      <button type="button" class="sd-nav-item {% if aba_ativa == 'mobile' %}active{% endif %}" data-aba="mobile">
+        <span class="sd-nav-icon">💬</span> Mobile <span id="mobileNavBadge" class="sd-mobile-badge hidden">0</span>
       </button>
       <button type="button" class="sd-nav-item {% if aba_ativa == 'arquivos' %}active{% endif %}" data-aba="arquivos">
         <span class="sd-nav-icon">📎</span> Arquivos
@@ -349,7 +353,7 @@
               {% include "partials/checklist_fotos_galeria.html" %}
               {% endwith %}
               {% elif item.fotos %}
-              <p class="muted" style="font-size:12px;margin-top:8px">Fotos registradas, porém indisponíveis (URI local do app). Reenvie o checklist pelo motorista.</p>
+              <p class="muted" style="font-size:12px;margin-top:8px">Foto antiga do dispositivo — reenviar checklist pelo motorista para visualizar na Central.</p>
               {% endif %}
             </div>
             {% endfor %}
@@ -383,6 +387,35 @@
 
           <div class="sd-actions">
             <a href="/servicos/{{ s.id }}/checklist" target="_blank" class="sd-btn sd-btn-dark">Visualizar checklist completo</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- ABA MOBILE — Chat Central ↔ App Motorista -->
+      <div class="sd-panel {% if aba_ativa == 'mobile' %}active{% endif %}" id="panel-mobile"
+           data-servico-id="{{ s.id }}"
+           data-protocolo="{{ s.protocolo or '' }}"
+           data-motorista="{{ s.motorista_nome or '' }}"
+           data-placa="{{ s.placa_veiculo_removido or s.placa_removida or '' }}"
+           data-tipo="{{ s.tipo or '' }}"
+           data-status="{{ s.status or '' }}">
+        <div class="sd-section sd-mobile-wrap">
+          <h3>Mobile — Chat com motorista</h3>
+          <div class="sd-mobile-meta">
+            <div><label>Protocolo</label><b>{{ s.protocolo or '-' }}</b></div>
+            <div><label>Motorista</label><b>{{ s.motorista_nome or '-' }}</b></div>
+            <div><label>Placa</label><b>{{ s.placa_veiculo_removido or s.placa_removida or '-' }}</b></div>
+            <div><label>Tipo</label><b>{{ s.tipo or '-' }}</b></div>
+            <div><label>Status</label><b>{{ s.status or '-' }}</b></div>
+          </div>
+          <div class="sd-mobile-chat">
+            <div class="sd-mobile-messages" id="sdMobileMessages">
+              <div class="sd-mobile-empty">Carregando mensagens…</div>
+            </div>
+            <div class="sd-mobile-compose">
+              <textarea id="sdMobileInput" rows="2" maxlength="1000" placeholder="Digite sua mensagem…"></textarea>
+              <button type="button" id="sdMobileSend">Enviar</button>
+            </div>
           </div>
         </div>
       </div>
@@ -456,6 +489,7 @@ calcularTotal();
 </script>
 <script src="/static/checklist_central.js?v=20260529"></script>
 <script src="/static/central_patio_integracao.js?v=20260529"></script>
+<script src="/static/central_mobile_chat.js?v=20260601"></script>
 {% include "partials/app_shell_end.html" %}
 </body>
 </html>

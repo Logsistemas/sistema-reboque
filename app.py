@@ -23,7 +23,7 @@ from pydantic import BaseModel
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import pandas as pd
-import io, socket, shutil, uuid, json, math, re, base64
+import io, socket, shutil, uuid, json, math, re, base64, html
 import psycopg2
 from psycopg2.extras import RealDictCursor, Json
 
@@ -813,6 +813,23 @@ def init_db():
               criado_em timestamp default now()
             );""")
             cur.execute("""
+            create table if not exists servico_mensagens_mobile (
+              id uuid primary key default uuid_generate_v4(),
+              servico_id uuid not null,
+              remetente_tipo text not null,
+              remetente_id text,
+              remetente_nome text,
+              mensagem text not null,
+              lida_central boolean default false,
+              lida_motorista boolean default false,
+              created_at timestamp default now(),
+              updated_at timestamp default now()
+            );""")
+            cur.execute("""
+            create index if not exists idx_servico_mensagens_mobile_servico
+              on servico_mensagens_mobile (servico_id, created_at);
+            """)
+            cur.execute("""
             create table if not exists controle_danos (
               id uuid primary key default uuid_generate_v4(),
               data_dano date,
@@ -946,6 +963,9 @@ def init_db():
             "alter table motoristas add column if not exists senha text;",
             "alter table motoristas add column if not exists placa_atual text;",
             "alter table motoristas add column if not exists ultimo_login timestamp;",
+            "alter table motoristas add column if not exists push_token text;",
+            "alter table motoristas add column if not exists push_platform text;",
+            "alter table motoristas add column if not exists fcm_token text;",
 
             "alter table servicos add column if not exists observacao text;",
             "alter table servicos add column if not exists motorista_nome text;",
@@ -1484,6 +1504,188 @@ def listar_comentarios_servico(servico_id):
     ]
 
 
+MOBILE_MSG_MAX_LEN = 1000
+
+
+def sanitizar_mensagem_mobile(texto):
+    t = (texto or "").strip()
+    if not t:
+        return ""
+    t = html.escape(t)
+    if len(t) > MOBILE_MSG_MAX_LEN:
+        t = t[:MOBILE_MSG_MAX_LEN]
+    return t
+
+
+def _serializar_mensagem_mobile(row):
+    return {
+        "id": str(row["id"]),
+        "servico_id": str(row["servico_id"]),
+        "remetente_tipo": row.get("remetente_tipo") or "",
+        "remetente_id": row.get("remetente_id") or "",
+        "remetente_nome": row.get("remetente_nome") or "",
+        "mensagem": row.get("mensagem") or "",
+        "lida_central": bool(row.get("lida_central")),
+        "lida_motorista": bool(row.get("lida_motorista")),
+        "created_at": formatar_data_hora_central(row.get("created_at")),
+        "created_at_iso": row.get("created_at").isoformat() if row.get("created_at") else "",
+    }
+
+
+def listar_mensagens_mobile_servico(servico_id):
+    rows = q(
+        """
+        select id, servico_id, remetente_tipo, remetente_id, remetente_nome,
+               mensagem, lida_central, lida_motorista, created_at, updated_at
+          from servico_mensagens_mobile
+         where servico_id = %s
+         order by created_at asc
+        """,
+        (str(servico_id),),
+        True,
+    )
+    return [_serializar_mensagem_mobile(r) for r in (rows or [])]
+
+
+def contar_mensagens_mobile_nao_lidas(servico_id, leitor):
+    leitor = (leitor or "").strip().lower()
+    if leitor == "central":
+        row = one(
+            """
+            select count(*)::int as qtd
+              from servico_mensagens_mobile
+             where servico_id = %s
+               and remetente_tipo = 'motorista'
+               and lida_central = false
+            """,
+            (str(servico_id),),
+        )
+    elif leitor == "motorista":
+        row = one(
+            """
+            select count(*)::int as qtd
+              from servico_mensagens_mobile
+             where servico_id = %s
+               and remetente_tipo = 'central'
+               and lida_motorista = false
+            """,
+            (str(servico_id),),
+        )
+    else:
+        return 0
+    return int((row or {}).get("qtd") or 0)
+
+
+def marcar_mensagens_mobile_lidas(servico_id, leitor):
+    leitor = (leitor or "").strip().lower()
+    if leitor == "central":
+        q(
+            """
+            update servico_mensagens_mobile
+               set lida_central = true, updated_at = now()
+             where servico_id = %s
+               and remetente_tipo = 'motorista'
+               and lida_central = false
+            """,
+            (str(servico_id),),
+        )
+    elif leitor == "motorista":
+        q(
+            """
+            update servico_mensagens_mobile
+               set lida_motorista = true, updated_at = now()
+             where servico_id = %s
+               and remetente_tipo = 'central'
+               and lida_motorista = false
+            """,
+            (str(servico_id),),
+        )
+
+
+def criar_mensagem_mobile_servico(servico_id, remetente_tipo, remetente_id, remetente_nome, mensagem):
+    sid = str(servico_id or "").strip()
+    tipo = (remetente_tipo or "").strip().lower()
+    texto = sanitizar_mensagem_mobile(mensagem)
+    if not sid or tipo not in ("central", "motorista") or not texto:
+        return None, "Dados inválidos ou mensagem vazia."
+
+    s = servico_by_id(sid)
+    if not s:
+        return None, "Serviço não encontrado."
+
+    nome = (remetente_nome or "").strip()
+    if not nome:
+        nome = "Central / Operação" if tipo == "central" else (s.get("motorista_nome") or "Motorista")
+
+    lida_central = tipo == "central"
+    lida_motorista = tipo == "motorista"
+
+    row = one(
+        """
+        insert into servico_mensagens_mobile (
+          servico_id, remetente_tipo, remetente_id, remetente_nome, mensagem,
+          lida_central, lida_motorista, created_at, updated_at
+        ) values (%s, %s, %s, %s, %s, %s, %s, now(), now())
+        returning id, servico_id, remetente_tipo, remetente_id, remetente_nome,
+                  mensagem, lida_central, lida_motorista, created_at, updated_at
+        """,
+        (
+            sid,
+            tipo,
+            (remetente_id or "").strip() or None,
+            nome,
+            texto,
+            lida_central,
+            lida_motorista,
+        ),
+    )
+    msg = _serializar_mensagem_mobile(row) if row else None
+
+    if tipo == "central":
+        motorista_id = s.get("motorista_id")
+        if motorista_id:
+            try:
+                enviar_push_expo_mensagem_central(str(motorista_id), s, texto)
+            except Exception as exc:
+                print(f"[PUSH] mobile mensagem: {exc}")
+
+    return msg, None
+
+
+def resumo_mensagens_mobile_central():
+    rows = q(
+        """
+        select m.servico_id, s.protocolo, count(*)::int as qtd, max(m.created_at) as ultima_em
+          from servico_mensagens_mobile m
+          join servicos s on s.id = m.servico_id
+         where m.remetente_tipo = 'motorista'
+           and m.lida_central = false
+         group by m.servico_id, s.protocolo
+         order by max(m.created_at) desc
+        """,
+        fetch=True,
+    )
+    itens = []
+    total = 0
+    latest_at = None
+    for r in rows or []:
+        qtd = int(r.get("qtd") or 0)
+        total += qtd
+        ultima = r.get("ultima_em")
+        if ultima and (latest_at is None or ultima > latest_at):
+            latest_at = ultima
+        itens.append({
+            "servico_id": str(r["servico_id"]),
+            "protocolo": r.get("protocolo") or "",
+            "qtd": qtd,
+        })
+    return {
+        "total": total,
+        "itens": itens,
+        "latest_at": latest_at.isoformat() if latest_at else "",
+    }
+
+
 def coletar_arquivos_servico(servico_id, servico=None):
     """Fotos gerais + fotos do checklist (URLs únicas)."""
     s = servico or servico_by_id(servico_id)
@@ -1510,11 +1712,17 @@ def enriquecer_foto_checklist(foto, request=None, protocolo='', parte='', index=
     info = resolver_url_foto_checklist(foto, request)
     slug = _slug_parte_checklist(parte)
     prot = _protocolo_checklist_slug(protocolo, servico_id)
+    indisponivel_local = info.get('erro') == 'uri_local_dispositivo'
+    mensagem = ''
+    if indisponivel_local:
+        mensagem = 'Foto antiga do dispositivo — reenviar checklist para visualizar na Central.'
     return {
         'raw': info['raw'],
         'url': info['url'],
         'valid': info['valid'],
         'erro': info['erro'],
+        'mensagem': mensagem,
+        'indisponivel_local': indisponivel_local,
         'download_nome': f"checklist_{prot}_{slug}_{index + 1}.jpg",
         'parte': parte,
         'index': index + 1,
@@ -7076,6 +7284,21 @@ def _bytes_foto_checklist(foto_raw):
     return None, None
 
 
+def _tipo_foto_checklist_recebida(raw):
+    low = (raw or '').strip().lower()
+    if low.startswith('data:image'):
+        return 'base64'
+    if low.startswith('file://') or low.startswith('ph://') or low.startswith('content://'):
+        return 'file_uri'
+    if low.startswith('http://') or low.startswith('https://'):
+        return 'url'
+    if low.startswith('/static/'):
+        return 'static'
+    if len(raw or '') > 200:
+        return 'base64'
+    return 'outro'
+
+
 def persistir_fotos_checklist_lista(servico_id, parte, fotos, protocolo=''):
     """Converte base64/data URI em arquivos servidos em /static/uploads/checklist/."""
     persistidas = []
@@ -7087,13 +7310,23 @@ def persistir_fotos_checklist_lista(servico_id, parte, fotos, protocolo=''):
         if not raw:
             continue
 
+        tipo = _tipo_foto_checklist_recebida(raw)
+        print(f'[CHECKLIST FOTO] recebida tipo={tipo} parte={parte} index={i + 1}')
+
         if raw.startswith('/static/uploads/checklist/'):
             persistidas.append(raw)
+            print(f'[CHECKLIST FOTO] salva_em={raw}')
+            continue
+
+        low = raw.lower()
+        if low.startswith('file://') or low.startswith('ph://') or low.startswith('content://'):
+            print(f'[CHECKLIST FOTO] indisponivel=file_uri parte={parte} index={i + 1}')
             continue
 
         resolved = resolver_url_foto_checklist(raw)
         if resolved['valid'] and resolved['url'].startswith(('http://', 'https://')):
             persistidas.append(resolved['url'])
+            print(f'[CHECKLIST FOTO] salva_em={resolved["url"]}')
             continue
 
         img_bytes, ext = _bytes_foto_checklist(raw)
@@ -7105,7 +7338,9 @@ def persistir_fotos_checklist_lista(servico_id, parte, fotos, protocolo=''):
             fpath = os.path.join(dir_path, fname)
             with open(fpath, 'wb') as fh:
                 fh.write(img_bytes)
-            persistidas.append(f"/static/uploads/checklist/{servico_id}/{fname}")
+            url_salva = f"/static/uploads/checklist/{servico_id}/{fname}"
+            persistidas.append(url_salva)
+            print(f'[CHECKLIST FOTO] salva_em={url_salva}')
             continue
 
         if resolved['valid'] and resolved['url']:
@@ -7119,13 +7354,16 @@ def persistir_fotos_checklist_lista(servico_id, parte, fotos, protocolo=''):
                     fpath = os.path.join(dir_path, fname)
                     with open(fpath, 'wb') as fh:
                         fh.write(img_bytes2)
-                    persistidas.append(f"/static/uploads/checklist/{servico_id}/{fname}")
+                    url_salva = f"/static/uploads/checklist/{servico_id}/{fname}"
+                    persistidas.append(url_salva)
+                    print(f'[CHECKLIST FOTO] salva_em={url_salva}')
                     continue
             if resolved['raw'].startswith('/static/'):
                 persistidas.append(resolved['raw'])
+                print(f'[CHECKLIST FOTO] salva_em={resolved["raw"]}')
                 continue
 
-        persistidas.append(raw)
+        print(f'[CHECKLIST FOTO] ignorada tipo={tipo} parte={parte} index={i + 1}')
 
     return persistidas
 
@@ -8012,6 +8250,12 @@ def enviar_servico(sid: str, motorista_id: str=Form(...)):
              where id=%s
         """, (str(motorista_id), m["nome"], str(sid)))
         registrar_evento_db(sid, 'enviado', f"Enviado/reencaminhado para {m['nome']} - placa atual: {placa_trabalho}")
+        try:
+            s_atualizado = servico_by_id(sid)
+            if s_atualizado:
+                enviar_push_expo_novo_servico(str(motorista_id), s_atualizado)
+        except Exception as exc:
+            print(f"[PUSH] enviar_servico: {exc}")
     return RedirectResponse('/central', 303)
 
 
@@ -8034,6 +8278,207 @@ class AppPlacaPayload(BaseModel):
 
 class AppFcmPayload(BaseModel):
     token: str
+
+class AppPushTokenPayload(BaseModel):
+    motorista_id: str
+    push_token: str
+    platform: str = ""
+
+EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send"
+# Som personalizado (até 20s) — requer Development Build; Expo Go usa som padrão do sistema.
+PUSH_SOUND_NOVO_SERVICO = os.environ.get("PUSH_SOUND", "ambulance_siren.wav")
+
+
+def motorista_push_token(mid):
+    m = motorista_by_id(mid)
+    if not m:
+        return None
+    token = (m.get("push_token") or m.get("fcm_token") or "").strip()
+    return token or None
+
+
+def _limpar_push_token_invalido(motorista_id, erro_expo):
+    if erro_expo in ("DeviceNotRegistered", "InvalidCredentials", "InvalidToken"):
+        print(f"[PUSH] token inválido ({erro_expo}) — limpando motorista {motorista_id}")
+        q("update motoristas set push_token=null, push_platform=null where id=%s", (str(motorista_id),))
+
+
+def enviar_push_expo(motorista_id, token, titulo, corpo, data_extra=None, protocolo_log="", sound=None, channel_id=None):
+    """Envia push via Expo Push Service e registra payload, status e resposta."""
+    if not token:
+        print(f"[PUSH] motorista {motorista_id} sem push_token cadastrado")
+        return False, {"erro": "sem_token"}
+
+    mensagem = [{
+        "to": token,
+        "title": titulo,
+        "body": corpo,
+        "sound": sound if sound is not None else PUSH_SOUND_NOVO_SERVICO,
+        "priority": "high",
+        "channelId": channel_id if channel_id is not None else "novo_servico",
+        "data": data_extra or {},
+    }]
+
+    print(f"[PUSH] enviando para motorista {motorista_id}")
+    print(f"[PUSH] token {token}")
+    if protocolo_log:
+        print(f"[PUSH] protocolo {protocolo_log}")
+    print(f"[PUSH] payload {json.dumps(mensagem, ensure_ascii=False)}")
+
+    try:
+        req = urllib.request.Request(
+            EXPO_PUSH_URL,
+            data=json.dumps(mensagem).encode("utf-8"),
+            headers={
+                "Accept": "application/json",
+                "Accept-encoding": "gzip, deflate",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=12) as resp:
+            status = resp.status
+            body = resp.read().decode("utf-8", errors="replace")
+        print(f"[PUSH] status {status}")
+        print(f"[PUSH] resposta {body}")
+
+        resultado = json.loads(body) if body else {}
+        tickets = resultado.get("data") or []
+        if tickets:
+            ticket = tickets[0]
+            if ticket.get("status") == "error":
+                detalhe = (ticket.get("details") or {})
+                erro = detalhe.get("error") or ticket.get("message") or "erro_desconhecido"
+                print(f"[PUSH] erro Expo: {erro}")
+                _limpar_push_token_invalido(motorista_id, erro)
+                return False, {"status": status, "expo": resultado, "erro": erro}
+            ticket_id = ticket.get("id")
+            if ticket_id:
+                print(f"[PUSH] ticket {ticket_id}")
+
+        return True, {"status": status, "expo": resultado}
+    except Exception as exc:
+        print(f"[PUSH] falha ao enviar para motorista {motorista_id}: {exc}")
+        return False, {"erro": str(exc)}
+
+
+def enviar_push_expo_novo_servico(motorista_id, servico):
+    """Envia push quando a Central vincula um serviço ao motorista."""
+    if not servico:
+        print(f"[PUSH] servico ausente para motorista {motorista_id}")
+        return False
+
+    token = motorista_push_token(motorista_id)
+    if not token:
+        print(f"[PUSH] motorista {motorista_id} sem push_token — app precisa registrar token após login")
+        return False
+
+    protocolo = (servico.get("protocolo") or "").strip()
+    tipo = (servico.get("tipo") or "SERVIÇO").strip().upper()
+    sid = str(servico.get("id") or "")
+
+    ok, _ = enviar_push_expo(
+        motorista_id,
+        token,
+        "Novo serviço recebido",
+        f"{protocolo} — {tipo}" if protocolo else tipo,
+        {
+            "servico_id": sid,
+            "protocolo": protocolo,
+            "type": "novo_servico",
+        },
+        protocolo_log=protocolo,
+    )
+    return ok
+
+    return ok
+
+
+def enviar_push_expo_mensagem_central(motorista_id, servico, texto_mensagem):
+    """Push de nova mensagem da Central — som padrão (não usa sirene de novo serviço)."""
+    token = motorista_push_token(motorista_id)
+    if not token or not servico:
+        return False
+
+    protocolo = (servico.get("protocolo") or "").strip()
+    sid = str(servico.get("id") or "")
+    resumo = (texto_mensagem or "").replace("\n", " ").strip()
+    if len(resumo) > 160:
+        resumo = resumo[:157] + "..."
+
+    ok, _ = enviar_push_expo(
+        motorista_id,
+        token,
+        "Nova mensagem da Central",
+        resumo or "Você tem uma nova mensagem",
+        {
+            "type": "mobile_message",
+            "servico_id": sid,
+            "protocolo": protocolo,
+        },
+        protocolo_log=protocolo,
+        sound="default",
+        channel_id="novo_servico",
+    )
+    return ok
+
+
+class MobileMensagemPayload(BaseModel):
+    remetente_tipo: str
+    remetente_id: str = ""
+    remetente_nome: str = ""
+    mensagem: str
+
+
+class MobileMarcarLidasPayload(BaseModel):
+    leitor: str
+
+
+@app.get("/api/servicos/{sid}/mobile/mensagens")
+def api_servico_mobile_mensagens_listar(sid: str):
+    if not servico_by_id(sid):
+        return JSONResponse({"ok": False, "erro": "Serviço não encontrado."}, status_code=404)
+    return {"ok": True, "mensagens": listar_mensagens_mobile_servico(sid)}
+
+
+@app.post("/api/servicos/{sid}/mobile/mensagens")
+def api_servico_mobile_mensagens_criar(sid: str, payload: MobileMensagemPayload):
+    msg, erro = criar_mensagem_mobile_servico(
+        sid,
+        payload.remetente_tipo,
+        payload.remetente_id,
+        payload.remetente_nome,
+        payload.mensagem,
+    )
+    if erro:
+        status = 404 if "não encontrado" in erro.lower() else 400
+        return JSONResponse({"ok": False, "erro": erro}, status_code=status)
+    return {"ok": True, "mensagem": msg}
+
+
+@app.post("/api/servicos/{sid}/mobile/marcar-lidas")
+def api_servico_mobile_marcar_lidas(sid: str, payload: MobileMarcarLidasPayload):
+    if not servico_by_id(sid):
+        return JSONResponse({"ok": False, "erro": "Serviço não encontrado."}, status_code=404)
+    marcar_mensagens_mobile_lidas(sid, payload.leitor)
+    return {"ok": True}
+
+
+@app.get("/api/servicos/{sid}/mobile/unread")
+def api_servico_mobile_unread(sid: str, leitor: str = "central"):
+    if not servico_by_id(sid):
+        return JSONResponse({"ok": False, "erro": "Serviço não encontrado."}, status_code=404)
+    return {
+        "ok": True,
+        "qtd": contar_mensagens_mobile_nao_lidas(sid, leitor),
+    }
+
+
+@app.get("/api/central/mobile/unread-summary")
+def api_central_mobile_unread_summary():
+    resumo = resumo_mensagens_mobile_central()
+    return {"ok": True, **resumo}
+
 
 class LocationPayload(BaseModel):
     lat: float; lng: float; online: bool=True
@@ -8488,6 +8933,17 @@ def api_app_motorista_servicos(mid: str):
     """, (str(mid),), fetch=True)
     return {"ok": True, "servicos": [normalizar_servico(r) for r in rows]}
 
+@app.get("/api/app/motorista/{mid}/historico")
+def api_app_motorista_historico(mid: str):
+    rows = q("""
+        select *
+          from servicos
+         where motorista_id=%s
+         order by created_at desc nulls last
+         limit 150
+    """, (str(mid),), fetch=True)
+    return {"ok": True, "servicos": [normalizar_servico(r) for r in rows]}
+
 @app.post("/api/app/motorista/{mid}/localizacao")
 def api_app_motorista_localizacao(mid: str, payload: AppLocationPayload):
     q("""
@@ -8542,6 +8998,67 @@ def api_app_servico_placa(sid: str, payload: AppPlacaPayload):
         return JSONResponse({"ok": False, "erro": erro}, status_code=400)
     return {"ok": True, "servico": servico_by_id(sid)}
 
+@app.post("/api/app/motorista/push-token")
+def api_app_motorista_push_token(payload: AppPushTokenPayload):
+    mid = (payload.motorista_id or "").strip()
+    token = (payload.push_token or "").strip()
+    platform = (payload.platform or "").strip().lower()
+
+    if not mid or not token:
+        return JSONResponse({"ok": False, "erro": "motorista_id e push_token são obrigatórios."}, status_code=400)
+
+    if not motorista_by_id(mid):
+        return JSONResponse({"ok": False, "erro": "Motorista não encontrado."}, status_code=404)
+
+    q(
+        "update motoristas set push_token=%s, push_platform=%s where id=%s",
+        (token, platform or None, str(mid)),
+    )
+    print(f"[PUSH] token salvo motorista={mid} platform={platform or '?'} token={token}")
+    return {"ok": True, "motorista_id": mid, "platform": platform or None}
+
+
+@app.get("/api/app/motorista/{mid}/push-status")
+def api_app_motorista_push_status(mid: str):
+    m = motorista_by_id(mid)
+    if not m:
+        return JSONResponse({"ok": False, "erro": "Motorista não encontrado."}, status_code=404)
+    token = motorista_push_token(mid)
+    preview = None
+    if token:
+        preview = token if len(token) <= 60 else f"{token[:57]}..."
+    return {
+        "ok": True,
+        "motorista_id": mid,
+        "tem_push_token": bool(token),
+        "push_platform": m.get("push_platform"),
+        "push_token": preview,
+    }
+
+
+@app.post("/api/app/motorista/{mid}/push-test")
+def api_app_motorista_push_test(mid: str):
+    """Dispara notificação de teste para validar cadeia Expo Push (tela bloqueada)."""
+    m = motorista_by_id(mid)
+    if not m:
+        return JSONResponse({"ok": False, "erro": "Motorista não encontrado."}, status_code=404)
+    token = motorista_push_token(mid)
+    if not token:
+        return JSONResponse(
+            {"ok": False, "erro": "Sem push_token. Faça login no app e aceite notificações."},
+            status_code=400,
+        )
+    ok, detalhe = enviar_push_expo(
+        mid,
+        token,
+        "Teste — Essência Motorista",
+        "Push de teste. Se viu isso com tela bloqueada, o push está OK.",
+        {"type": "push_test"},
+        protocolo_log="TESTE",
+    )
+    status_code = 200 if ok else 502
+    return JSONResponse({"ok": ok, "detalhe": detalhe}, status_code=status_code)
+
 @app.post("/api/app/motorista/{mid}/fcm-token")
 def api_app_motorista_fcm_token(mid: str, payload: AppFcmPayload):
     # Nesta V1 apenas registra o token no cadastro do motorista.
@@ -8553,7 +9070,7 @@ def api_app_motorista_fcm_token(mid: str, payload: AppFcmPayload):
         q("alter table motoristas add column if not exists fcm_token text")
     except Exception:
         pass
-    q("update motoristas set fcm_token=%s where id=%s", (token, str(mid)))
+    q("update motoristas set fcm_token=%s, push_token=%s where id=%s", (token, token, str(mid)))
     return {"ok": True}
 
 @app.get('/motorista/login', response_class=HTMLResponse)
@@ -8793,7 +9310,7 @@ def faturamento_detalhe(sid: str, request: Request, aba: str = "editar", ok: str
     end_origem = desmontar_endereco_servico(s.get("origem"))
     end_destino = desmontar_endereco_servico(s.get("destino"))
     chk = checklist_resumo_servico(sid, request, s)
-    abas_validas = {"editar", "financeiro", "comentarios", "arquivos", "checklist", "patio"}
+    abas_validas = {"editar", "financeiro", "comentarios", "mobile", "arquivos", "checklist", "patio"}
     aba_ativa = aba if aba in abas_validas else "editar"
     return templates.TemplateResponse(
         'servico_financeiro.html',

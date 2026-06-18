@@ -12,31 +12,52 @@
         loading="lazy"
       >
       {% else %}
-      <div class="chk-foto-placeholder">Foto não carregada</div>
+      <div class="chk-foto-placeholder">
+        {% if foto.indisponivel_local %}
+        Foto antiga do dispositivo — reenviar checklist para visualizar na Central.
+        {% else %}
+        Foto não carregada
+        {% endif %}
+      </div>
       {% endif %}
     </div>
     <div class="chk-foto-meta">
       <b>{{ foto.parte or parte_label }}</b>
       <span>Foto {{ foto.index }}</span>
     </div>
-    {% if not foto.valid and foto.raw %}
+    {% if not foto.valid and foto.raw and not foto.indisponivel_local %}
     <div class="chk-foto-debug" title="{{ foto.raw }}">{{ foto.erro or 'indisponível' }} · {{ foto.raw|truncate(72, True, '…') }}</div>
     {% endif %}
     <div class="chk-foto-acoes chk-no-print">
+      {% if foto.valid %}
       <button
         type="button"
         class="chk-btn-foto chk-btn-abrir"
         data-chk-abrir
-        data-url="{{ foto.url if foto.valid else foto.raw }}"
+        data-url="{{ foto.url }}"
         data-titulo="{{ foto.parte or parte_label }} — foto {{ foto.index }}"
       >Abrir</button>
       <button
         type="button"
         class="chk-btn-foto chk-btn-baixar"
         data-chk-baixar
-        data-url="{{ foto.url if foto.valid else foto.raw }}"
+        data-url="{{ foto.url }}"
         data-nome="{{ foto.download_nome }}"
       >Baixar</button>
+      {% else %}
+      <button
+        type="button"
+        class="chk-btn-foto chk-btn-abrir chk-btn-disabled"
+        disabled
+        title="{% if foto.mensagem %}{{ foto.mensagem }}{% else %}Foto indisponível{% endif %}"
+      >Abrir</button>
+      <button
+        type="button"
+        class="chk-btn-foto chk-btn-baixar chk-btn-disabled"
+        disabled
+        title="{% if foto.mensagem %}{{ foto.mensagem }}{% else %}Foto indisponível{% endif %}"
+      >Baixar</button>
+      {% endif %}
     </div>
   </div>
   {% endfor %}

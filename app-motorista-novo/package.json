@@ -15,13 +15,17 @@
     "doctor": "expo-doctor"
   },
   "dependencies": {
+    "@expo/vector-icons": "^15.0.3",
     "@react-native-async-storage/async-storage": "2.2.0",
     "expo": "~54.0.35",
     "expo-av": "~16.0.8",
     "expo-constants": "~18.0.13",
+    "expo-dev-client": "~6.0.21",
+    "expo-device": "~8.0.10",
     "expo-image-picker": "~17.0.11",
     "expo-linking": "~8.0.12",
     "expo-location": "~19.0.8",
+    "expo-notifications": "~0.32.17",
     "expo-router": "~6.0.24",
     "expo-status-bar": "~3.0.9",
     "react": "19.1.0",

@@ -372,23 +372,49 @@ export async function limparRascunhoChecklist(servicoId: string) {
   await AsyncStorage.removeItem(`${DRAFT_PREFIX}${servicoId}`);
 }
 
-/** Converte URI local em data URI apenas no envio final (mantém file:// no rascunho). */
+/** Converte asset do ImagePicker em data URI para envio à Central. */
+export function fotoAssetParaChecklist(asset: {
+  uri?: string;
+  base64?: string | null;
+  mimeType?: string | null;
+}): string {
+  if (asset.base64) {
+    const mime = asset.mimeType || 'image/jpeg';
+    const dataUri = `data:${mime};base64,${asset.base64}`;
+    console.log('[CHECKLIST FOTO] capturada base64=true tamanho=', asset.base64.length);
+    return dataUri;
+  }
+  const uri = String(asset.uri || '');
+  console.log('[CHECKLIST FOTO] capturada base64=false uri=', uri.substring(0, 48));
+  return uri;
+}
+
+/** Converte URI local em data URI no envio final (fallback para fotos antigas). */
 export async function uriFotoParaEnvio(uri: string): Promise<string> {
   const u = String(uri || '').trim();
   if (!u) return u;
   if (u.startsWith('data:image')) return u;
   if (u.startsWith('http://') || u.startsWith('https://') || u.startsWith('/static/')) return u;
 
-  try {
-    const FileSystem = await import('expo-file-system');
-    const base64 = await FileSystem.readAsStringAsync(u, {
-      encoding: FileSystem.EncodingType.Base64,
-    });
-    if (!base64) return u;
-    return `data:image/jpeg;base64,${base64}`;
-  } catch {
+  const low = u.toLowerCase();
+  if (!low.startsWith('file://') && !low.startsWith('content://') && !low.startsWith('ph://')) {
     return u;
   }
+
+  try {
+    const FileSystem = await import('expo-file-system/legacy');
+    const base64 = await FileSystem.readAsStringAsync(u, {
+      encoding: 'base64',
+    });
+    if (base64) {
+      console.log('[CHECKLIST FOTO] convertida file->base64 tamanho=', base64.length);
+      return `data:image/jpeg;base64,${base64}`;
+    }
+  } catch (err) {
+    console.log('[CHECKLIST FOTO] falha converter file uri', err);
+  }
+
+  return u;
 }
 
 export async function fotosParteParaEnvio(fotos: string[] = []): Promise<string[]> {
