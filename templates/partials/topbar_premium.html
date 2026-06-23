@@ -72,6 +72,9 @@
   </nav>
   <div class="ess-topbar-right">
     <a href="/central" class="ess-top-quick" title="Central do Sistema">⚡ Central</a>
+    {% if nav_som %}
+    <button type="button" id="btnCentralSomIco" class="ess-top-icon central-som-toggle" title="Som da Central desativado" aria-label="Som da Central" onclick="window.centralAlertas && window.centralAlertas.toggleSom()">🔇</button>
+    {% endif %}
     <button type="button" class="ess-top-icon" title="Notificações" aria-label="Notificações">🔔</button>
     <div class="ess-top-user">
       <span class="ess-top-avatar">EL</span>

@@ -12,6 +12,7 @@ import {
   buttonStyle,
   buttonText,
   ButtonVariant,
+  colors,
 } from '../../lib/ui/theme';
 
 type Props = {
@@ -36,9 +37,11 @@ export function AppButton({
       style={({ pressed }) => [
         buttonStyle(variant),
         {
-          backgroundColor: buttonBackground(variant, pressed && !disabled && !loading),
+          backgroundColor:
+            disabled || loading
+              ? '#CBD5E1'
+              : buttonBackground(variant, pressed && !disabled && !loading),
         },
-        disabled && styles.disabled,
         style,
       ]}
       onPress={onPress}
@@ -47,12 +50,12 @@ export function AppButton({
       {loading ? (
         <ActivityIndicator color="#fff" />
       ) : (
-        <Text style={buttonText}>{label}</Text>
+        <Text style={[buttonText, disabled && styles.labelDisabled]}>{label}</Text>
       )}
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  disabled: { opacity: 0.65 },
+  labelDisabled: { color: colors.textMuted },
 });

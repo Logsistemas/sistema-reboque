@@ -171,6 +171,17 @@ console.log('[CMM] SCRIPT CARREGADO VERSAO DEBUG 20260529d');
     return txt || '—';
   }
 
+  function formatarDistanciaCard(m) {
+    if (!hasGps(m)) return 'Sem GPS';
+    const km = formatarDistanciaCurta(m);
+    const min = (m.duracao_texto || '').trim();
+    if (km && min && min !== '—' && km !== 'Distância indisponível' && km !== 'Sem GPS') {
+      return `${km} • ${min}`;
+    }
+    if (km && km !== '—' && km !== 'Distância indisponível') return km;
+    return m.distancia_texto || 'Distância indisponível';
+  }
+
   function motoristaSearchHaystack(m) {
     return [
       m.nome_exibicao,
@@ -301,7 +312,7 @@ console.log('[CMM] SCRIPT CARREGADO VERSAO DEBUG 20260529d');
     const st = statsPainel();
     els.statOnline.textContent = String(st.online);
     els.statProximo.textContent = st.proximo
-      ? `${st.proximo.nome_exibicao || st.proximo.nome} · ${formatarDistanciaCurta(st.proximo)}`
+      ? `${st.proximo.nome_exibicao || st.proximo.nome} · ${formatarDistanciaCard(st.proximo)}`
       : '—';
     els.statTaxa.textContent = st.taxaAceitacao;
     els.statUltima.textContent = st.ultimaAtualizacao;
@@ -344,7 +355,7 @@ console.log('[CMM] SCRIPT CARREGADO VERSAO DEBUG 20260529d');
           </div>
           <div class="cmm-card-foot">
             <span class="cmm-status ${statusCls}">${escapeHtml(statusTxt)}</span>
-            <span class="cmm-dist">${escapeHtml(formatarDistanciaCurta(m))}</span>
+            <span class="cmm-dist">${escapeHtml(formatarDistanciaCard(m))}</span>
             <span class="cmm-gps">${escapeHtml(m.ultima_atualizacao || 'GPS —')}</span>
           </div>
           ${alerta}

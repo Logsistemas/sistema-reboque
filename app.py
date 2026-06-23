@@ -3,12 +3,88 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-# .env na raiz do projeto; não sobrescreve variáveis já definidas (ex.: Render).
-load_dotenv(dotenv_path=Path(__file__).resolve().parent / ".env", encoding="utf-8-sig")
+_ROOT = Path(__file__).resolve().parent
+_LOCAL_DB_FILE = _ROOT / "data" / "local_database.url"
+_LOCAL_DB_DEFAULTS = (
+    "postgresql://postgres:postgres@localhost:5432/postgres",
+    "postgresql://postgres@localhost:5432/postgres",
+)
 
-DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
-if DATABASE_URL and "sslmode=" not in DATABASE_URL:
-    DATABASE_URL += ("&" if "?" in DATABASE_URL else "?") + "sslmode=require"
+
+def _load_env_files():
+    # .env base; .env.local sobrescreve só em desenvolvimento (não usado no Render).
+    load_dotenv(dotenv_path=_ROOT / ".env", encoding="utf-8-sig")
+    if not _is_render_deploy():
+        load_dotenv(dotenv_path=_ROOT / ".env.local", encoding="utf-8-sig", override=True)
+
+
+def _is_render_deploy():
+    return bool(
+        os.getenv("RENDER")
+        or os.getenv("RENDER_SERVICE_ID")
+        or os.getenv("RENDER_EXTERNAL_URL")
+    )
+
+
+def _is_remote_db_url(url):
+    u = (url or "").lower()
+    return "localhost" not in u and "127.0.0.1" not in u
+
+
+def _apply_sslmode(url):
+    if not url or not _is_remote_db_url(url) or "sslmode=" in url:
+        return url
+    return url + ("&" if "?" in url else "?") + "sslmode=require"
+
+
+def _read_db_url_file():
+    if not _LOCAL_DB_FILE.is_file():
+        return ""
+    return _LOCAL_DB_FILE.read_text(encoding="utf-8-sig").strip()
+
+
+def _try_connect(url):
+    try:
+        import psycopg2
+
+        conn = psycopg2.connect(url, connect_timeout=2)
+        conn.close()
+        return True
+    except Exception:
+        return False
+
+
+def _resolve_database_url():
+    explicit = os.getenv("DATABASE_URL", "").strip()
+    if explicit:
+        return _apply_sslmode(explicit)
+
+    if _is_render_deploy():
+        return ""
+
+    candidates = []
+    local = os.getenv("LOCAL_DATABASE_URL", "").strip()
+    if local:
+        candidates.append(local)
+    file_url = _read_db_url_file()
+    if file_url:
+        candidates.append(file_url)
+    candidates.extend(_LOCAL_DB_DEFAULTS)
+
+    seen = set()
+    for candidate in candidates:
+        url = (candidate or "").strip()
+        if not url or url in seen:
+            continue
+        seen.add(url)
+        if _try_connect(url):
+            return url
+
+    return candidates[0] if candidates else ""
+
+
+_load_env_files()
+DATABASE_URL = _resolve_database_url()
 
 import urllib
 import urllib.request
@@ -677,8 +753,22 @@ def dt_str(v):
     return dt.strftime("%d/%m/%Y %H:%M:%S")
 def get_conn():
     if not DATABASE_URL:
-        raise RuntimeError("DATABASE_URL não configurada no Render.")
-    return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+        if _is_render_deploy():
+            raise RuntimeError("DATABASE_URL não configurada no Render.")
+        raise RuntimeError(
+            "Banco local não configurado. Defina DATABASE_URL ou LOCAL_DATABASE_URL no .env "
+            f"ou crie {_LOCAL_DB_FILE} com a URL do PostgreSQL."
+        )
+    try:
+        return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+    except psycopg2.OperationalError as exc:
+        if _is_render_deploy():
+            raise
+        raise RuntimeError(
+            "Não foi possível conectar ao PostgreSQL. "
+            "Restaure DATABASE_URL no .env (foi removida ao adicionar GOOGLE_MAPS_API_KEY) "
+            f"ou verifique se o servidor está ativo. Detalhe: {exc}"
+        ) from exc
 def q(sql, params=None, fetch=False):
     with get_conn() as conn:
         with conn.cursor() as cur:
@@ -828,6 +918,21 @@ def init_db():
             cur.execute("""
             create index if not exists idx_servico_mensagens_mobile_servico
               on servico_mensagens_mobile (servico_id, created_at);
+            """)
+            cur.execute("""
+            create table if not exists central_alertas_operacionais (
+              id uuid primary key default uuid_generate_v4(),
+              servico_id uuid not null,
+              tipo text not null,
+              titulo text,
+              descricao text,
+              visto boolean default false,
+              created_at timestamp default now(),
+              visto_em timestamp
+            );""")
+            cur.execute("""
+            create index if not exists idx_central_alertas_servico
+              on central_alertas_operacionais (servico_id, tipo, visto);
             """)
             cur.execute("""
             create table if not exists controle_danos (
@@ -1453,6 +1558,17 @@ def salvar_placa_cliente_servico(sid, placa_veiculo):
         (placa, placa, novo_status, str(sid)),
     )
     registrar_evento_db(sid, "placa lançada", f"Placa: {placa}")
+    try:
+        s_atual = servico_by_id(sid)
+        protocolo = (s_atual.get("protocolo") or "").strip() if s_atual else ""
+        registrar_alerta_operacional(
+            sid,
+            "placa",
+            "Placa enviada pelo motorista",
+            f"Placa {placa} no protocolo {protocolo}" if protocolo else f"Placa {placa}",
+        )
+    except Exception as exc:
+        print(f"[ALERTA] placa: {exc}")
     return True, None
 
 
@@ -1683,6 +1799,133 @@ def resumo_mensagens_mobile_central():
         "total": total,
         "itens": itens,
         "latest_at": latest_at.isoformat() if latest_at else "",
+    }
+
+
+def registrar_alerta_operacional(servico_id, tipo, titulo="", descricao=""):
+    sid = str(servico_id or "").strip()
+    t = (tipo or "").strip().lower()
+    if not sid or t not in ("mensagem", "placa", "recusa"):
+        return None
+    existente = one(
+        """
+        select id from central_alertas_operacionais
+         where servico_id=%s and tipo=%s and visto=false
+         limit 1
+        """,
+        (sid, t),
+    )
+    if existente:
+        q(
+            """
+            update central_alertas_operacionais
+               set titulo=%s, descricao=%s, created_at=now()
+             where id=%s
+            """,
+            ((titulo or "").strip(), (descricao or "").strip(), str(existente["id"])),
+        )
+        print(f"[CENTRAL_ALERTAS] alerta {t} atualizado servico_id={sid}")
+        return str(existente["id"])
+    row = one(
+        """
+        insert into central_alertas_operacionais (servico_id, tipo, titulo, descricao, visto, created_at)
+        values (%s, %s, %s, %s, false, now())
+        returning id
+        """,
+        (sid, t, (titulo or "").strip(), (descricao or "").strip()),
+    )
+    print(f"[CENTRAL_ALERTAS] alerta {t} criado servico_id={sid}")
+    return str(row["id"]) if row else None
+
+
+def listar_alertas_operacionais_pendentes(tipo=None):
+    try:
+        params = []
+        where = "where visto=false"
+        if tipo:
+            where += " and tipo=%s"
+            params.append(str(tipo).strip().lower())
+        rows = q(
+            f"""
+            select a.id, a.servico_id, a.tipo, a.titulo, a.descricao, a.created_at,
+                   s.protocolo, s.motorista_nome, s.placa_veiculo_removido, s.placa_removida, s.status
+              from central_alertas_operacionais a
+              join servicos s on s.id = a.servico_id
+             {where}
+             order by a.created_at desc
+            """,
+            tuple(params) if params else None,
+            True,
+        )
+    except Exception as exc:
+        print(f"[ALERTA] listar pendentes: {exc}")
+        return []
+    out = []
+    for r in rows or []:
+        out.append({
+            "id": str(r["id"]),
+            "servico_id": str(r["servico_id"]),
+            "tipo": r.get("tipo") or "",
+            "titulo": r.get("titulo") or "",
+            "descricao": r.get("descricao") or "",
+            "protocolo": r.get("protocolo") or "",
+            "motorista_nome": r.get("motorista_nome") or "",
+            "placa": r.get("placa_veiculo_removido") or r.get("placa_removida") or "",
+            "status": r.get("status") or "",
+            "created_at": formatar_data_hora_central(r.get("created_at")),
+            "created_at_iso": r.get("created_at").isoformat() if r.get("created_at") else "",
+        })
+    return out
+
+
+def marcar_alerta_operacional_visto(servico_id, tipo):
+    sid = str(servico_id or "").strip()
+    t = (tipo or "").strip().lower()
+    if not sid or t not in ("mensagem", "placa", "recusa"):
+        return False
+    if t == "mensagem":
+        marcar_mensagens_mobile_lidas(sid, "central")
+    q(
+        """
+        update central_alertas_operacionais
+           set visto=true, visto_em=now()
+         where servico_id=%s and tipo=%s and visto=false
+        """,
+        (sid, t),
+    )
+    return True
+
+
+def resumo_alertas_central():
+    mensagens = resumo_mensagens_mobile_central()
+    placas = listar_alertas_operacionais_pendentes("placa")
+    recusas = listar_alertas_operacionais_pendentes("recusa")
+    por_servico = {}
+
+    def bump(sid, campo, qtd=1):
+        if not sid:
+            return
+        por_servico.setdefault(sid, {"mensagem": 0, "placa": 0, "recusa": 0})
+        por_servico[sid][campo] = por_servico[sid].get(campo, 0) + qtd
+
+    for item in mensagens.get("itens") or []:
+        bump(str(item.get("servico_id")), "mensagem", int(item.get("qtd") or 0))
+
+    for item in placas:
+        bump(item.get("servico_id"), "placa", 1)
+    for item in recusas:
+        bump(item.get("servico_id"), "recusa", 1)
+
+    latest_candidates = [mensagens.get("latest_at") or ""]
+    latest_candidates += [a.get("created_at_iso") or "" for a in placas + recusas]
+    latest_at = max([x for x in latest_candidates if x], default="")
+
+    return {
+        "mensagens": mensagens,
+        "placas": placas,
+        "recusas": recusas,
+        "por_servico": por_servico,
+        "latest_at": latest_at,
     }
 
 
@@ -6995,6 +7238,7 @@ def central(
             'titulo_filtro': titulo_filtro,
             'nav_ativo': 'central',
             'nav_som': True,
+            'google_maps_api_key': google_api_key(),
             'status_operacionais': [
                 'novo', 'enviado', 'aceito', 'a caminho', 'na origem',
                 'em transporte', 'finalizado', 'recusado', 'cancelado',
@@ -7880,7 +8124,12 @@ async def importar_servicos(file: UploadFile=File(...)):
 
 
 def google_api_key():
-    return os.environ.get("GOOGLE_MAPS_API_KEY") or os.environ.get("GOOGLE_API_KEY") or ""
+    return (
+        os.environ.get("GOOGLE_MAPS_API_KEY")
+        or os.environ.get("GOOGLE_API_KEY")
+        or os.environ.get("CENTRAL_GOOGLE_MAPS_API_KEY")
+        or ""
+    ).strip()
 
 def google_geocode_endereco(endereco):
     """
@@ -8480,6 +8729,78 @@ def api_central_mobile_unread_summary():
     return {"ok": True, **resumo}
 
 
+@app.get("/api/central/alertas")
+def api_central_alertas():
+    return {"ok": True, **resumo_alertas_central()}
+
+
+@app.post("/api/central/alertas/{tipo}/{sid}/marcar-visto")
+def api_central_alerta_marcar_visto(tipo: str, sid: str):
+    if not servico_by_id(sid):
+        return JSONResponse({"ok": False, "erro": "Serviço não encontrado."}, status_code=404)
+    marcar_alerta_operacional_visto(sid, tipo)
+    return {"ok": True}
+
+
+@app.get("/api/servicos/{sid}/localizacao-motorista")
+def api_servico_localizacao_motorista(sid: str):
+    s = servico_by_id(sid)
+    if not s:
+        return JSONResponse({"ok": False, "erro": "Serviço não encontrado."}, status_code=404)
+
+    mid = s.get("motorista_id")
+    m = motorista_by_id(mid) if mid else None
+    origem_lat, origem_lng = obter_origem_lat_lng(s)
+    destino_lat, destino_lng = None, None
+    destino_end = (s.get("destino") or "").strip()
+    if destino_end:
+        destino_lat, destino_lng = google_geocode_endereco(destino_end)
+
+    dist_txt = ""
+    dur_txt = ""
+    if m and m.get("lat") and m.get("lng"):
+        info = calcular_info_distancia_motorista(m, s)
+        dist_txt = info.get("distancia_texto") or ""
+        dur_txt = info.get("duracao_texto") or ""
+
+    return {
+        "ok": True,
+        "servico_id": str(sid),
+        "protocolo": s.get("protocolo") or "",
+        "motorista": {
+            "id": str(mid) if mid else "",
+            "nome": (m.get("nome") if m else s.get("motorista_nome")) or "",
+            "lat": m.get("lat") if m else None,
+            "lng": m.get("lng") if m else None,
+            "online": bool(m.get("online")) if m else False,
+            "atualizado_em": formatar_data_hora_central(m.get("ultima_atualizacao")) if m else "",
+        },
+        "origem": {
+            "endereco": s.get("origem") or "",
+            "lat": origem_lat,
+            "lng": origem_lng,
+        },
+        "destino": {
+            "endereco": destino_end,
+            "lat": destino_lat,
+            "lng": destino_lng,
+        },
+        "distancia_texto": dist_txt,
+        "duracao_texto": dur_txt,
+    }
+
+
+@app.get("/api/central/config/maps")
+def api_central_config_maps():
+    key = google_api_key()
+    return {
+        "ok": True,
+        "google_maps_api_key": key,
+        "googleMapsApiKey": key,
+        "configurado": bool(key),
+    }
+
+
 class LocationPayload(BaseModel):
     lat: float; lng: float; online: bool=True
 @app.post('/api/motoristas/{mid}/localizacao')
@@ -8987,6 +9308,19 @@ def api_app_servico_status(sid: str, payload: AppStatusPayload):
 
     q(f"update servicos set status=%s, atualizado_em=now(){extra} where id=%s", (status, str(sid)))
     registrar_evento_db(sid, status, payload.detalhe or f"Status atualizado pelo App do Motorista: {status}")
+    if status == "recusado":
+        try:
+            s_atual = servico_by_id(sid)
+            protocolo = (s_atual.get("protocolo") or "").strip() if s_atual else ""
+            nome_mot = (s_atual.get("motorista_nome") or "Motorista").strip() if s_atual else "Motorista"
+            registrar_alerta_operacional(
+                sid,
+                "recusa",
+                "Motorista recusou o serviço",
+                f"{nome_mot} recusou o protocolo {protocolo}" if protocolo else f"{nome_mot} recusou o serviço",
+            )
+        except Exception as exc:
+            print(f"[ALERTA] recusa: {exc}")
     return {"ok": True, "servico": servico_by_id(sid)}
 
 

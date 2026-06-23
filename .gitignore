@@ -1,4 +1,6 @@
 .env
+.env.local
+data/local_database.url
 __pycache__/
 *.pyc
 nfse_nacional/schemas/v1.01/.validation_cache/

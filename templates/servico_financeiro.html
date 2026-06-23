@@ -486,6 +486,14 @@ document.querySelectorAll('.sd-nav-item[data-aba]').forEach((btn) => {
 });
 
 calcularTotal();
+
+(function marcarAlertasServicoAberto() {
+  const sid = {{ s.id|tojson }};
+  if (!sid) return;
+  ['placa', 'recusa'].forEach((tipo) => {
+    fetch(`/api/central/alertas/${tipo}/${sid}/marcar-visto`, { method: 'POST' }).catch(() => {});
+  });
+})();
 </script>
 <script src="/static/checklist_central.js?v=20260529"></script>
 <script src="/static/central_patio_integracao.js?v=20260529"></script>

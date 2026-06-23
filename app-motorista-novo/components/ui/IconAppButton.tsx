@@ -14,6 +14,7 @@ import {
   buttonStyle,
   buttonText,
   ButtonVariant,
+  colors,
 } from '../../lib/ui/theme';
 
 type Props = {
@@ -40,9 +41,11 @@ export function IconAppButton({
       style={({ pressed }) => [
         buttonStyle(variant),
         {
-          backgroundColor: buttonBackground(variant, pressed && !disabled && !loading),
+          backgroundColor:
+            disabled || loading
+              ? '#CBD5E1'
+              : buttonBackground(variant, pressed && !disabled && !loading),
         },
-        disabled && styles.disabled,
         style,
       ]}
       onPress={onPress}
@@ -52,8 +55,13 @@ export function IconAppButton({
         <ActivityIndicator color="#fff" />
       ) : (
         <View style={styles.row}>
-          <Ionicons name={icon} size={20} color="#fff" style={styles.icon} />
-          <Text style={buttonText}>{label}</Text>
+          <Ionicons
+            name={icon}
+            size={20}
+            color={disabled ? colors.textMuted : '#fff'}
+            style={styles.icon}
+          />
+          <Text style={[buttonText, disabled && styles.labelDisabled]}>{label}</Text>
         </View>
       )}
     </Pressable>
@@ -61,7 +69,7 @@ export function IconAppButton({
 }
 
 const styles = StyleSheet.create({
-  disabled: { opacity: 0.65 },
+  labelDisabled: { color: colors.textMuted },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

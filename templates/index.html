@@ -6,8 +6,9 @@
   <title>Central de Serviços — Essência Logística</title>
   <link rel="stylesheet" href="/static/dashboard.css">
   {% include "partials/head_pages_v2.html" %}
-<link rel="stylesheet" href="/static/central_mobile_chat.css?v=20260601">
+  <link rel="stylesheet" href="/static/central_mobile_chat.css?v=20260601">
   <link rel="stylesheet" href="/static/central.css?v=20260529d">
+  <link rel="stylesheet" href="/static/central_alertas_operacionais.css?v=20260603">
 </head>
 <body class="ess-app central-body">
   {% include "partials/app_shell_start.html" %}
@@ -58,7 +59,7 @@
             {% for s in servicos %}
             <tr data-id="{{ s.id }}" onclick="irParaServico('{{ s.id }}')">
               <td class="col-data">{{ s.data_hora_central or '-' }}</td>
-              <td><span data-status="{{ s.status }}">{{ s.status }}</span></td>
+              <td class="col-status-alerta"><span data-status="{{ s.status }}">{{ s.status }}</span></td>
               <td>{{ s.seguradora or '-' }}</td>
               <td class="col-protocolo"><a href="/faturamento/{{ s.id }}" onclick="event.stopPropagation()">{{ s.protocolo or '-' }}</a></td>
               <td>{{ s.tipo or '-' }}</td>
@@ -66,10 +67,14 @@
               <td>{{ s.origem_cidade or '-' }}</td>
               <td>{{ s.destino_bairro or '-' }}</td>
               <td>{{ s.destino_cidade or '-' }}</td>
-              <td><b>{{ s.placa_veiculo_removido or s.placa_removida or '-' }}</b></td>
+              <td data-col-placa="1"><b>{{ s.placa_veiculo_removido or s.placa_removida or '-' }}</b></td>
               <td>{{ s.motorista_nome or '-' }}</td>
               <td class="col-valor">{{ s.valor_total_fmt or 'R$ 0,00' }}</td>
               <td class="col-acoes">
+                <span class="central-atalhos">
+                  <button type="button" class="central-ico-btn" data-central-chat="{{ s.id }}" title="Mensagens Mobile" onclick="event.stopPropagation(); window.centralAlertas && window.centralAlertas.abrirChat('{{ s.id }}');">💬<span class="central-ico-badge" data-badge-chat="{{ s.id }}">0</span></button>
+                  <button type="button" class="central-ico-btn" data-central-map="{{ s.id }}" title="Localização" onclick="event.stopPropagation(); window.centralAlertas && window.centralAlertas.abrirMapa('{{ s.id }}');">📍</button>
+                </span>
                 <a class="central-link-rota" target="_blank" href="https://www.google.com/maps/dir/?api=1&origin={{ s.origem|urlencode }}&destination={{ s.destino|urlencode }}" onclick="event.stopPropagation()">Rota</a>
                 {% if s.status == 'finalizado' %}
                 <button type="button" class="central-btn-acao muted" disabled>Finalizado</button>
@@ -311,8 +316,43 @@
     </div>
   </div>
 
+  <div id="modalCentralChat" class="central-modal-backdrop" aria-hidden="true">
+    <div class="central-modal-box">
+      <div class="central-modal-head">
+        <h3 id="centralChatTitle">Mobile — Chat</h3>
+        <button type="button" class="central-modal-close" data-close-modal="modalCentralChat">Fechar</button>
+      </div>
+      <div class="central-modal-body">
+        <div class="sd-mobile-chat">
+          <div class="sd-mobile-messages" id="centralChatMessages"></div>
+          <div class="sd-mobile-compose">
+            <textarea id="centralChatInput" rows="2" maxlength="1000" placeholder="Digite sua mensagem…"></textarea>
+            <button type="button" id="centralChatSend">Enviar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="modalCentralMapa" class="central-modal-backdrop" aria-hidden="true">
+    <div class="central-modal-box mapa">
+      <div class="central-modal-head">
+        <h3>Localização do motorista</h3>
+        <button type="button" class="central-modal-close" data-close-modal="modalCentralMapa">Fechar</button>
+      </div>
+      <div class="central-modal-body">
+        <div id="centralMapCanvas"></div>
+        <div class="central-map-meta" id="centralMapMeta"></div>
+      </div>
+    </div>
+  </div>
+
 <script src="/static/central_modal_motorista.js?v=20260529d"></script>
+<script src="/static/central_alertas_operacionais.js?v=20260603"></script>
 <script>
+window.CENTRAL_CONFIG = {
+  googleMapsApiKey: {{ google_maps_api_key|tojson }}
+};
 function abrirModal(id) {
   const el = document.getElementById(id);
   if (el) el.style.display = 'flex';
@@ -322,7 +362,6 @@ function fecharModal(id) {
   if (el) el.style.display = 'none';
 }
 
-let somAtivo = false;
 let ultimoEstado = {};
 let motoristasCache = [];
 let ultimosServicos = [];
@@ -377,33 +416,10 @@ function statusBadgeClass(status) {
 }
 
 function irParaServico(id) {
-  if (id) window.location.href = '/faturamento/' + id;
-}
-
-function beep(freq = 880, duration = 180) {
-  if (!somAtivo) return;
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.frequency.value = freq;
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start();
-    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + duration / 1000);
-    osc.stop(ctx.currentTime + duration / 1000);
-  } catch (e) {}
-}
-
-function ativarSom() {
-  somAtivo = !somAtivo;
-  localStorage.setItem('somAtivo', somAtivo ? '1' : '0');
-  const btn = document.getElementById('btnSomTopo') || document.querySelector('button[onclick="ativarSom()"]');
-  if (btn) {
-    btn.innerText = somAtivo ? 'Desativar som' : 'Ativar som';
-    btn.classList.toggle('off', somAtivo);
+  if (id && window.centralAlertas) {
+    window.centralAlertas.marcarServicoVisto(id, ['placa', 'recusa']);
   }
-  if (somAtivo) beep(900, 220);
+  if (id) window.location.href = '/faturamento/' + id;
 }
 
 const PRECOS_POR_TIPO = {{ precos_por_tipo|tojson }};
@@ -501,10 +517,16 @@ function renderServicos(ss) {
       ? '<button type="button" class="central-btn-acao muted" disabled>Finalizado</button>'
       : botaoEnviarTrocarHtml(sid);
 
+    const atalhos = (window.centralAtalhosHtml && window.centralAtalhosHtml(sid)) || `
+      <span class="central-atalhos">
+        <button type="button" class="central-ico-btn" data-central-chat="${escapeHtml(sid)}" title="Mensagens Mobile" onclick="event.stopPropagation(); window.centralAlertas && window.centralAlertas.abrirChat('${escapeHtml(sid)}');">💬<span class="central-ico-badge" data-badge-chat="${escapeHtml(sid)}">0</span></button>
+        <button type="button" class="central-ico-btn" data-central-map="${escapeHtml(sid)}" title="Localização" onclick="event.stopPropagation(); window.centralAlertas && window.centralAlertas.abrirMapa('${escapeHtml(sid)}');">📍</button>
+      </span>`;
+
     return `
       <tr data-id="${escapeHtml(sid)}" onclick="irParaServico('${escapeHtml(sid)}')">
         <td class="col-data">${escapeHtml(formatarDataHoraCentral(s.data_hora_central))}</td>
-        <td><span class="${statusBadgeClass(s.status)}">${escapeHtml(s.status)}</span></td>
+        <td class="col-status-alerta"><span class="${statusBadgeClass(s.status)}">${escapeHtml(s.status)}</span></td>
         <td>${escapeHtml(s.seguradora)}</td>
         <td class="col-protocolo"><a href="/faturamento/${s.id}" onclick="event.stopPropagation()">${escapeHtml(s.protocolo)}</a></td>
         <td>${escapeHtml(s.tipo)}</td>
@@ -512,10 +534,11 @@ function renderServicos(ss) {
         <td>${escapeHtml(s.origem_cidade)}</td>
         <td>${escapeHtml(s.destino_bairro)}</td>
         <td>${escapeHtml(s.destino_cidade)}</td>
-        <td><b>${escapeHtml(placa || '-')}</b></td>
+        <td data-col-placa="1"><b>${escapeHtml(placa || '-')}</b></td>
         <td>${escapeHtml(s.motorista_nome)}</td>
         <td class="col-valor">${escapeHtml(s.valor_total_fmt || brMoney(s.valor_total))}</td>
         <td class="col-acoes">
+          ${atalhos}
           <a class="central-link-rota" target="_blank" href="${rota}" onclick="event.stopPropagation()">Rota</a>
           ${btnAcao}
         </td>
@@ -530,6 +553,10 @@ function renderServicos(ss) {
 
   if (typeof window.CMM_rebindTable === 'function') {
     window.CMM_rebindTable();
+  }
+
+  if (typeof window.centralAlertas?.pollAlertas === 'function') {
+    void window.centralAlertas.pollAlertas();
   }
 }
 
@@ -551,15 +578,6 @@ async function atualizarCentral() {
       const fotosQtd = Array.isArray(s.fotos) ? s.fotos.length : 0;
       const key = s.id;
       const val = `${s.status || ''}|${s.placa_veiculo_removido || s.placa_removida || ''}|${fotosQtd}|${s.ultimo_evento || ''}`;
-
-      if (ultimoEstado[key] && ultimoEstado[key] !== val) {
-        beep(760, 180);
-        if (window.Notification && Notification.permission === 'granted') {
-          new Notification('Serviço atualizado', {
-            body: `${s.motorista_nome || 'Motorista'} - ${s.status || ''}`
-          });
-        }
-      }
       ultimoEstado[key] = val;
     });
   } catch (err) {
@@ -631,67 +649,12 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-if (localStorage.getItem('somAtivo') === '1') {
-  somAtivo = true;
-  setTimeout(() => {
-    const btn = document.getElementById('btnSomTopo') || document.querySelector('button[onclick="ativarSom()"]');
-    if (btn) { btn.innerText = 'Desativar som'; btn.classList.add('off'); }
-  }, 300);
-}
-
 if (window.Notification && Notification.permission !== 'granted') {
   Notification.requestPermission();
 }
 
 setInterval(atualizarCentral, 5000);
 atualizarCentral();
-
-let ultimoMobileCentralTs = null;
-
-function beepMsgMobile(freq = 1040, duration = 220) {
-  if (!somAtivo) return;
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.frequency.value = freq;
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start();
-    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + duration / 1000);
-    osc.stop(ctx.currentTime + duration / 1000);
-  } catch (e) {}
-}
-
-function mostrarToastMobile(msg) {
-  const el = document.createElement('div');
-  el.className = 'sd-mobile-toast';
-  el.textContent = msg;
-  document.body.appendChild(el);
-  setTimeout(() => el.remove(), 5000);
-}
-
-async function checarMensagensMobileCentral() {
-  try {
-    const res = await fetch('/api/central/mobile/unread-summary', { cache: 'no-store' });
-    const data = await res.json();
-    if (!data.ok) return;
-    if (ultimoMobileCentralTs !== null && data.latest_at && data.latest_at > ultimoMobileCentralTs) {
-      const item = (data.itens && data.itens[0]) || {};
-      beepMsgMobile();
-      mostrarToastMobile(`Nova mensagem do motorista no protocolo ${item.protocolo || ''}`);
-      if (window.Notification && Notification.permission === 'granted') {
-        new Notification('Nova mensagem Mobile', {
-          body: `Protocolo ${item.protocolo || ''} — ${item.qtd || 1} não lida(s)`,
-        });
-      }
-    }
-    ultimoMobileCentralTs = data.latest_at || ultimoMobileCentralTs;
-  } catch (e) {}
-}
-
-setInterval(checarMensagensMobileCentral, 5000);
-checarMensagensMobileCentral();
 </script>
 
 </body>

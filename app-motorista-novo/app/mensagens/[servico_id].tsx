@@ -12,7 +12,7 @@ import {
   View,
 } from 'react-native';
 
-import { AppButton } from '../../components/ui/AppButton';
+import { IconAppButton } from '../../components/ui/IconAppButton';
 import { useMotorista } from '../../context/MotoristaContext';
 import {
   enviarMensagemMobile,
@@ -123,7 +123,14 @@ export default function MensagensServicoScreen() {
           multiline
           maxLength={1000}
         />
-        <AppButton title="Enviar" onPress={enviar} loading={enviando} disabled={!texto.trim()} />
+        <IconAppButton
+          label="Enviar"
+          icon="send"
+          onPress={enviar}
+          loading={enviando}
+          disabled={!texto.trim()}
+          style={styles.sendBtn}
+        />
       </View>
     </KeyboardAvoidingView>
   );
@@ -171,5 +178,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     color: colors.text,
     backgroundColor: colors.bg,
+  },
+  sendBtn: {
+    alignSelf: 'stretch',
   },
 });
