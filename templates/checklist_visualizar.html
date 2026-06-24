@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Checklist — {{ servico.protocolo or servico_id }}</title>
-<link rel="stylesheet" href="/static/checklist_central.css?v=20260529">
+<link rel="stylesheet" href="/static/checklist_central.css?v=20260624">
 </head>
 <body class="chk-page">
 
@@ -59,6 +59,10 @@
   {% elif item.fotos %}
   <p class="chk-foto-placeholder">Foto antiga do dispositivo — reenviar checklist para visualizar na Central.</p>
   {% endif %}
+
+  {% with observacao=item.observacao %}
+  {% include "partials/checklist_observacao_parte.html" %}
+  {% endwith %}
 </div>
 {% else %}
 <div class="chk-bloco">
@@ -88,6 +92,6 @@
   </div>
 </div>
 
-<script src="/static/checklist_central.js?v=20260529"></script>
+<script src="/static/checklist_central.js?v=20260624"></script>
 </body>
 </html>

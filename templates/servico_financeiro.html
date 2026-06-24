@@ -6,7 +6,7 @@
 <title>Serviço {{ s.protocolo }} — Auditoria</title>
   {% include "partials/head_pages_v2.html" %}
 <link rel="stylesheet" href="/static/servico_detalhe.css">
-<link rel="stylesheet" href="/static/checklist_central.css?v=20260529">
+<link rel="stylesheet" href="/static/checklist_central.css?v=20260624">
 <link rel="stylesheet" href="/static/central_patio_integracao.css?v=20260529">
 <link rel="stylesheet" href="/static/central_mobile_chat.css?v=20260601">
 </head>
@@ -355,6 +355,9 @@
               {% elif item.fotos %}
               <p class="muted" style="font-size:12px;margin-top:8px">Foto antiga do dispositivo — reenviar checklist pelo motorista para visualizar na Central.</p>
               {% endif %}
+              {% with observacao=item.observacao %}
+              {% include "partials/checklist_observacao_parte.html" %}
+              {% endwith %}
             </div>
             {% endfor %}
           {% else %}
@@ -495,7 +498,7 @@ calcularTotal();
   });
 })();
 </script>
-<script src="/static/checklist_central.js?v=20260529"></script>
+<script src="/static/checklist_central.js?v=20260624"></script>
 <script src="/static/central_patio_integracao.js?v=20260529"></script>
 <script src="/static/central_mobile_chat.js?v=20260601"></script>
 {% include "partials/app_shell_end.html" %}

@@ -14,6 +14,23 @@ export function obterPlacaServico(servico: any) {
   );
 }
 
+/** Modelo/descrição do veículo atendido (campo da Central: veiculo_cliente). */
+export function obterVeiculoServico(servico: any) {
+  const candidatos = [
+    servico?.veiculo_cliente,
+    servico?.veiculo,
+    servico?.modelo_veiculo,
+    servico?.veiculo_modelo,
+    servico?.modelo,
+    servico?.dados_veiculo,
+  ];
+  for (const item of candidatos) {
+    const texto = String(item || '').trim();
+    if (texto && texto !== '-') return texto;
+  }
+  return '';
+}
+
 export function servicoFinalizado(servico: any) {
   const s = String(servico?.status || '').toLowerCase();
   return s === 'finalizado' || s === 'concluido' || s === 'concluído';

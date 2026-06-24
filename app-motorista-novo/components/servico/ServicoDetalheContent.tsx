@@ -6,24 +6,30 @@ import { FadeInView } from '../ui/FadeInView';
 import { IconAppButton } from '../ui/IconAppButton';
 import { StatusBadge } from '../ui/StatusBadge';
 import { colors, radius, shadow, spacing } from '../../lib/ui/theme';
-import { obterPlacaServico, servicoSomenteLeitura } from '../../lib/servico';
+import { obterPlacaServico, obterVeiculoServico, servicoSomenteLeitura } from '../../lib/servico';
 
 type Props = {
   servico: any;
   onEnviarPlaca: (placa: string) => Promise<boolean>;
   onAbrirChecklist: () => void;
-  onAbrirRota: () => void;
-  onAbrirRotaTela: () => void;
   onAbrirMensagens: () => void;
   onStatus: (status: string) => void;
   somenteLeitura?: boolean;
 };
 
-function InfoCard({ label, value }: { label: string; value: string }) {
+function InfoCard({
+  label,
+  value,
+  fullWidth,
+}: {
+  label: string;
+  value: string;
+  fullWidth?: boolean;
+}) {
   return (
-    <View style={styles.infoCard}>
+    <View style={[styles.infoCard, fullWidth && styles.infoCardFull]}>
       <Text style={styles.infoLabel}>{label}</Text>
-      <Text style={styles.infoValue}>{value || '—'}</Text>
+      <Text style={[styles.infoValue, fullWidth && styles.infoValueWrap]}>{value || '—'}</Text>
     </View>
   );
 }
@@ -32,8 +38,6 @@ export function ServicoDetalheContent({
   servico,
   onEnviarPlaca,
   onAbrirChecklist,
-  onAbrirRota,
-  onAbrirRotaTela,
   onAbrirMensagens,
   onStatus,
   somenteLeitura = false,
@@ -61,6 +65,7 @@ export function ServicoDetalheContent({
           <InfoCard label="Combustível" value={servico.combustivel || servico.tipo_combustivel || '—'} />
           <InfoCard label="Solicitante" value={servico.solicitante || '—'} />
           <InfoCard label="Telefone" value={servico.telefone_cliente || servico.telefone || '—'} />
+          <InfoCard label="Veículo" value={obterVeiculoServico(servico)} fullWidth />
         </View>
       </FadeInView>
 
@@ -100,12 +105,8 @@ export function ServicoDetalheContent({
 
       <FadeInView delay={220}>
         <Text style={styles.acoesTitulo}>Ações principais</Text>
-        <IconAppButton label="Abrir rota no mapa" icon="map-outline" onPress={onAbrirRotaTela} variant="navy" />
-        <IconAppButton label="Abrir checklist" icon="clipboard-outline" onPress={onAbrirChecklist} variant="navy" style={styles.btnGap} />
+        <IconAppButton label="Abrir checklist" icon="clipboard-outline" onPress={onAbrirChecklist} variant="navy" />
         <IconAppButton label="Falar com a Central" icon="chatbubbles-outline" onPress={onAbrirMensagens} variant="navy" style={styles.btnGap} />
-        {!somenteLeitura ? (
-          <IconAppButton label="Google Maps" icon="navigate-outline" onPress={onAbrirRota} variant="navy" style={styles.btnGap} />
-        ) : null}
       </FadeInView>
 
       {!somenteLeitura ? (
@@ -155,8 +156,15 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     ...shadow,
   },
+  infoCardFull: {
+    width: '100%',
+  },
   infoLabel: { fontSize: 10, fontWeight: '800', color: colors.textMuted, textTransform: 'uppercase' },
   infoValue: { fontSize: 14, fontWeight: '700', color: colors.navy, marginTop: 4 },
+  infoValueWrap: {
+    lineHeight: 20,
+    flexShrink: 1,
+  },
   sectionCard: {
     backgroundColor: colors.bgCard,
     borderRadius: radius.md,

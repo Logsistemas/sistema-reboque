@@ -67,6 +67,7 @@ export default function ChecklistScreen() {
 
   const [marcacoes, setMarcacoes] = useState<any>({});
   const [fotosAvarias, setFotosAvarias] = useState<any>({});
+  const [observacoes, setObservacoes] = useState<Record<string, string>>({});
   const [fotoVeiculo, setFotoVeiculo] = useState<string | null>(null);
   const [tipoServico, setTipoServico] = useState(String(params.tipo_servico || ''));
   const [observacaoServico, setObservacaoServico] = useState(String(params.observacao || ''));
@@ -81,6 +82,7 @@ export default function ChecklistScreen() {
       try {
         const novasMarcacoes: any = {};
         const novasFotos: any = {};
+        const novasObservacoes: Record<string, string> = {};
         let origemAtual: string | null = null;
         let destinoAtual: string | null = null;
         let origemNoServidor = false;
@@ -119,6 +121,7 @@ export default function ChecklistScreen() {
             Object.keys(partes).forEach((parte) => {
               novasMarcacoes[parte] = partes[parte].marcacoes || [];
               novasFotos[parte] = partes[parte].fotos || [];
+              novasObservacoes[parte] = String(partes[parte].observacao || '').trim();
             });
 
             origemNoServidor = !!dados.assinatura_origem_salva;
@@ -145,6 +148,9 @@ export default function ChecklistScreen() {
           Object.keys(rascunho.fotos || {}).forEach((parte) => {
             novasFotos[parte] = rascunho.fotos[parte] || [];
           });
+          Object.keys(rascunho.observacoes || {}).forEach((parte) => {
+            novasObservacoes[parte] = String(rascunho.observacoes?.[parte] || '').trim();
+          });
         }
 
         if (assinaturaValida(params.assinatura_origem)) {
@@ -157,6 +163,7 @@ export default function ChecklistScreen() {
 
         setMarcacoes(novasMarcacoes);
         setFotosAvarias(novasFotos);
+        setObservacoes(novasObservacoes);
         setAssinaturaOrigem(origemAtual);
         setAssinaturaDestino(destinoAtual);
         setOrigemPersistida(origemNoServidor);
@@ -184,6 +191,7 @@ export default function ChecklistScreen() {
         if (!rascunho) return;
         setMarcacoes((atual) => ({ ...atual, ...(rascunho.marcacoes || {}) }));
         setFotosAvarias((atual) => ({ ...atual, ...(rascunho.fotos || {}) }));
+        setObservacoes((atual) => ({ ...atual, ...(rascunho.observacoes || {}) }));
       });
     }, [params.servico_id])
   );
@@ -264,11 +272,17 @@ export default function ChecklistScreen() {
       const fotosEnvio = await checklistFotosParaEnvio(fotosAvarias);
       console.log('[CHECKLIST FOTO] envio finalizado partes=', Object.keys(fotosEnvio).length);
       const checklistCompleto: any = {};
+      const todasPartes = new Set([
+        ...Object.keys(marcacoes),
+        ...Object.keys(fotosEnvio),
+        ...Object.keys(observacoes),
+      ]);
 
-      Object.keys(marcacoes).forEach((parte) => {
+      todasPartes.forEach((parte) => {
         checklistCompleto[parte] = {
           marcacoes: marcacoes[parte] || [],
           fotos: fotosEnvio[parte] || [],
+          observacao: String(observacoes[parte] || '').trim(),
         };
       });
 
@@ -313,6 +327,7 @@ export default function ChecklistScreen() {
       await salvarRascunhoChecklist(String(params.servico_id), {
         marcacoes,
         fotos: fotosAvarias,
+        observacoes,
       });
 
       router.replace('/checklist-sucesso' as any);

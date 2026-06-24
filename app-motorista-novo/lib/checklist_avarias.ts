@@ -347,7 +347,11 @@ const DRAFT_PREFIX = '@essencia_checklist_draft:';
 
 export async function salvarRascunhoChecklist(
   servicoId: string,
-  dados: { marcacoes: Record<string, MarcacaoAvaria[]>; fotos: Record<string, string[]> }
+  dados: {
+    marcacoes: Record<string, MarcacaoAvaria[]>;
+    fotos: Record<string, string[]>;
+    observacoes?: Record<string, string>;
+  }
 ) {
   if (!servicoId) return;
   await AsyncStorage.setItem(`${DRAFT_PREFIX}${servicoId}`, JSON.stringify(dados));
@@ -361,6 +365,7 @@ export async function carregarRascunhoChecklist(servicoId: string) {
     return JSON.parse(json) as {
       marcacoes: Record<string, MarcacaoAvaria[]>;
       fotos: Record<string, string[]>;
+      observacoes?: Record<string, string>;
     };
   } catch {
     return null;

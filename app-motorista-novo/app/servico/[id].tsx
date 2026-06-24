@@ -13,7 +13,6 @@ export default function ServicoDetalheScreen() {
     obterServicoPorId,
     enviarPlacaServico,
     abrirChecklist,
-    abrirRota,
     atualizarStatus,
   } = useMotorista();
 
@@ -34,13 +33,6 @@ export default function ServicoDetalheScreen() {
       somenteLeitura={servicoSomenteLeitura(servico)}
       onEnviarPlaca={(placa) => enviarPlacaServico(String(servico.id), placa)}
       onAbrirChecklist={() => abrirChecklist(servico)}
-      onAbrirRota={() => abrirRota(servico)}
-      onAbrirRotaTela={() => {
-        router.push({
-          pathname: '/rota',
-          params: { servico_id: servico.id },
-        } as any);
-      }}
       onAbrirMensagens={() => {
         router.push({
           pathname: '/mensagens/[servico_id]',

@@ -10,6 +10,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -51,6 +52,7 @@ export default function AvariaScreen() {
   const [marcacoes, setMarcacoes] = useState<MarcacaoAvaria[]>([]);
 
   const [fotos, setFotos] = useState<string[]>([]);
+  const [observacao, setObservacao] = useState('');
 
   useEffect(() => {
     let cancelado = false;
@@ -64,6 +66,9 @@ export default function AvariaScreen() {
       }
       if (Array.isArray(rascunho.fotos?.[parte])) {
         setFotos(rascunho.fotos[parte]);
+      }
+      if (typeof rascunho.observacoes?.[parte] === 'string') {
+        setObservacao(rascunho.observacoes[parte]);
       }
     }
 
@@ -99,33 +104,38 @@ export default function AvariaScreen() {
   async function mesclarEstadoChecklist() {
     let todasMarcacoes: Record<string, MarcacaoAvaria[]> = {};
     let fotosAvarias: Record<string, string[]> = {};
+    let observacoes: Record<string, string> = {};
 
     if (servicoId) {
       const rascunho = await carregarRascunhoChecklist(servicoId);
       if (rascunho) {
         todasMarcacoes = { ...(rascunho.marcacoes || {}) };
         fotosAvarias = { ...(rascunho.fotos || {}) };
+        observacoes = { ...(rascunho.observacoes || {}) };
       }
     }
 
     todasMarcacoes[parte] = marcacoes;
     fotosAvarias[parte] = fotos;
-    return { todasMarcacoes, fotosAvarias };
+    observacoes[parte] = observacao.trim();
+    return { todasMarcacoes, fotosAvarias, observacoes };
   }
 
   async function voltarChecklist() {
-    const { todasMarcacoes, fotosAvarias } = await mesclarEstadoChecklist();
+    const { todasMarcacoes, fotosAvarias, observacoes } = await mesclarEstadoChecklist();
 
     if (servicoId) {
       await salvarRascunhoChecklist(servicoId, {
         marcacoes: todasMarcacoes,
         fotos: fotosAvarias,
+        observacoes,
       });
     }
 
     debugLog('avaria', 'salvar parte', parte, {
       marcacoes: marcacoes.length,
       fotos: fotos.length,
+      observacao: observacao.trim().length,
     });
 
     router.replace({
@@ -316,6 +326,20 @@ export default function AvariaScreen() {
         </View>
       )}
 
+      <View style={styles.observacaoCard}>
+        <Text style={styles.observacaoTitulo}>Observações da avaria</Text>
+        <TextInput
+          style={styles.observacaoInput}
+          placeholder="Descreva detalhes da avaria nesta parte..."
+          placeholderTextColor={colors.textMuted}
+          value={observacao}
+          onChangeText={setObservacao}
+          multiline
+          numberOfLines={4}
+          textAlignVertical="top"
+        />
+      </View>
+
       <AppButton label="Salvar" onPress={voltarChecklist} variant="navy" style={styles.botaoSalvar} />
 
       <Modal visible={verFotosAberto} animationType="slide" transparent>
@@ -463,5 +487,27 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   fotoRemoverTxt: { color: colors.dangerDark, fontWeight: '700', fontSize: 13 },
+  observacaoCard: {
+    marginBottom: spacing.md,
+    backgroundColor: colors.bgCard,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadow,
+  },
+  observacaoTitulo: { fontWeight: '800', marginBottom: 10, color: colors.navy, fontSize: 16 },
+  observacaoInput: {
+    minHeight: 100,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    backgroundColor: '#fff',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 15,
+    color: colors.text,
+    lineHeight: 22,
+  },
   botaoSalvar: { marginTop: 4 },
 });

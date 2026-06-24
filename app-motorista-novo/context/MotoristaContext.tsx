@@ -23,6 +23,7 @@ import {
 import {
   formatarPlaca,
   obterPlacaServico,
+  obterVeiculoServico,
   placaValida,
   servicoEmAndamento,
   servicoFinalizado,
@@ -368,8 +369,13 @@ export function MotoristaProvider({ children }: { children: React.ReactNode }) {
   }
 
   function abrirRota(servico: any) {
-    const destino = encodeURIComponent(servico.origem || '');
-    Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${destino}`);
+    const origem = encodeURIComponent(String(servico?.origem || '').trim());
+    const destino = encodeURIComponent(String(servico?.destino || '').trim());
+    const url =
+      origem && destino
+        ? `https://www.google.com/maps/dir/?api=1&origin=${origem}&destination=${destino}&travelmode=driving`
+        : `https://www.google.com/maps/search/?api=1&query=${origem || destino}`;
+    Linking.openURL(url);
   }
 
   function abrirRotaWaze(servico: any) {
@@ -444,4 +450,4 @@ export function useMotorista() {
   return ctx;
 }
 
-export { formatarPlaca, placaValida, obterPlacaServico, servicoFinalizado, servicoRecusado, servicoEmAndamento, servicoSomenteLeitura };
+export { formatarPlaca, placaValida, obterPlacaServico, obterVeiculoServico, servicoFinalizado, servicoRecusado, servicoEmAndamento, servicoSomenteLeitura };

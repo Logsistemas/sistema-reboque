@@ -17,7 +17,7 @@ import { colors, radius, shadow, spacing } from '../../lib/ui/theme';
 
 export default function MapaScreen() {
   const insets = useSafeAreaInsets();
-  const { logado, restaurandoSessao, servicos, abrirRotaWaze } = useMotorista();
+  const { logado, restaurandoSessao, servicos, abrirRotaWaze, abrirRota } = useMotorista();
 
   const servicoAtivo = useMemo(
     () => servicos.find((s) => !servicoFinalizado(s)) || servicos[0],
@@ -90,6 +90,14 @@ export default function MapaScreen() {
           icon="navigate"
           onPress={() => abrirRotaWaze(servicoAtivo)}
           variant="waze"
+        />
+
+        <IconAppButton
+          label="Abrir Google Maps"
+          icon="map-outline"
+          onPress={() => abrirRota(servicoAtivo)}
+          variant="navy"
+          style={{ marginTop: 8 }}
         />
 
         <IconAppButton

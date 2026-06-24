@@ -8,7 +8,7 @@
   {% include "partials/head_pages_v2.html" %}
   <link rel="stylesheet" href="/static/central_mobile_chat.css?v=20260601">
   <link rel="stylesheet" href="/static/central.css?v=20260529d">
-  <link rel="stylesheet" href="/static/central_alertas_operacionais.css?v=20260603">
+  <link rel="stylesheet" href="/static/central_alertas_operacionais.css?v=20260609">
 </head>
 <body class="ess-app central-body">
   {% include "partials/app_shell_start.html" %}
@@ -348,7 +348,7 @@
   </div>
 
 <script src="/static/central_modal_motorista.js?v=20260529d"></script>
-<script src="/static/central_alertas_operacionais.js?v=20260603"></script>
+<script src="/static/central_alertas_operacionais.js?v=20260609"></script>
 <script>
 window.CENTRAL_CONFIG = {
   googleMapsApiKey: {{ google_maps_api_key|tojson }}
@@ -524,7 +524,7 @@ function renderServicos(ss) {
       </span>`;
 
     return `
-      <tr data-id="${escapeHtml(sid)}" onclick="irParaServico('${escapeHtml(sid)}')">
+      <tr data-id="${escapeHtml(sid)}" data-servico-id="${escapeHtml(sid)}" onclick="irParaServico('${escapeHtml(sid)}')">
         <td class="col-data">${escapeHtml(formatarDataHoraCentral(s.data_hora_central))}</td>
         <td class="col-status-alerta"><span class="${statusBadgeClass(s.status)}">${escapeHtml(s.status)}</span></td>
         <td>${escapeHtml(s.seguradora)}</td>
@@ -534,7 +534,7 @@ function renderServicos(ss) {
         <td>${escapeHtml(s.origem_cidade)}</td>
         <td>${escapeHtml(s.destino_bairro)}</td>
         <td>${escapeHtml(s.destino_cidade)}</td>
-        <td data-col-placa="1"><b>${escapeHtml(placa || '-')}</b></td>
+        <td data-col-placa="1" data-coluna="placa" data-alerta-placa="0" data-servico-id="${escapeHtml(sid)}"><b>${escapeHtml(placa || '-')}</b></td>
         <td>${escapeHtml(s.motorista_nome)}</td>
         <td class="col-valor">${escapeHtml(s.valor_total_fmt || brMoney(s.valor_total))}</td>
         <td class="col-acoes">
@@ -553,6 +553,10 @@ function renderServicos(ss) {
 
   if (typeof window.CMM_rebindTable === 'function') {
     window.CMM_rebindTable();
+  }
+
+  if (typeof window.centralAlertas?.aplicarEstadoNaTabela === 'function') {
+    window.centralAlertas.aplicarEstadoNaTabela();
   }
 
   if (typeof window.centralAlertas?.pollAlertas === 'function') {

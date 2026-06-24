@@ -1100,7 +1100,8 @@ def init_db():
             "alter table checklist_assinaturas add column if not exists assinatura_destino_base64 text;",
             "alter table checklist_assinaturas add column if not exists origem_atualizada_em timestamp;",
             "alter table checklist_assinaturas add column if not exists destino_atualizada_em timestamp;",
-            "alter table checklist_assinaturas alter column assinatura_base64 drop not null;"]
+            "alter table checklist_assinaturas alter column assinatura_base64 drop not null;",
+            "alter table checklist_avarias add column if not exists observacao text;"]
             controle_alters = [
                 "alter table controle_danos add column if not exists data_hora_dano timestamp;",
                 "alter table controle_danos add column if not exists aviso text;",
@@ -1558,17 +1559,14 @@ def salvar_placa_cliente_servico(sid, placa_veiculo):
         (placa, placa, novo_status, str(sid)),
     )
     registrar_evento_db(sid, "placa lançada", f"Placa: {placa}")
-    try:
-        s_atual = servico_by_id(sid)
-        protocolo = (s_atual.get("protocolo") or "").strip() if s_atual else ""
-        registrar_alerta_operacional(
-            sid,
-            "placa",
-            "Placa enviada pelo motorista",
-            f"Placa {placa} no protocolo {protocolo}" if protocolo else f"Placa {placa}",
-        )
-    except Exception as exc:
-        print(f"[ALERTA] placa: {exc}")
+    s_atual = servico_by_id(sid)
+    protocolo = (s_atual.get("protocolo") or "").strip() if s_atual else ""
+    registrar_alerta_operacional(
+        sid,
+        "placa",
+        "Placa enviada",
+        f"Motorista enviou placa no protocolo {protocolo}" if protocolo else f"Motorista enviou placa {placa}",
+    )
     return True, None
 
 
@@ -1757,6 +1755,9 @@ def criar_mensagem_mobile_servico(servico_id, remetente_tipo, remetente_id, reme
     )
     msg = _serializar_mensagem_mobile(row) if row else None
 
+    if tipo == "motorista":
+        print(f"[CENTRAL_ALERTAS] mensagem motorista servico_id={sid}")
+
     if tipo == "central":
         motorista_id = s.get("motorista_id")
         if motorista_id:
@@ -1802,11 +1803,35 @@ def resumo_mensagens_mobile_central():
     }
 
 
+def ensure_central_alertas_operacionais_table():
+    """Garante tabela de alertas mesmo se init_db não rodou após deploy."""
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute('create extension if not exists "uuid-ossp";')
+            cur.execute("""
+            create table if not exists central_alertas_operacionais (
+              id uuid primary key default uuid_generate_v4(),
+              servico_id uuid not null,
+              tipo text not null,
+              titulo text,
+              descricao text,
+              visto boolean default false,
+              created_at timestamp default now(),
+              visto_em timestamp
+            );""")
+            cur.execute("""
+            create index if not exists idx_central_alertas_servico
+              on central_alertas_operacionais (servico_id, tipo, visto);
+            """)
+        conn.commit()
+
+
 def registrar_alerta_operacional(servico_id, tipo, titulo="", descricao=""):
     sid = str(servico_id or "").strip()
     t = (tipo or "").strip().lower()
     if not sid or t not in ("mensagem", "placa", "recusa"):
         return None
+    ensure_central_alertas_operacionais_table()
     existente = one(
         """
         select id from central_alertas_operacionais
@@ -1824,7 +1849,7 @@ def registrar_alerta_operacional(servico_id, tipo, titulo="", descricao=""):
             """,
             ((titulo or "").strip(), (descricao or "").strip(), str(existente["id"])),
         )
-        print(f"[CENTRAL_ALERTAS] alerta {t} atualizado servico_id={sid}")
+        print(f"[CENTRAL_ALERTAS] atualizado tipo={t} servico_id={sid}")
         return str(existente["id"])
     row = one(
         """
@@ -1834,47 +1859,48 @@ def registrar_alerta_operacional(servico_id, tipo, titulo="", descricao=""):
         """,
         (sid, t, (titulo or "").strip(), (descricao or "").strip()),
     )
-    print(f"[CENTRAL_ALERTAS] alerta {t} criado servico_id={sid}")
+    print(f"[CENTRAL_ALERTAS] criado tipo={t} servico_id={sid}")
     return str(row["id"]) if row else None
 
 
 def listar_alertas_operacionais_pendentes(tipo=None):
     try:
+        ensure_central_alertas_operacionais_table()
         params = []
-        where = "where visto=false"
+        where = "where coalesce(visto, false) = false"
         if tipo:
-            where += " and tipo=%s"
+            where += " and lower(tipo)=%s"
             params.append(str(tipo).strip().lower())
         rows = q(
             f"""
-            select a.id, a.servico_id, a.tipo, a.titulo, a.descricao, a.created_at,
-                   s.protocolo, s.motorista_nome, s.placa_veiculo_removido, s.placa_removida, s.status
-              from central_alertas_operacionais a
-              join servicos s on s.id = a.servico_id
+            select id, servico_id, tipo, titulo, descricao, created_at
+              from central_alertas_operacionais
              {where}
-             order by a.created_at desc
+             order by created_at desc
             """,
             tuple(params) if params else None,
             True,
         )
     except Exception as exc:
-        print(f"[ALERTA] listar pendentes: {exc}")
+        print(f"[CENTRAL_ALERTAS] listar pendentes erro tipo={tipo}: {exc}")
         return []
     out = []
     for r in rows or []:
+        s = servico_by_id(r.get("servico_id")) or {}
         out.append({
             "id": str(r["id"]),
             "servico_id": str(r["servico_id"]),
             "tipo": r.get("tipo") or "",
             "titulo": r.get("titulo") or "",
             "descricao": r.get("descricao") or "",
-            "protocolo": r.get("protocolo") or "",
-            "motorista_nome": r.get("motorista_nome") or "",
-            "placa": r.get("placa_veiculo_removido") or r.get("placa_removida") or "",
-            "status": r.get("status") or "",
+            "protocolo": s.get("protocolo") or "",
+            "motorista_nome": s.get("motorista_nome") or "",
+            "placa": s.get("placa_veiculo_removido") or s.get("placa_removida") or "",
+            "status": s.get("status") or "",
             "created_at": formatar_data_hora_central(r.get("created_at")),
             "created_at_iso": r.get("created_at").isoformat() if r.get("created_at") else "",
         })
+    print(f"[CENTRAL_ALERTAS] listar tipo={tipo or 'todos'} count={len(out)}")
     return out
 
 
@@ -1885,6 +1911,7 @@ def marcar_alerta_operacional_visto(servico_id, tipo):
         return False
     if t == "mensagem":
         marcar_mensagens_mobile_lidas(sid, "central")
+    ensure_central_alertas_operacionais_table()
     q(
         """
         update central_alertas_operacionais
@@ -1902,19 +1929,26 @@ def resumo_alertas_central():
     recusas = listar_alertas_operacionais_pendentes("recusa")
     por_servico = {}
 
-    def bump(sid, campo, qtd=1):
+    def bump(sid, campo, qtd=1, protocolo=""):
         if not sid:
             return
-        por_servico.setdefault(sid, {"mensagem": 0, "placa": 0, "recusa": 0})
+        por_servico.setdefault(sid, {"mensagem": 0, "placa": 0, "recusa": 0, "protocolo": ""})
         por_servico[sid][campo] = por_servico[sid].get(campo, 0) + qtd
+        if protocolo and not por_servico[sid].get("protocolo"):
+            por_servico[sid]["protocolo"] = protocolo
 
     for item in mensagens.get("itens") or []:
-        bump(str(item.get("servico_id")), "mensagem", int(item.get("qtd") or 0))
+        bump(str(item.get("servico_id")), "mensagem", int(item.get("qtd") or 0), item.get("protocolo") or "")
 
     for item in placas:
-        bump(item.get("servico_id"), "placa", 1)
+        bump(str(item.get("servico_id")), "placa", 1, item.get("protocolo") or "")
     for item in recusas:
-        bump(item.get("servico_id"), "recusa", 1)
+        bump(str(item.get("servico_id")), "recusa", 1, item.get("protocolo") or "")
+
+    for sid, info in por_servico.items():
+        info["mensagens"] = info.get("mensagem", 0)
+        info["placa_pendente"] = info.get("placa", 0) > 0
+        info["recusa_pendente"] = info.get("recusa", 0) > 0
 
     latest_candidates = [mensagens.get("latest_at") or ""]
     latest_candidates += [a.get("created_at_iso") or "" for a in placas + recusas]
@@ -1972,6 +2006,19 @@ def enriquecer_foto_checklist(foto, request=None, protocolo='', parte='', index=
     }
 
 
+def extrair_observacao_checklist_parte(dados):
+    """Observação textual por parte (coluna DB ou chaves legadas do JSON)."""
+    if not isinstance(dados, dict):
+        return ''
+    for chave in ('observacao', 'observacoes'):
+        valor = dados.get(chave)
+        if isinstance(valor, str):
+            texto = valor.strip()
+            if texto:
+                return texto
+    return ''
+
+
 def checklist_resumo_servico(servico_id, request=None, servico=None):
     partes = partes_checklist_dict(servico_id)
     s = servico or servico_by_id(servico_id) or {}
@@ -1990,6 +2037,7 @@ def checklist_resumo_servico(servico_id, request=None, servico=None):
             'marcacoes': dados.get('marcacoes') or [],
             'fotos': fotos_raw,
             'fotos_resolvidas': fotos_resolvidas,
+            'observacao': extrair_observacao_checklist_parte(dados),
             'imagem_url': imagem_checklist_parte(parte, tipo_veiculo),
         })
     assinaturas = obter_assinaturas_checklist(servico_id)
@@ -7613,10 +7661,10 @@ def persistir_fotos_checklist_lista(servico_id, parte, fotos, protocolo=''):
 
 
 def partes_checklist_dict(servico_id):
-    """Retorna { parte: { marcacoes, fotos } } para um serviço."""
+    """Retorna { parte: { marcacoes, fotos, observacao } } para um serviço."""
     rows = q(
         """
-        select parte, marcacoes, fotos
+        select parte, marcacoes, fotos, observacao
           from checklist_avarias
          where servico_id = %s
          order by parte
@@ -7626,9 +7674,11 @@ def partes_checklist_dict(servico_id):
     )
     partes = {}
     for row in rows or []:
-        partes[row["parte"]] = {
-            "marcacoes": row["marcacoes"] or [],
-            "fotos": row["fotos"] or [],
+        dados_row = dict(row)
+        partes[dados_row["parte"]] = {
+            "marcacoes": dados_row.get("marcacoes") or [],
+            "fotos": dados_row.get("fotos") or [],
+            "observacao": extrair_observacao_checklist_parte(dados_row),
         }
     return partes
 
@@ -7826,6 +7876,7 @@ async def salvar_checklist(request: Request):
                 info = info or {}
 
                 marcacoes = info.get("marcacoes", [])
+                observacao = extrair_observacao_checklist_parte(info)
                 fotos = persistir_fotos_checklist_lista(
                     servico_id, parte, info.get("fotos", []), protocolo
                 )
@@ -7837,13 +7888,14 @@ async def salvar_checklist(request: Request):
 
                 cur.execute("""
                     insert into checklist_avarias
-                    (servico_id, parte, marcacoes, fotos)
-                    values (%s, %s, %s::jsonb, %s::jsonb)
+                    (servico_id, parte, marcacoes, fotos, observacao)
+                    values (%s, %s, %s::jsonb, %s::jsonb, %s)
                 """, (
                     servico_id,
                     parte,
                     json.dumps(marcacoes),
-                    json.dumps(fotos)
+                    json.dumps(fotos),
+                    observacao or None,
                 ))
 
         conn.commit()
@@ -9309,18 +9361,14 @@ def api_app_servico_status(sid: str, payload: AppStatusPayload):
     q(f"update servicos set status=%s, atualizado_em=now(){extra} where id=%s", (status, str(sid)))
     registrar_evento_db(sid, status, payload.detalhe or f"Status atualizado pelo App do Motorista: {status}")
     if status == "recusado":
-        try:
-            s_atual = servico_by_id(sid)
-            protocolo = (s_atual.get("protocolo") or "").strip() if s_atual else ""
-            nome_mot = (s_atual.get("motorista_nome") or "Motorista").strip() if s_atual else "Motorista"
-            registrar_alerta_operacional(
-                sid,
-                "recusa",
-                "Motorista recusou o serviço",
-                f"{nome_mot} recusou o protocolo {protocolo}" if protocolo else f"{nome_mot} recusou o serviço",
-            )
-        except Exception as exc:
-            print(f"[ALERTA] recusa: {exc}")
+        s_atual = servico_by_id(sid)
+        protocolo = (s_atual.get("protocolo") or "").strip() if s_atual else ""
+        registrar_alerta_operacional(
+            sid,
+            "recusa",
+            "Serviço recusado",
+            f"Motorista recusou protocolo {protocolo}" if protocolo else "Motorista recusou o serviço",
+        )
     return {"ok": True, "servico": servico_by_id(sid)}
 
 
@@ -9449,7 +9497,17 @@ def atualizar_status(sid: str, status: str=Form(...)):
     if not servico_by_id(sid): return JSONResponse({'ok':False,'erro':'Serviço não encontrado'},404)
     if status=="finalizado": q("update servicos set status=%s,atualizado_em=now(),finalizado_em=now() where id=%s",(status,str(sid)))
     else: q("update servicos set status=%s,atualizado_em=now() where id=%s",(status,str(sid)))
-    registrar_evento_db(sid,status); return {'ok':True,'servico':servico_by_id(sid)}
+    registrar_evento_db(sid,status)
+    if (status or "").strip().lower() == "recusado":
+        s_atual = servico_by_id(sid)
+        protocolo = (s_atual.get("protocolo") or "").strip() if s_atual else ""
+        registrar_alerta_operacional(
+            sid,
+            "recusa",
+            "Serviço recusado",
+            f"Motorista recusou protocolo {protocolo}" if protocolo else "Motorista recusou o serviço",
+        )
+    return {'ok':True,'servico':servico_by_id(sid)}
 @app.post('/api/servicos/{sid}/placa')
 def enviar_placa(sid: str, placa_veiculo: str=Form(...)):
     ok, erro = salvar_placa_cliente_servico(sid, placa_veiculo)
