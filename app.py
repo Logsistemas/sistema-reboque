@@ -652,6 +652,12 @@ def normalizar_tipo_importado(tipo):
         "UTILITÁRIO": "R. UTILITARIO",
         "REBOQUE GARAGEM": "R. GARAGEM",
         "GARAGEM": "R. GARAGEM",
+        "REBOQUE MEGA PESADO": "R. MEGA PESADO",
+        "MEGA PESADO": "R. MEGA PESADO",
+        "EXTRA PESADO": "R. MEGA PESADO",
+        "GUINDAUTO": "GUINDAUTO",
+        "PLATAFORMA": "GUINDAUTO",
+        "APOIO": "C. MEC. LEVE",
     }
     return mapa.get(t, tipo)
 
@@ -1407,6 +1413,9 @@ def init_db():
             financeiro_nfse.init_nfse_tables(cur)
             import financeiro_config_fiscal
             financeiro_config_fiscal.init_config_fiscal_tables(cur)
+            import cliente_tabela_valores as ctv
+            ctv.init_cliente_tabela_valores_table(cur)
+            ctv.migrar_tabela_valores_clientes_existentes(q, one, normalizar_tipo_importado, cur=cur)
             cur.execute("select count(*) as total from tabela_precos")
             total_precos = cur.fetchone()["total"]
             if not total_precos:
@@ -1431,6 +1440,32 @@ def itens_padrao_tipo(tipo_servico):
         return []
     rows = q("select nome_item, valor_padrao from tabela_precos where tipo_servico=%s and coalesce(ativo,true)=true order by nome_item", (tipo_servico,), True)
     return [{"nome_item": r["nome_item"], "valor_padrao": float(r["valor_padrao"] or 0)} for r in rows]
+
+
+def itens_padrao_tipo_cliente(tipo_servico, seguradora=None, cliente_id=None):
+    import cliente_tabela_valores as ctv
+    return ctv.itens_padrao_tipo_com_cliente(
+        tipo_servico,
+        itens_padrao_tipo,
+        seguradora=seguradora,
+        cliente_id=cliente_id,
+        one_fn=one,
+        normalizar_tipo_fn=normalizar_tipo_importado,
+        q_fn=q,
+    )
+
+
+def precos_por_tipo_cliente(seguradora=None, cliente_id=None):
+    import cliente_tabela_valores as ctv
+    return ctv.precos_por_tipo_com_cliente(
+        lista_tipos_servico,
+        itens_padrao_tipo,
+        seguradora=seguradora,
+        cliente_id=cliente_id,
+        one_fn=one,
+        normalizar_tipo_fn=normalizar_tipo_importado,
+        q_fn=q,
+    )
 
 def itens_do_servico(servico_id):
     rows = q("select * from servico_itens where servico_id=%s order by nome_item", (str(servico_id),), True)
@@ -3752,6 +3787,7 @@ def _params_contato_cadastro(p):
 def salvar_contato_cadastro(payload):
     p = payload or {}
     cid = (p.get("id") or "").strip()
+    cliente_flag = _bool_cad(p.get("cliente"))
     params = _params_contato_cadastro(p)
     cols = """
       tipo_pessoa=%s, status=%s, razao_social=%s, nome_fantasia=%s, cnpj=%s,
@@ -3765,6 +3801,9 @@ def salvar_contato_cadastro(payload):
     """
     if cid:
         q(f"update cadastro_contatos set {cols} where id=%s", params + (cid,))
+        if cliente_flag:
+            import cliente_tabela_valores as ctv
+            ctv.seed_tabela_valores_cliente(cid, q, one, normalizar_tipo_importado)
         return contato_cadastro_por_id(cid)
     row = one(
         f"""
@@ -3782,7 +3821,11 @@ def salvar_contato_cadastro(payload):
         """,
         params,
     )
-    return contato_cadastro_por_id(row["id"])
+    cid = str(row["id"])
+    if cliente_flag:
+        import cliente_tabela_valores as ctv
+        ctv.seed_tabela_valores_cliente(cid, q, one, normalizar_tipo_importado)
+    return contato_cadastro_por_id(cid)
 
 
 def excluir_contato_cadastro(cid):
@@ -4595,6 +4638,85 @@ def api_cadastros_delete_arquivo_contato(cid: str, aid: str):
         return {"ok": True, "itens": listar_arquivos_contato_cadastro(cid)}
     except Exception as exc:
         return JSONResponse({"ok": False, "erro": str(exc)}, status_code=400)
+
+
+@app.get("/api/cadastros/contatos/{cid}/tabela-valores")
+def api_cadastros_get_tabela_valores(cid: str):
+    import cliente_tabela_valores as ctv
+    item = contato_cadastro_por_id(cid)
+    if not item or not item.get("cliente"):
+        return JSONResponse({"ok": False, "erro": "Cliente não encontrado"}, status_code=404)
+    data = ctv.listar_tabela_valores_cliente(cid, q, normalizar_tipo_importado)
+    return {"ok": True, **data}
+
+
+@app.put("/api/cadastros/contatos/{cid}/tabela-valores")
+async def api_cadastros_put_tabela_valores(cid: str, request: Request):
+    import cliente_tabela_valores as ctv
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    try:
+        data = ctv.salvar_tabela_valores_cliente(
+            cid,
+            payload.get("itens") or [],
+            q,
+            one,
+            normalizar_tipo_importado,
+        )
+        return {"ok": True, **data}
+    except Exception as exc:
+        return JSONResponse({"ok": False, "erro": str(exc)}, status_code=400)
+
+
+@app.get("/api/clientes/tabela-valores/mapa-itens")
+def api_cliente_tabela_valores_mapa_itens(
+    seguradora: str = "",
+    tipo: str = "",
+    cliente_id: str = "",
+):
+    import cliente_tabela_valores as ctv
+    cid = (cliente_id or "").strip() or ctv.cliente_id_por_seguradora(seguradora, one)
+    tipo_norm = normalizar_tipo_importado(tipo) if tipo else ""
+    mapa = {}
+    if cid and tipo_norm:
+        mapa = ctv.mapa_itens_cliente_por_tipo(cid, tipo_norm, q, normalizar_tipo_importado)
+    return {"ok": True, "cliente_id": cid, "tipo": tipo_norm, "itens": mapa}
+
+
+@app.get("/api/clientes/tabela-valores/precos")
+def api_cliente_tabela_valores_precos(
+    seguradora: str = "",
+    tipo: str = "",
+    item: str = "",
+    cliente_id: str = "",
+):
+    import cliente_tabela_valores as ctv
+    cid = (cliente_id or "").strip() or ctv.cliente_id_por_seguradora(seguradora, one)
+    tipo_norm = normalizar_tipo_importado(tipo) if tipo else ""
+    item_norm = ctv.normalizar_nome_item(item or "SAIDA")
+    valor = 0.0
+    if cid and tipo_norm:
+        v = ctv.valor_item_cliente(cid, tipo_norm, item_norm, one, normalizar_tipo_importado)
+        valor = float(v or 0)
+    return {
+        "ok": True,
+        "cliente_id": cid,
+        "tipo": tipo_norm,
+        "item": item_norm,
+        "valor": valor,
+    }
+
+
+@app.get("/api/clientes/tabela-valores/linhas")
+def api_cliente_tabela_valores_linhas(seguradora: str = "", cliente_id: str = ""):
+    import cliente_tabela_valores as ctv
+    cid = (cliente_id or "").strip() or ctv.cliente_id_por_seguradora(seguradora, one)
+    if not cid:
+        return {"ok": True, "cliente_id": None, "itens": []}
+    ativos = ctv.linhas_ativas_cliente(cid, q, normalizar_tipo_importado)
+    return {"ok": True, "cliente_id": cid, "itens": ativos}
 
 
 def opcoes_profissionais_controle():
@@ -7279,7 +7401,7 @@ def central(
             'servicos': lista_servicos_central_filtrada(**filtros),
             'lan_ip': get_lan_ip(),
             'tipos_servico': lista_tipos_servico(),
-            'precos_por_tipo': {t: itens_padrao_tipo(t) for t in lista_tipos_servico()},
+            'precos_por_tipo': precos_por_tipo_cliente(),
             'filtros': filtros,
             'filtro_statuses': statuses,
             'filtro_status': status,
@@ -9711,7 +9833,7 @@ def faturamento_detalhe(sid: str, request: Request, aba: str = "editar", ok: str
             's': s,
             'itens': itens,
             'tipos_servico': lista_tipos_servico(),
-            'precos_por_tipo': {t: itens_padrao_tipo(t) for t in lista_tipos_servico()},
+            'precos_por_tipo': precos_por_tipo_cliente(seguradora=s.get("seguradora")),
             'motoristas': lista_motoristas(),
             'status_operacionais': [
                 'novo', 'enviado', 'aceito', 'a caminho', 'na origem',

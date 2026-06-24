@@ -131,6 +131,9 @@
       <button type="button" class="cad-nav-btn" data-cad-tab="endereco">📍 Endereço</button>
       <button type="button" class="cad-nav-btn" data-cad-tab="comunicacao">✉️ Contatos</button>
       <button type="button" class="cad-nav-btn" data-cad-tab="comercial">💼 Comercial</button>
+      {% if filtro_cliente %}
+      <button type="button" class="cad-nav-btn" data-cad-tab="tabela-valores">💰 Tabela de Valores</button>
+      {% endif %}
       <button type="button" class="cad-nav-btn" data-cad-tab="observacoes">📝 Observações</button>
       <button type="button" class="cad-nav-btn" data-cad-tab="arquivos">📎 Arquivos</button>
     </nav>
@@ -217,6 +220,30 @@
         </div>
       </div>
 
+      {% if filtro_cliente %}
+      <div class="cad-panel" data-cad-panel="tabela-valores">
+        <h3 class="cad-section-title">Tabela de valores por tipo de serviço</h3>
+        <p class="muted" style="margin:0 0 12px;font-size:13px">Valores negociados com este cliente. Usados automaticamente ao criar ou editar serviços vinculados à empresa/seguradora.</p>
+        <div class="ctrl-table-wrap">
+          <table class="ctrl-table" id="tabelaValoresCliente">
+            <thead>
+              <tr>
+                <th>Tipo de serviço / Item</th>
+                <th style="width:140px">Valor unit. (R$)</th>
+                <th style="width:90px">Ativo</th>
+                <th>Observação</th>
+              </tr>
+            </thead>
+            <tbody id="tbodyTabelaValores"></tbody>
+          </table>
+        </div>
+        <div class="cad-import-actions" style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
+          <button type="button" class="ctrl-btn ctrl-btn-primary" id="btnSalvarTabelaValores">Salvar tabela de valores</button>
+        </div>
+        <p id="cadMsgTabelaValores" class="muted" style="display:none;margin-top:10px"></p>
+      </div>
+      {% endif %}
+
       <div class="cad-panel" data-cad-panel="observacoes">
         <div class="cad-form-grid">
           <div class="full"><label>Observações gerais</label><textarea id="c_observacoes" rows="8"></textarea></div>
@@ -265,6 +292,7 @@
 
 {% include "partials/app_shell_end.html" %}
 <script src="/static/cadastros_contatos.js"></script>
+{% if filtro_cliente %}<script src="/static/cadastros_contatos_tabela_valores.js"></script>{% endif %}
 {% if filtro_cliente %}<script src="/static/cadastros_import_clientes.js"></script>{% endif %}
 </body>
 </html>

@@ -239,6 +239,18 @@
               </div>
             </div>
 
+            <div class="sd-grid" style="margin-bottom:14px;align-items:end">
+              <div class="sd-field">
+                <label>Adicionar da tabela do cliente</label>
+                <select id="selItemTabelaCliente">
+                  <option value="">— Selecione um tipo negociado —</option>
+                </select>
+              </div>
+              <div class="sd-field">
+                <button type="button" class="sd-btn sd-btn-dark" id="btnAddItemTabelaCliente">Adicionar item</button>
+              </div>
+            </div>
+
             <div class="sd-finance-wrap">
               <div class="sd-finance-grid head">
                 <span>Item</span><span>Qtd</span><span>Valor unit.</span>
@@ -439,9 +451,34 @@
 
 <script>
 const PRECOS_POR_TIPO = {{ precos_por_tipo|tojson }};
+const SEGURADORA_SERVICO = {{ (s.seguradora or '')|tojson }};
 
 function brMoney(v) {
   return Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function aplicarMapaClienteItens(tipo) {
+  if (!SEGURADORA_SERVICO || !tipo) return Promise.resolve();
+  return fetch(`/api/clientes/tabela-valores/mapa-itens?seguradora=${encodeURIComponent(SEGURADORA_SERVICO)}&tipo=${encodeURIComponent(tipo)}`)
+    .then((r) => r.json())
+    .then((j) => {
+      if (!j.ok || !j.itens) return;
+      const mapa = j.itens;
+      document.querySelectorAll('.item-financeiro').forEach((l) => {
+        const hidden = (l.querySelector('[name="item_nome"]')?.value || '').toUpperCase().replace('SAÍDA', 'SAIDA');
+        const label = (l.querySelector('label')?.textContent || '').toUpperCase().replace('SAÍDA', 'SAIDA');
+        const nome = hidden || label;
+        const val = mapa[nome];
+        if (val && Number(val) > 0) {
+          const inp = l.querySelector('[name="item_valor"]');
+          if (inp) inp.value = Number(val).toFixed(2);
+          const q = l.querySelector('[name="item_qtd"]');
+          if (q && Number(q.value) === 0 && (nome === 'SAIDA')) q.value = 1;
+        }
+      });
+      calcularTotal();
+    })
+    .catch(() => {});
 }
 
 function calcularTotal() {
@@ -470,7 +507,67 @@ function carregarPadrao() {
     </div>`;
   }).join('');
   calcularTotal();
+  aplicarMapaClienteItens(tipo);
 }
+
+function adicionarLinhaFinanceira(label, valor, qtd, codigoItem) {
+  const box = document.getElementById('itens-financeiros');
+  if (!box) return;
+  const nome = codigoItem || label;
+  const div = document.createElement('div');
+  div.className = 'sd-finance-grid item-financeiro';
+  div.innerHTML = `
+    <input type="hidden" name="item_nome" value="${nome}">
+    <label>${label}</label>
+    <input type="number" step="0.01" min="0" name="item_qtd" value="${qtd}" oninput="calcularTotal()">
+    <input type="number" step="0.01" min="0" name="item_valor" value="${Number(valor || 0).toFixed(2)}" oninput="calcularTotal()">
+  `;
+  box.appendChild(div);
+  calcularTotal();
+}
+
+function carregarOpcoesTabelaCliente() {
+  const sel = document.getElementById('selItemTabelaCliente');
+  if (!sel || !SEGURADORA_SERVICO) return;
+  const tipoAtual = document.getElementById('tipo-servico')?.value || '';
+  fetch(`/api/clientes/tabela-valores/linhas?seguradora=${encodeURIComponent(SEGURADORA_SERVICO)}`)
+    .then((r) => r.json())
+    .then((j) => {
+      const base = '<option value="">— Selecione um item da tabela —</option>';
+      if (!j.ok || !j.itens?.length) {
+        sel.innerHTML = base;
+        return;
+      }
+      const filtrados = j.itens.filter((i) => !tipoAtual || i.tipo_servico === tipoAtual);
+      sel.innerHTML = base + filtrados
+        .map((i) => {
+          const v = Number(i.valor_unitario ?? i.valor ?? 0);
+          const lblItem = i.label_item || i.item;
+          const vFmt = v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+          return `<option value="${i.item}" data-tipo="${i.tipo_servico}" data-valor="${v.toFixed(2)}" data-nome="${i.item}" data-label="${lblItem}">${lblItem} — R$ ${vFmt}</option>`;
+        })
+        .join('');
+    })
+    .catch(() => {});
+}
+
+document.getElementById('btnAddItemTabelaCliente')?.addEventListener('click', () => {
+  const sel = document.getElementById('selItemTabelaCliente');
+  const opt = sel?.selectedOptions?.[0];
+  if (!opt || !opt.value) {
+    alert('Selecione um item da tabela do cliente.');
+    return;
+  }
+  const valor = Number(opt.dataset.valor || 0);
+  const nomeItem = opt.dataset.nome || opt.value || 'SAIDA';
+  const labelItem = opt.dataset.label || nomeItem;
+  adicionarLinhaFinanceira(labelItem, valor, nomeItem.toUpperCase() === 'SAIDA' ? 1 : 0, nomeItem);
+});
+
+document.getElementById('tipo-servico')?.addEventListener('change', function () {
+  aplicarMapaClienteItens(this.value);
+  carregarOpcoesTabelaCliente();
+});
 
 function ativarAba(nome) {
   document.querySelectorAll('.sd-panel').forEach((p) => p.classList.remove('active'));
@@ -489,6 +586,7 @@ document.querySelectorAll('.sd-nav-item[data-aba]').forEach((btn) => {
 });
 
 calcularTotal();
+carregarOpcoesTabelaCliente();
 
 (function marcarAlertasServicoAberto() {
   const sid = {{ s.id|tojson }};

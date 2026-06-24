@@ -196,6 +196,9 @@
     el("btnExcluirContato").style.display = item?.id ? "inline-block" : "none";
     preencherForm(item || {});
     initTabs();
+    if (window.__cadCarregarTabelaValores && item?.id) {
+      window.__cadCarregarTabelaValores(item.id);
+    }
   }
 
   function payload() {
@@ -256,6 +259,7 @@
         el("btnExcluirContato").style.display = "inline-block";
         const det = await fetch(`${API}/${j.item.id}`).then((x) => x.json());
         if (det.item) preencherForm(det.item);
+        if (window.__cadCarregarTabelaValores) window.__cadCarregarTabelaValores(j.item.id);
       }
     } catch (e) {
       erro.textContent = e.message;

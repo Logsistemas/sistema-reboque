@@ -1,0 +1,97 @@
+{
+  "catalogo": {
+    "C. MEC. LEVE": [
+      "SAIDA"
+    ],
+    "E. PATIO": [
+      "ESTADIA"
+    ],
+    "GUINDAUTO": [
+      "SAIDA",
+      "HORA TRABALHADA"
+    ],
+    "R. 5 RODA": [
+      "HORA TRABALHADA",
+      "SAIDA",
+      "HORA PARADA",
+      "KM VIAGEM"
+    ],
+    "R. E. PESADO": [
+      "ESTADIA",
+      "PEDAGIO",
+      "HORA TRABALHADA",
+      "HORA PARADA",
+      "KM DESLOCAMENTO",
+      "KM VIAGEM",
+      "SAIDA"
+    ],
+    "R. GARAGEM": [
+      "PEDAGIO",
+      "HORA TRABALHADA",
+      "HORA PARADA",
+      "KM RETORNO",
+      "KM DESLOCAMENTO",
+      "KM VIAGEM",
+      "SAIDA"
+    ],
+    "R. LEVE": [
+      "KM VIAGEM",
+      "HORA TRABALHADA",
+      "ESTADIA",
+      "PEDAGIO",
+      "HORA PARADA",
+      "SAIDA"
+    ],
+    "R. MEGA PESADO": [
+      "KM VIAGEM",
+      "SAIDA",
+      "KM DESLOCAMENTO",
+      "KM RETORNO",
+      "HORA PARADA",
+      "HORA TRABALHADA",
+      "PEDAGIO"
+    ],
+    "R. MOTO": [
+      "KM RETORNO",
+      "ESTADIA",
+      "KM VIAGEM",
+      "SAIDA",
+      "KM DESLOCAMENTO",
+      "HORA PARADA",
+      "HORA TRABALHADA",
+      "PEDAGIO"
+    ],
+    "R. MOTO ESP.": [
+      "KM VIAGEM",
+      "PEDAGIO",
+      "HORA PARADA",
+      "HORA TRABALHADA",
+      "SAIDA"
+    ],
+    "R. PATINS": [
+      "PEDAGIO",
+      "HORA TRABALHADA",
+      "HORA PARADA",
+      "KM VIAGEM",
+      "SAIDA",
+      "ESTADIA"
+    ],
+    "R. PESADO": [
+      "PEDAGIO",
+      "HORA TRABALHADA",
+      "SAIDA",
+      "KM VIAGEM",
+      "KM DESLOCAMENTO",
+      "ESTADIA",
+      "HORA PARADA"
+    ],
+    "R. UTILITARIO": [
+      "PEDAGIO",
+      "ESTADIA",
+      "SAIDA",
+      "KM VIAGEM",
+      "HORA PARADA",
+      "HORA TRABALHADA"
+    ]
+  }
+}
