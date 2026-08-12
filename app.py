@@ -115,6 +115,10 @@ _cors_origins = (
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
+    # Extensão Chrome (Essência Exportador / captura Vianet) roda com
+    # origem chrome-extension://<id> — libera esse padrão à parte da
+    # lista de domínios web em ALLOWED_ORIGINS.
+    allow_origin_regex=r"chrome-extension://.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
