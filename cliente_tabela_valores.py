@@ -236,23 +236,44 @@ def seed_tabela_valores_cliente(cliente_id, q_fn, one_fn, normalizar_tipo_fn, cu
     cliente_id = str(cliente_id)
     catalogo = catalogo_tabela_valores()
 
-    def _exec(sql, params):
-        if cur is not None:
-            cur.execute(sql, params)
-        else:
-            q_fn(sql, params)
-
+    linhas = []
     for tipo_raw, itens in catalogo.items():
         tipo = normalizar_tipo_fn(tipo_raw) or tipo_raw
         for item in itens:
-            _exec(
+            linhas.append((cliente_id, tipo, item))
+
+    if not linhas:
+        return
+
+    sql = """
+        insert into cliente_tabela_valores
+          (cliente_id, tipo_servico, item, valor, valor_unitario, ativo, updated_at)
+        values %s
+        on conflict (cliente_id, tipo_servico, item) do nothing
+    """
+    template = "(%s, %s, %s, 0, 0, true, now())"
+
+    # Insere tudo em um único round-trip por cliente, em vez de uma
+    # instrução por item (evita travar o startup com centenas/milhares
+    # de execuções sequenciais contra um Postgres remoto).
+    if cur is not None:
+        from psycopg2.extras import execute_values
+
+        execute_values(cur, sql, linhas, template=template)
+    else:
+        # Chamada avulsa (sem cursor compartilhado): q_fn abre e fecha
+        # sua própria conexão por chamada, então mantemos item a item
+        # aqui — só o caminho de startup (cur != None), que processa
+        # todos os clientes de uma vez, precisava do batch acima.
+        for cliente_id_row, tipo, item in linhas:
+            q_fn(
                 """
                 insert into cliente_tabela_valores
                   (cliente_id, tipo_servico, item, valor, valor_unitario, ativo, updated_at)
                 values (%s, %s, %s, 0, 0, true, now())
                 on conflict (cliente_id, tipo_servico, item) do nothing
                 """,
-                (cliente_id, tipo, item),
+                (cliente_id_row, tipo, item),
             )
 
 
