@@ -9402,28 +9402,13 @@ def api_app_motorista_login(payload: AppLoginPayload):
         where coalesce(ativo,true)=true
           and (
             lower(coalesce(login,''))=lower(%s)
-            or regexp_replace(coalesce(cpf,''),'[^0-9]','','g')=regexp_replace(%s,'[^0-9]','','g')
+            or (
+              regexp_replace(%s,'[^0-9]','','g') <> ''
+              and regexp_replace(coalesce(cpf,''),'[^0-9]','','g') = regexp_replace(%s,'[^0-9]','','g')
+            )
           )
         limit 1
-    """, (login, login))
-
-    # DEBUG TEMP: diagnóstico do login que não estava batendo em produção.
-    # Remover depois de confirmar a causa.
-    try:
-        _senha_guardada = m.get("senha") if m else None
-        print(
-            f"[DEBUG LOGIN] login_recebido={login!r} encontrou_motorista={bool(m)} "
-            f"id={m.get('id') if m else None} senha_guardada_repr={_senha_guardada!r} "
-            f"tipo={type(_senha_guardada).__name__}"
-        )
-        if m:
-            try:
-                _ok = verificar_senha(senha, _senha_guardada)
-                print(f"[DEBUG LOGIN] verificar_senha resultado={_ok!r}")
-            except Exception as _exc:
-                print(f"[DEBUG LOGIN] verificar_senha EXPLODIU: {type(_exc).__name__}: {_exc}")
-    except Exception as _exc_outer:
-        print(f"[DEBUG LOGIN] bloco debug falhou: {type(_exc_outer).__name__}: {_exc_outer}")
+    """, (login, login, login))
 
     if not m or not verificar_senha(senha, m.get("senha")):
         return JSONResponse({"ok": False, "erro": "Login ou senha inválidos."}, status_code=401)
@@ -9631,7 +9616,7 @@ async def motorista_login(request: Request):
         where coalesce(ativo,true)=true
           and (lower(coalesce(login,''))=lower(%s) or regexp_replace(coalesce(cpf,''),'[^0-9]','','g')=regexp_replace(%s,'[^0-9]','','g'))
         limit 1
-    """, (login, login))
+    """, (login, login, login))
 
     if not m or not verificar_senha(senha, m.get("senha")):
         return templates.TemplateResponse('motorista_login.html', {'request': request, 'erro': 'Login ou senha inválidos.'})
