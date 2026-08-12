@@ -103,10 +103,18 @@ import io, socket, shutil, uuid, json, math, re, base64, html
 import psycopg2
 from psycopg2.extras import RealDictCursor, Json
 
+from auth_senha import e_hash_bcrypt, hash_senha, verificar_senha
+
 app = FastAPI(title="Sistema Interno de Reboque V13 - Faturamento")
+_allowed_origins_env = (os.getenv("ALLOWED_ORIGINS") or "").strip()
+_cors_origins = (
+    [o.strip() for o in _allowed_origins_env.split(",") if o.strip()]
+    if _allowed_origins_env
+    else ["*"]
+)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -7458,9 +7466,10 @@ async def salvar_veiculo(request: Request):
 @app.post('/cadastros/usuarios')
 async def salvar_usuario(request: Request):
     form = await request.form()
+    senha_hash = hash_senha(form.get('senha','').strip())
     q("insert into usuarios_sistema (nome,cpf,telefone,email,senha,perfil,ativo) values (%s,%s,%s,%s,%s,%s,true)", (
         form.get('nome','').strip(), form.get('cpf','').strip(), form.get('telefone','').strip(),
-        form.get('email','').strip(), form.get('senha','').strip(), form.get('perfil','').strip()
+        form.get('email','').strip(), senha_hash, form.get('perfil','').strip()
     ))
     return RedirectResponse('/central', 303)
 
@@ -8067,6 +8076,14 @@ async def editar_motorista(mid: str, request: Request):
     form = await request.form()
     ativo = True if form.get('ativo') == 'on' else False
     online = True if form.get('online') == 'on' else False
+    senha_form = form.get('senha','').strip()
+    if not senha_form:
+        row = one("select senha from motoristas where id=%s", (str(mid),))
+        senha_gravar = (row or {}).get("senha") or ""
+    elif e_hash_bcrypt(senha_form):
+        senha_gravar = senha_form
+    else:
+        senha_gravar = hash_senha(senha_form)
 
     q("""
         update motoristas
@@ -8102,7 +8119,7 @@ async def editar_motorista(mid: str, request: Request):
         form.get('estado_civil','').strip(),
         form.get('endereco','').strip(),
         form.get('login','').strip(),
-        form.get('senha','').strip(),
+        senha_gravar,
         ativo,
         online,
         str(mid)
@@ -8140,12 +8157,13 @@ def operacao(request: Request):
 @app.post('/motoristas')
 async def criar_motorista(request: Request):
     form = await request.form()
+    senha_hash = hash_senha(form.get('senha','').strip())
     q("""insert into motoristas (nome,telefone,veiculo,placa,placa_atual,tipo,cpf,cnh,vencimento_cnh,nascimento,estado_civil,endereco,login,senha,online,ultima_atualizacao)
          values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,false,now())""", (
         form.get('nome','').strip(), form.get('telefone','').strip(), form.get('veiculo','').strip(), form.get('placa','').strip(),
         form.get('placa','').strip().upper(), form.get('tipo','').strip(), form.get('cpf','').strip(), form.get('cnh','').strip(), form.get('vencimento_cnh','').strip(),
         form.get('nascimento','').strip(), form.get('estado_civil','').strip(), form.get('endereco','').strip(),
-        form.get('login','').strip(), form.get('senha','').strip()
+        form.get('login','').strip(), senha_hash
     ))
     return RedirectResponse('/central', 303)
 @app.post('/servicos')
@@ -9386,11 +9404,10 @@ def api_app_motorista_login(payload: AppLoginPayload):
             lower(coalesce(login,''))=lower(%s)
             or regexp_replace(coalesce(cpf,''),'[^0-9]','','g')=regexp_replace(%s,'[^0-9]','','g')
           )
-          and coalesce(senha,'')=%s
         limit 1
-    """, (login, login, senha))
+    """, (login, login))
 
-    if not m:
+    if not m or not verificar_senha(senha, m.get("senha")):
         return JSONResponse({"ok": False, "erro": "Login ou senha inválidos."}, status_code=401)
 
     mid = str(m["id"])
@@ -9595,11 +9612,10 @@ async def motorista_login(request: Request):
         select * from motoristas
         where coalesce(ativo,true)=true
           and (lower(coalesce(login,''))=lower(%s) or regexp_replace(coalesce(cpf,''),'[^0-9]','','g')=regexp_replace(%s,'[^0-9]','','g'))
-          and coalesce(senha,'')=%s
         limit 1
-    """, (login, login, senha))
+    """, (login, login))
 
-    if not m:
+    if not m or not verificar_senha(senha, m.get("senha")):
         return templates.TemplateResponse('motorista_login.html', {'request': request, 'erro': 'Login ou senha inválidos.'})
 
     mid = str(m['id'])

@@ -68,7 +68,7 @@ textarea{min-height:70px}
         <tr>
           <td><strong>{{ m.nome or '-' }}</strong><br><span class="small">{{ m.telefone or '' }}</span></td>
           <td>{{ m.login or '-' }}<br><span class="small">CPF: {{ m.cpf or '-' }}</span></td>
-          <td>{{ m.senha or '-' }}</td>
+          <td>••••••</td>
           <td>{{ m.veiculo or '-' }}<br><strong>{{ m.placa_atual or m.placa or '-' }}</strong></td>
           <td>
             {% if m.online %}<span class="badge on">Online</span>{% else %}<span class="badge off">Offline</span>{% endif %}
@@ -114,7 +114,7 @@ textarea{min-height:70px}
           <input name="login" value="{{ m.login or '' }}">
         </label>
         <label>Senha do app
-          <input name="senha" value="{{ m.senha or '' }}">
+          <input name="senha" type="password" value="" placeholder="Deixe em branco para manter">
         </label>
         <label>Tipo
           <input name="tipo" value="{{ m.tipo or '' }}" placeholder="leve, pesado, moto...">
