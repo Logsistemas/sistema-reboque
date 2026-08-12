@@ -1,23 +1,13 @@
-"""Utilitários de hash/verificação de senha (bcrypt via passlib)."""
+"""Utilitários de hash/verificação de senha (bcrypt direto, sem passlib).
+
+Antes usava passlib[bcrypt]==1.7.4, que é incompatível com bcrypt>=4.0
+(passlib nunca recebeu correção pra isso) e fazia toda verificação de
+senha falhar silenciosamente. Chamando a biblioteca bcrypt direto
+evitamos essa camada quebrada.
+"""
 from __future__ import annotations
 
-import bcrypt as _bcrypt
-
-# Compat: bcrypt>=4.0 removeu o submódulo bcrypt.__about__, que o
-# passlib==1.7.4 usa para detectar a versão instalada do backend.
-# Sem isso o passlib falha ao carregar o backend bcrypt e toda
-# verificação de senha quebra silenciosamente (verificar_senha abaixo
-# captura a exceção e devolve False sempre — login "inválido" mesmo
-# com a senha certa). Este shim recria o atributo que o passlib espera.
-if not hasattr(_bcrypt, "__about__"):
-    class _BcryptAbout:
-        __version__ = getattr(_bcrypt, "__version__", "4.0.1")
-
-    _bcrypt.__about__ = _BcryptAbout()
-
-from passlib.context import CryptContext
-
-_pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+import bcrypt
 
 
 def e_hash_bcrypt(valor: str | None) -> bool:
@@ -26,7 +16,8 @@ def e_hash_bcrypt(valor: str | None) -> bool:
 
 
 def hash_senha(senha: str | None) -> str:
-    return _pwd_context.hash(senha or "")
+    dados = (senha or "").encode("utf-8")
+    return bcrypt.hashpw(dados, bcrypt.gensalt()).decode("utf-8")
 
 
 def verificar_senha(senha_plana: str | None, armazenada: str | None) -> bool:
@@ -37,7 +28,7 @@ def verificar_senha(senha_plana: str | None, armazenada: str | None) -> bool:
         return False
     if e_hash_bcrypt(guardada):
         try:
-            return _pwd_context.verify(plana, guardada)
+            return bcrypt.checkpw(plana.encode("utf-8"), guardada.encode("utf-8"))
         except Exception:
             return False
     return plana == guardada
