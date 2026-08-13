@@ -92,9 +92,8 @@ def upsert_categoria(cur, ln, pai_id=None):
 def main():
     import app as main_app
 
-    conn = main_app.get_conn()
     stats = {"inseridas": 0, "atualizadas": 0}
-    try:
+    with main_app.get_conn() as conn:
         with conn.cursor() as cur:
             pai_ids = {}
             for ln in CATEGORIAS:
@@ -118,8 +117,6 @@ def main():
                 stats["inseridas" if acao == "inserida" else "atualizadas"] += 1
                 print(f"  {acao}: {ln['descricao']} ({ln['grupo_dre']})")
         conn.commit()
-    finally:
-        conn.close()
 
     print("\n=== Seed receitas concluído ===")
     print(f"Inseridas: {stats['inseridas']}")

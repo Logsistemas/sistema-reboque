@@ -101,6 +101,7 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 import io, socket, shutil, uuid, json, math, re, base64, html
 import psycopg2
+import psycopg2.pool
 from psycopg2.extras import RealDictCursor, Json
 
 from auth_senha import e_hash_bcrypt, hash_senha, verificar_senha
@@ -769,16 +770,71 @@ def dt_str(v):
         return "-"
     dt = _dt_para_local_br(dt)
     return dt.strftime("%d/%m/%Y %H:%M:%S")
-def get_conn():
-    if not DATABASE_URL:
-        if _is_render_deploy():
-            raise RuntimeError("DATABASE_URL não configurada no Render.")
-        raise RuntimeError(
-            "Banco local não configurado. Defina DATABASE_URL ou LOCAL_DATABASE_URL no .env "
-            f"ou crie {_LOCAL_DB_FILE} com a URL do PostgreSQL."
+_pg_pool = None
+
+
+def _get_pg_pool():
+    """Cria (uma vez) e devolve o pool de conexões com o Postgres.
+
+    Antes, get_conn() abria uma conexão TCP+SSL nova a cada consulta.
+    Como o Render fica em Oregon e o banco (Supabase) em São Paulo, cada
+    handshake de conexão paga várias idas-e-voltas cruzando o continente
+    (~1-1.5s) — em páginas com 20-40 consultas isso vira 1-3 minutos.
+    Reaproveitando conexões já abertas via pool, só pagamos esse custo
+    uma vez por conexão, não uma vez por consulta.
+    """
+    global _pg_pool
+    if _pg_pool is None:
+        if not DATABASE_URL:
+            if _is_render_deploy():
+                raise RuntimeError("DATABASE_URL não configurada no Render.")
+            raise RuntimeError(
+                "Banco local não configurado. Defina DATABASE_URL ou LOCAL_DATABASE_URL no .env "
+                f"ou crie {_LOCAL_DB_FILE} com a URL do PostgreSQL."
+            )
+        _pg_pool = psycopg2.pool.ThreadedConnectionPool(
+            2, 25, DATABASE_URL, cursor_factory=RealDictCursor
         )
+    return _pg_pool
+
+
+class _PooledConn:
+    """Wrapper de contexto que devolve a conexão pro pool ao sair do `with`,
+    em vez de derrubar a conexão. Mantém o mesmo uso de sempre:
+    `with get_conn() as conn: ...`.
+    """
+
+    __slots__ = ("_pool", "_conn")
+
+    def __init__(self, pool, conn):
+        self._pool = pool
+        self._conn = conn
+
+    def __enter__(self):
+        return self._conn
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        quebrada = False
+        try:
+            if exc_type is None:
+                self._conn.commit()
+            else:
+                self._conn.rollback()
+        except Exception:
+            quebrada = True
+        if not quebrada:
+            quebrada = bool(self._conn.closed) or (
+                exc_type is not None
+                and issubclass(exc_type, (psycopg2.OperationalError, psycopg2.InterfaceError))
+            )
+        self._pool.putconn(self._conn, close=quebrada)
+        return False
+
+
+def get_conn():
+    pool = _get_pg_pool()
     try:
-        return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+        conn = pool.getconn()
     except psycopg2.OperationalError as exc:
         if _is_render_deploy():
             raise
@@ -787,13 +843,26 @@ def get_conn():
             "Restaure DATABASE_URL no .env (foi removida ao adicionar GOOGLE_MAPS_API_KEY) "
             f"ou verifique se o servidor está ativo. Detalhe: {exc}"
         ) from exc
+    return _PooledConn(pool, conn)
 def q(sql, params=None, fetch=False):
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute(sql, params or ())
-            rows = cur.fetchall() if fetch else None
-        conn.commit()
-    return rows
+    tentativas = 2
+    ultimo_erro = None
+    for _ in range(tentativas):
+        try:
+            with get_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(sql, params or ())
+                    rows = cur.fetchall() if fetch else None
+                conn.commit()
+            return rows
+        except (psycopg2.OperationalError, psycopg2.InterfaceError) as exc:
+            # Conexão do pool pode ter sido fechada pelo outro lado
+            # (ex.: pooler do Supabase reciclando conexão ociosa).
+            # A conexão quebrada já foi descartada do pool no __exit__
+            # acima; tenta de novo com uma conexão nova.
+            ultimo_erro = exc
+            continue
+    raise ultimo_erro
 def one(sql, params=None):
     rows=q(sql, params, True)
     return rows[0] if rows else None

@@ -179,11 +179,8 @@ def main():
     print(f"Lendo: {xlsx}")
     print(f"Linhas válidas no Excel: {len(linhas)}")
 
-    conn = main_app.get_conn()
-    try:
+    with main_app.get_conn() as conn:
         stats = importar(linhas, conn)
-    finally:
-        conn.close()
 
     print("\n=== Importação concluída ===")
     print(f"Categorias importadas: {stats['importadas']}")
