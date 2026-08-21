@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Faturamento — Essência Logística</title>
-<link rel="stylesheet" href="/static/faturamento.css?v=20260531">
+<link rel="stylesheet" href="/static/faturamento.css?v=20260819">
   {% include "partials/head_pages_v2.html" %}
 </head>
 <body class="ess-app fat-body">
@@ -143,7 +143,13 @@
             <td class="fat-col-check">
               <input type="checkbox" class="chk-servico" value="{{ s.id }}">
             </td>
-            <td class="fat-protocolo"><a href="/faturamento/{{ s.id }}">{{ s.protocolo or '-' }}</a></td>
+            <td class="fat-protocolo">
+              <a href="/faturamento/{{ s.id }}">{{ s.protocolo or '-' }}</a>
+              {% if s.fotos and s.fotos|length > 0 %}
+              <span class="fat-icon-anexo" title="{{ s.fotos|length }} arquivo(s) anexado(s)">📁</span>
+              {% endif %}
+              <a class="fat-icon-checklist" href="/faturamento/{{ s.id }}?aba=checklist" title="Abrir checklist do serviço">📋</a>
+            </td>
             <td class="fat-col-date">{{ s.created_at or '-' }}</td>
             <td>{{ s.seguradora or '-' }}</td>
             <td>{{ s.tipo or '-' }}</td>

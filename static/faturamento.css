@@ -377,6 +377,32 @@ body.fat-body {
   text-decoration: underline;
 }
 
+.fat-icon-anexo,
+.fat-icon-checklist {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 13px;
+  line-height: 1;
+  vertical-align: middle;
+  text-decoration: none;
+  opacity: 0.85;
+}
+
+.fat-icon-anexo {
+  cursor: default;
+}
+
+.fat-icon-checklist {
+  opacity: 0.55;
+  filter: grayscale(1);
+  transition: opacity 0.15s ease, filter 0.15s ease;
+}
+
+.fat-icon-checklist:hover {
+  opacity: 1;
+  filter: none;
+}
+
 /* —— Badges —— */
 .fat-badge-op {
   display: inline-block;
