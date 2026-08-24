@@ -8571,44 +8571,58 @@ def google_distance_matrix_endereco(origem_lat, origem_lng, destino_endereco):
 KM_COBERTO_PADRAO = 40
 
 
-def google_distance_matrix_enderecos(origem_endereco, destino_endereco):
+def google_routes_km(origem_endereco, destino_endereco):
     """
-    Calcula rota entre dois endereços textuais (sem depender de lat/lng de
-    ninguém). Retorna (distancia_texto, duracao_texto, distancia_valor_metros).
+    Calcula km entre dois endereços textuais usando a Routes API do Google
+    (routes.googleapis.com/directions/v2:computeRoutes), com
+    routingPreference=TRAFFIC_UNAWARE (rota "padrão", sem considerar trânsito
+    em tempo real). É a MESMA API e a mesma configuração que a ferramenta
+    original de auditoria de KM excedente (km_excedente_app_v4_geral) usava —
+    escolhido de propósito pra manter os números consistentes com o que já
+    era calculado antes. Isso pode divergir um pouco do link do Google Maps
+    aberto no navegador, que sempre roteia pela condição de trânsito atual
+    (às vezes pegando um caminho com pedágio um pouco mais longo em km, mas
+    mais rápido no momento) — o link é só uma referência visual da rota, o
+    valor "oficial" de km excedente é sempre o calculado aqui.
+    Retorna km (float) ou None se não conseguir calcular.
     """
     key = google_api_key()
     origem_endereco = normalizar_endereco_google(origem_endereco)
     destino_endereco = normalizar_endereco_google(destino_endereco)
     if not key or not origem_endereco or not destino_endereco:
-        return None, None, None
+        return None
 
     try:
-        params = urllib.parse.urlencode({
-            "origins": origem_endereco,
-            "destinations": destino_endereco,
-            "mode": "driving",
-            "language": "pt-BR",
-            "region": "br",
-            "key": key
-        })
-        url = "https://maps.googleapis.com/maps/api/distancematrix/json?" + params
-        with urllib.request.urlopen(url, timeout=8) as resp:
+        body = json.dumps({
+            "origin": {"address": origem_endereco},
+            "destination": {"address": destino_endereco},
+            "travelMode": "DRIVE",
+            "routingPreference": "TRAFFIC_UNAWARE",
+            "languageCode": "pt-BR",
+            "units": "METRIC",
+        }).encode("utf-8")
+        req = urllib.request.Request(
+            "https://routes.googleapis.com/directions/v2:computeRoutes",
+            data=body,
+            method="POST",
+            headers={
+                "Content-Type": "application/json",
+                "X-Goog-Api-Key": key,
+                "X-Goog-FieldMask": "routes.distanceMeters",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
             data = json.loads(resp.read().decode("utf-8"))
 
-        if data.get("status") != "OK":
-            return None, None, None
-
-        rows = data.get("rows") or []
-        if rows and rows[0].get("elements"):
-            el = rows[0]["elements"][0]
-            if el.get("status") == "OK":
-                dist = el.get("distance", {})
-                dur = el.get("duration", {})
-                return dist.get("text"), dur.get("text"), dist.get("value")
+        rotas = data.get("routes") or []
+        if not rotas:
+            return None
+        metros = rotas[0].get("distanceMeters")
+        if metros is None:
+            return None
+        return float(metros) / 1000.0
     except Exception:
-        pass
-
-    return None, None, None
+        return None
 
 
 def gerar_link_rota_maps_km_excedente(origem, destino):
@@ -8652,15 +8666,15 @@ def calcular_km_excedente_servico(sid, forcar=False):
     if not google_api_key():
         return {"ok": False, "erro": "GOOGLE_MAPS_API_KEY não configurada"}
 
-    _, _, km_ida_m = google_distance_matrix_enderecos(origem, destino)
-    _, _, km_volta_m = google_distance_matrix_enderecos(destino, origem)
+    km_ida = google_routes_km(origem, destino)
+    km_volta = google_routes_km(destino, origem)
 
-    if km_ida_m is None or km_volta_m is None:
+    if km_ida is None or km_volta is None:
         erro = "Não foi possível calcular a rota no Google Maps"
         q("update servicos set km_calculo_erro=%s where id=%s", (erro, str(sid)))
         return {"ok": False, "erro": erro}
 
-    km_total = round((float(km_ida_m) + float(km_volta_m)) / 1000.0, 2)
+    km_total = round(float(km_ida) + float(km_volta), 2)
     km_excedente = round(max(0.0, km_total - KM_COBERTO_PADRAO), 2)
     q(
         "update servicos set km_total_ida_volta=%s, km_excedente=%s, km_calculado_em=now(), km_calculo_erro=null where id=%s",
