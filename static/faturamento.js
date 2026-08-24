@@ -202,4 +202,71 @@
   if (btnExport) {
     btnExport.addEventListener("click", exportarExcel);
   }
+
+  /* KM Excedente — calcular por linha */
+  document.querySelectorAll(".fat-km-calc-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const sid = btn.dataset.servicoId;
+      if (!sid) return;
+      btn.disabled = true;
+      btn.textContent = "Calculando...";
+      try {
+        const res = await fetch(`/faturamento/${sid}/calcular-km`, { method: "POST" });
+        const data = await res.json();
+        if (!data.ok) {
+          alert(data.erro || "Não foi possível calcular o km excedente deste serviço.");
+          btn.disabled = false;
+          btn.textContent = "Calcular";
+          return;
+        }
+        const cell = btn.closest(".fat-col-km");
+        if (cell) {
+          const km = Number(data.km_excedente || 0);
+          const link = data.km_maps_link || "#";
+          if (km > 0) {
+            cell.innerHTML = `<a class="fat-km-badge fat-km-over" href="${link}" target="_blank" rel="noopener" title="Ver rota Origem → Destino → Origem no Google Maps"><span class="fat-km-icon" aria-hidden="true">🗺️</span>${km.toFixed(1)} km exced.</a>`;
+          } else {
+            cell.innerHTML = `<a class="fat-km-badge fat-km-ok" href="${link}" target="_blank" rel="noopener" title="Rota dentro dos 40km cobertos — ver no Google Maps"><span class="fat-km-icon" aria-hidden="true">✓</span>Sem excedente</a>`;
+          }
+        }
+      } catch (e) {
+        console.warn("[faturamento km]", e);
+        alert("Não foi possível calcular o km excedente deste serviço.");
+        btn.disabled = false;
+        btn.textContent = "Calcular";
+      }
+    });
+  });
+
+  /* KM Excedente — calcular pendentes em lote */
+  const btnKmPendentes = document.getElementById("btn-calcular-km-pendentes");
+  if (btnKmPendentes) {
+    btnKmPendentes.addEventListener("click", async () => {
+      btnKmPendentes.disabled = true;
+      const textoOriginal = btnKmPendentes.textContent;
+      let totalCalculados = 0;
+      let totalErros = 0;
+      try {
+        for (let i = 0; i < 20; i++) {
+          btnKmPendentes.textContent = "Calculando...";
+          const res = await fetch("/faturamento/calcular-km-pendentes?limite=15", { method: "POST" });
+          const data = await res.json();
+          totalCalculados += data.calculados || 0;
+          totalErros += data.erros || 0;
+          btnKmPendentes.textContent = `Calculando... (${totalCalculados} feitos)`;
+          if (!data.restantes || (data.calculados === 0 && data.erros === 0)) break;
+        }
+        alert(
+          `Cálculo de km excedente concluído.\n${totalCalculados} serviço(s) calculado(s).` +
+            (totalErros ? `\n${totalErros} com erro (sem rota ou endereço incompleto).` : "")
+        );
+        location.reload();
+      } catch (e) {
+        console.warn("[faturamento km pendentes]", e);
+        alert("Não foi possível calcular os km pendentes.");
+        btnKmPendentes.disabled = false;
+        btnKmPendentes.textContent = textoOriginal;
+      }
+    });
+  }
 })();

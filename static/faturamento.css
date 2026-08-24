@@ -511,6 +511,76 @@ body.fat-body {
   font-size: 14px;
 }
 
+/* —— KM Excedente —— */
+.fat-col-km {
+  white-space: nowrap;
+}
+
+.fat-km-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+  border: 1px solid transparent;
+  transition: filter 0.15s ease, transform 0.1s ease;
+}
+
+.fat-km-badge:hover {
+  filter: brightness(0.96);
+  transform: translateY(-1px);
+}
+
+.fat-km-badge.fat-km-over {
+  background: #ffedd5;
+  color: #9a3412;
+  border-color: #fdba74;
+}
+
+.fat-km-badge.fat-km-ok {
+  background: #f1f5f9;
+  color: #475569;
+  border-color: #e2e8f0;
+}
+
+.fat-km-icon {
+  font-size: 12px;
+  line-height: 1;
+}
+
+.fat-km-calc-btn {
+  padding: 5px 11px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  background: #fff;
+  color: #2563eb;
+  border: 1px dashed #93c5fd;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.fat-km-calc-btn:hover {
+  background: #eff6ff;
+}
+
+.fat-km-calc-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.fat-km-none {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.fat-btn-km-pendentes {
+  white-space: nowrap;
+}
+
 /* —— Ações por linha —— */
 .fat-actions {
   display: flex;

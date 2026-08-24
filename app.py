@@ -1609,7 +1609,9 @@ def normalizar_servico(s, incluir_fotos=True):
     if s.get("motorista_id"): s["motorista_id"]=str(s["motorista_id"])
     if not s.get("placa_veiculo_removido") and s.get("placa_removida"): s["placa_veiculo_removido"]=s.get("placa_removida")
     if not s.get("placa_removida") and s.get("placa_veiculo_removido"): s["placa_removida"]=s.get("placa_veiculo_removido")
-    for k in ["criado_em","atualizado_em","finalizado_em","created_at"]: s[k]=dt_str(s.get(k))
+    for k in ["criado_em","atualizado_em","finalizado_em","created_at","km_calculado_em"]: s[k]=dt_str(s.get(k))
+    if s.get("km_excedente") is not None: s["km_excedente"]=float(s["km_excedente"])
+    if s.get("km_total_ida_volta") is not None: s["km_total_ida_volta"]=float(s["km_total_ida_volta"])
     h=s.get("historico") or []
     if isinstance(h,str):
         try: h=json.loads(h)
@@ -8560,6 +8562,113 @@ def google_distance_matrix_endereco(origem_lat, origem_lng, destino_endereco):
         return None, None, None, f"erro Google: {str(e)[:60]}"
 
 
+# ---------------------------------------------------------------------------
+# KM excedente (faturamento) — cobertura padrão da empresa é de 40 km por
+# serviço, calculados como duas pernas separadas: Origem->Destino e
+# Destino->Origem (NÃO é a ida multiplicada por 2). O que passar de 40 km
+# no total das duas pernas é "km excedente" e gera cobrança extra.
+# ---------------------------------------------------------------------------
+KM_COBERTO_PADRAO = 40
+
+
+def google_distance_matrix_enderecos(origem_endereco, destino_endereco):
+    """
+    Calcula rota entre dois endereços textuais (sem depender de lat/lng de
+    ninguém). Retorna (distancia_texto, duracao_texto, distancia_valor_metros).
+    """
+    key = google_api_key()
+    origem_endereco = normalizar_endereco_google(origem_endereco)
+    destino_endereco = normalizar_endereco_google(destino_endereco)
+    if not key or not origem_endereco or not destino_endereco:
+        return None, None, None
+
+    try:
+        params = urllib.parse.urlencode({
+            "origins": origem_endereco,
+            "destinations": destino_endereco,
+            "mode": "driving",
+            "language": "pt-BR",
+            "region": "br",
+            "key": key
+        })
+        url = "https://maps.googleapis.com/maps/api/distancematrix/json?" + params
+        with urllib.request.urlopen(url, timeout=8) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+
+        if data.get("status") != "OK":
+            return None, None, None
+
+        rows = data.get("rows") or []
+        if rows and rows[0].get("elements"):
+            el = rows[0]["elements"][0]
+            if el.get("status") == "OK":
+                dist = el.get("distance", {})
+                dur = el.get("duration", {})
+                return dist.get("text"), dur.get("text"), dist.get("value")
+    except Exception:
+        pass
+
+    return None, None, None
+
+
+def gerar_link_rota_maps_km_excedente(origem, destino):
+    """
+    Link direto pro Google Maps mostrando a rota Origem -> Destino -> Origem
+    (ida e volta), igual ao que a ferramenta de auditoria de KM excedente já
+    gerava separadamente.
+    """
+    origem = (origem or "").strip()
+    destino = (destino or "").strip()
+    if not origem or not destino:
+        return ""
+    return (
+        "https://www.google.com/maps/dir/?api=1"
+        f"&origin={urllib.parse.quote_plus(origem)}"
+        f"&destination={urllib.parse.quote_plus(origem)}"
+        f"&waypoints={urllib.parse.quote_plus(destino)}"
+        "&travelmode=driving"
+    )
+
+
+def calcular_km_excedente_servico(sid, forcar=False):
+    """
+    Calcula o km total rodado (Origem->Destino + Destino->Origem) pra um
+    serviço e grava km_total_ida_volta/km_excedente na tabela servicos, pra
+    não precisar chamar o Google de novo toda vez que a página de
+    faturamento for aberta.
+    """
+    servico = servico_by_id(sid)
+    if not servico:
+        return {"ok": False, "erro": "Serviço não encontrado"}
+    if servico.get("km_calculado_em") and not forcar:
+        return {"ok": True, "ja_calculado": True}
+
+    origem = (servico.get("origem") or "").strip()
+    destino = (servico.get("destino") or "").strip()
+    if not origem or not destino:
+        erro = "Origem ou destino não preenchidos"
+        q("update servicos set km_calculo_erro=%s where id=%s", (erro, str(sid)))
+        return {"ok": False, "erro": erro}
+    if not google_api_key():
+        return {"ok": False, "erro": "GOOGLE_MAPS_API_KEY não configurada"}
+
+    _, _, km_ida_m = google_distance_matrix_enderecos(origem, destino)
+    _, _, km_volta_m = google_distance_matrix_enderecos(destino, origem)
+
+    if km_ida_m is None or km_volta_m is None:
+        erro = "Não foi possível calcular a rota no Google Maps"
+        q("update servicos set km_calculo_erro=%s where id=%s", (erro, str(sid)))
+        return {"ok": False, "erro": erro}
+
+    km_total = round((float(km_ida_m) + float(km_volta_m)) / 1000.0, 2)
+    km_excedente = round(max(0.0, km_total - KM_COBERTO_PADRAO), 2)
+    q(
+        "update servicos set km_total_ida_volta=%s, km_excedente=%s, km_calculado_em=now(), km_calculo_erro=null where id=%s",
+        (km_total, km_excedente, str(sid)),
+    )
+    return {"ok": True, "km_total": km_total, "km_excedente": km_excedente}
+
+
 def calcular_info_distancia_motorista(motorista, servico):
     """
     Textos amigáveis para a modal Enviar/trocar motorista na Central.
@@ -9744,7 +9853,10 @@ async def enviar_fotos(sid: str, fotos: list[UploadFile]=File(default=[])):
 @app.post('/api/servicos/{sid}/finalizar')
 def finalizar_servico(sid: str):
     if not servico_by_id(sid): return JSONResponse({'ok':False,'erro':'Serviço não encontrado'},404)
-    q("update servicos set status='finalizado',atualizado_em=now(),finalizado_em=now() where id=%s",(str(sid),)); registrar_evento_db(sid,'finalizado','Serviço finalizado pelo motorista'); return {'ok':True,'servico':servico_by_id(sid)}
+    q("update servicos set status='finalizado',atualizado_em=now(),finalizado_em=now() where id=%s",(str(sid),)); registrar_evento_db(sid,'finalizado','Serviço finalizado pelo motorista')
+    try: calcular_km_excedente_servico(sid)
+    except Exception: pass
+    return {'ok':True,'servico':servico_by_id(sid)}
 
 @app.get('/faturamento', response_class=HTMLResponse)
 def faturamento(request: Request, data_ini: str="", data_fim: str="", seguradora: str="", status_faturamento: str="", motorista: str="", busca_campo: str="", busca_valor: str=""):
@@ -9778,6 +9890,11 @@ def faturamento(request: Request, data_ini: str="", data_fim: str="", seguradora
     }
     for s in servs:
         s["tem_anexo"] = bool(s.get("fotos")) or s["id"] in ids_com_foto_checklist
+        s["km_maps_link"] = gerar_link_rota_maps_km_excedente(s.get("origem"), s.get("destino"))
+    km_pendentes = len([
+        s for s in servs
+        if s.get("km_calculado_em") is None and (s.get("origem") or "").strip() and (s.get("destino") or "").strip()
+    ])
     total=sum(float(s.get("valor_total") or 0) for s in servs)
     kpis={
       "total_servicos": len(servs),
@@ -9787,7 +9904,33 @@ def faturamento(request: Request, data_ini: str="", data_fim: str="", seguradora
       "negociacao": len([s for s in servs if s.get("status_faturamento")=="negociacao"]),
       "faturado": len([s for s in servs if s.get("status_faturamento")=="faturado"]),
     }
-    return templates.TemplateResponse('faturamento.html', {'request':request,'servicos':servs,'filtros':dict(data_ini=data_ini,data_fim=data_fim,seguradora=seguradora,status_faturamento=status_faturamento,motorista=motorista,busca_campo=busca_campo,busca_valor=busca_valor),'kpis':kpis,'nav_ativo':'faturamento','nav_som':False})
+    return templates.TemplateResponse('faturamento.html', {'request':request,'servicos':servs,'filtros':dict(data_ini=data_ini,data_fim=data_fim,seguradora=seguradora,status_faturamento=status_faturamento,motorista=motorista,busca_campo=busca_campo,busca_valor=busca_valor),'kpis':kpis,'nav_ativo':'faturamento','nav_som':False,'km_pendentes':km_pendentes})
+
+
+@app.post('/faturamento/{sid}/calcular-km')
+def faturamento_calcular_km(sid: str):
+    resultado = calcular_km_excedente_servico(sid, forcar=True)
+    servico = servico_by_id(sid)
+    resultado["km_maps_link"] = gerar_link_rota_maps_km_excedente((servico or {}).get("origem"), (servico or {}).get("destino"))
+    return JSONResponse(resultado)
+
+
+@app.post('/faturamento/calcular-km-pendentes')
+def faturamento_calcular_km_pendentes(limite: int = 15):
+    pendentes = q(
+        "select id from servicos where km_calculado_em is null and coalesce(origem,'')<>'' and coalesce(destino,'')<>'' order by created_at desc limit %s",
+        (limite,), True,
+    )
+    calculados = 0; erros = 0
+    for r in pendentes:
+        resultado = calcular_km_excedente_servico(str(r["id"]))
+        if resultado.get("ok"): calculados += 1
+        else: erros += 1
+    restante = q(
+        "select count(*) as n from servicos where km_calculado_em is null and coalesce(origem,'')<>'' and coalesce(destino,'')<>''",
+        fetch=True,
+    )[0]["n"]
+    return JSONResponse({"ok": True, "calculados": calculados, "erros": erros, "restantes": restante})
 
 
 def _faturamento_redirect_com_filtros(form_or_dict):

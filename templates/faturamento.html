@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Faturamento — Essência Logística</title>
-<link rel="stylesheet" href="/static/faturamento.css?v=20260824">
+<link rel="stylesheet" href="/static/faturamento.css?v=20260824b">
   {% include "partials/head_pages_v2.html" %}
 </head>
 <body class="ess-app fat-body">
@@ -127,6 +127,9 @@
       </div>
       <div class="fat-table-head-tools">
         <span class="fat-table-meta">{{ servicos|length }} registro(s)</span>
+        {% if km_pendentes %}
+        <button type="button" class="fat-btn fat-btn-outline fat-btn-km-pendentes" id="btn-calcular-km-pendentes">Calcular KM pendentes ({{ km_pendentes }})</button>
+        {% endif %}
         <button type="button" class="fat-btn fat-btn-outline fat-btn-export" id="btn-export-excel">Exportar Excel</button>
       </div>
     </div>
@@ -145,6 +148,7 @@
             <th>Status fat.</th>
             <th>Motorista</th>
             <th>Placa</th>
+            <th class="fat-col-km" title="Km rodado acima dos 40km cobertos pela empresa (Origem → Destino → Origem)">KM Excedente</th>
             <th class="fat-col-num">Valor</th>
             <th class="fat-col-actions">Ações</th>
           </tr>
@@ -171,6 +175,21 @@
             <td><span class="fat-badge-fat {{ fat_st }}">{{ fat_lbl }}</span></td>
             <td>{{ s.motorista_nome or '-' }}</td>
             <td class="fat-col-placa"><b>{{ s.placa_veiculo_removido or s.placa_removida or '-' }}</b></td>
+            <td class="fat-col-km" data-servico-id="{{ s.id }}">
+              {% if s.km_excedente is not none and s.km_excedente > 0 %}
+              <a class="fat-km-badge fat-km-over" href="{{ s.km_maps_link }}" target="_blank" rel="noopener" title="Ver rota Origem → Destino → Origem no Google Maps">
+                <span class="fat-km-icon" aria-hidden="true">🗺️</span>{{ '%.1f'|format(s.km_excedente) }} km exced.
+              </a>
+              {% elif s.km_excedente is not none %}
+              <a class="fat-km-badge fat-km-ok" href="{{ s.km_maps_link }}" target="_blank" rel="noopener" title="Rota dentro dos 40km cobertos — ver no Google Maps">
+                <span class="fat-km-icon" aria-hidden="true">✓</span>Sem excedente
+              </a>
+              {% elif s.km_maps_link %}
+              <button type="button" class="fat-km-calc-btn" data-servico-id="{{ s.id }}" title="Calcular km excedente deste serviço">Calcular</button>
+              {% else %}
+              <span class="fat-km-none" title="Serviço sem origem/destino cadastrados">-</span>
+              {% endif %}
+            </td>
             <td class="fat-valor fat-col-num">{{ s.valor_total_fmt }}</td>
             <td class="fat-col-actions">
               <div class="fat-actions">
@@ -197,7 +216,7 @@
           </tr>
           {% else %}
           <tr class="fat-empty-row">
-            <td colspan="11">
+            <td colspan="12">
               <div class="fat-empty">
                 <span class="fat-empty-icon" aria-hidden="true">📭</span>
                 <p>Nenhum serviço encontrado para os filtros selecionados.</p>
@@ -218,7 +237,7 @@
   </div>
 </div>
 
-<script src="/static/faturamento.js?v=20260532"></script>
+<script src="/static/faturamento.js?v=20260824b"></script>
 {% include "partials/app_shell_end.html" %}
 </body>
 </html>
