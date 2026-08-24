@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Faturamento — Essência Logística</title>
-<link rel="stylesheet" href="/static/faturamento.css?v=20260819">
+<link rel="stylesheet" href="/static/faturamento.css?v=20260824">
   {% include "partials/head_pages_v2.html" %}
 </head>
 <body class="ess-app fat-body">
@@ -24,7 +24,18 @@
       <span class="fat-card-icon">⚙</span>
       <h2>Filtros</h2>
     </div>
-    <form method="get" action="/faturamento" class="fat-filters" id="fat-form-filtros">
+    <form method="get" action="/faturamento" id="fat-form-filtros">
+      <div class="fat-busca-bar">
+        <select id="fat-busca-campo" name="busca_campo" class="fat-busca-select" aria-label="Buscar por">
+          <option value="protocolo" {% if not filtros.busca_campo or filtros.busca_campo == 'protocolo' %}selected{% endif %}>Protocolo</option>
+          <option value="placa" {% if filtros.busca_campo == 'placa' %}selected{% endif %}>Placa</option>
+        </select>
+        <span class="fat-busca-divisor" aria-hidden="true"></span>
+        <span class="fat-busca-icon" aria-hidden="true">🔎</span>
+        <input id="fat-busca-valor" name="busca_valor" class="fat-busca-input" placeholder="Buscar serviço..." value="{{ filtros.busca_valor or '' }}">
+      </div>
+
+      <div class="fat-filters">
       <div class="fat-field">
         <label for="fat-data-ini">Data inicial</label>
         <input type="date" id="fat-data-ini" name="data_ini" value="{{ filtros.data_ini or '' }}">
@@ -32,16 +43,6 @@
       <div class="fat-field">
         <label for="fat-data-fim">Data final</label>
         <input type="date" id="fat-data-fim" name="data_fim" value="{{ filtros.data_fim or '' }}">
-      </div>
-      <div class="fat-field fat-field-busca">
-        <label for="fat-busca-valor">Buscar por</label>
-        <div class="fat-busca-grupo">
-          <select id="fat-busca-campo" name="busca_campo" class="fat-busca-select">
-            <option value="protocolo" {% if not filtros.busca_campo or filtros.busca_campo == 'protocolo' %}selected{% endif %}>Protocolo</option>
-            <option value="placa" {% if filtros.busca_campo == 'placa' %}selected{% endif %}>Placa</option>
-          </select>
-          <input id="fat-busca-valor" name="busca_valor" placeholder="Digite para buscar..." value="{{ filtros.busca_valor or '' }}">
-        </div>
       </div>
       <div class="fat-field">
         <label for="fat-seguradora">Seguradora</label>
@@ -64,6 +65,7 @@
       <div class="fat-field fat-field-action">
         <label>&nbsp;</label>
         <button type="submit" class="fat-btn fat-btn-primary fat-btn-filter">Filtrar</button>
+      </div>
       </div>
     </form>
   </div>
