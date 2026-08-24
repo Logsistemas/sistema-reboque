@@ -1,7 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import React, { useEffect } from 'react';
-import { AppState } from 'react-native';
+import { AppState, Platform } from 'react-native';
 
 import { useMotorista } from '../context/MotoristaContext';
 import { processarNotificacaoTap } from '../lib/pushNotifications';
@@ -27,11 +27,13 @@ export function PushNotificationBootstrap() {
   const { logado, motorista, registrarPush } = useMotorista();
 
   useEffect(() => {
+    if (Platform.OS === 'web') return;
     if (!logado || !motorista?.id) return;
     void registrarPush();
   }, [logado, motorista?.id, registrarPush]);
 
   useEffect(() => {
+    if (Platform.OS === 'web') return;
     if (!logado || !motorista?.id) return;
 
     const sub = AppState.addEventListener('change', (state) => {
@@ -44,6 +46,10 @@ export function PushNotificationBootstrap() {
   }, [logado, motorista?.id, registrarPush]);
 
   useEffect(() => {
+    // expo-notifications não é suportado na web (Expo Go / navegador) —
+    // essas APIs nem existem nesse ambiente, então nem tentamos.
+    if (Platform.OS === 'web') return;
+
     const subRecebida = Notifications.addNotificationReceivedListener((notif) => {
       console.log('[PUSH] recebida em foreground', notif.request.content.title);
     });

@@ -7,9 +7,9 @@ import {
 } from 'react-native';
 
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import SignatureScreen from 'react-native-signature-canvas';
 
 import { AppButton } from '../components/ui/AppButton';
+import SignatureScreen from '../components/SignaturePad';
 import { colors, radius, shadow, spacing } from '../lib/ui/theme';
 
 function paramsParaChecklist(
