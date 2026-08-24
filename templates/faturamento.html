@@ -33,6 +33,16 @@
         <label for="fat-data-fim">Data final</label>
         <input type="date" id="fat-data-fim" name="data_fim" value="{{ filtros.data_fim or '' }}">
       </div>
+      <div class="fat-field fat-field-busca">
+        <label for="fat-busca-valor">Buscar por</label>
+        <div class="fat-busca-grupo">
+          <select id="fat-busca-campo" name="busca_campo" class="fat-busca-select">
+            <option value="protocolo" {% if not filtros.busca_campo or filtros.busca_campo == 'protocolo' %}selected{% endif %}>Protocolo</option>
+            <option value="placa" {% if filtros.busca_campo == 'placa' %}selected{% endif %}>Placa</option>
+          </select>
+          <input id="fat-busca-valor" name="busca_valor" placeholder="Digite para buscar..." value="{{ filtros.busca_valor or '' }}">
+        </div>
+      </div>
       <div class="fat-field">
         <label for="fat-seguradora">Seguradora</label>
         <input id="fat-seguradora" name="seguradora" placeholder="Empresa..." value="{{ filtros.seguradora or '' }}">
@@ -103,6 +113,8 @@
     <input type="hidden" name="seguradora" value="{{ filtros.seguradora or '' }}">
     <input type="hidden" name="motorista" value="{{ filtros.motorista or '' }}">
     <input type="hidden" name="status_faturamento_filtro" value="{{ filtros.status_faturamento or '' }}">
+    <input type="hidden" name="busca_campo" value="{{ filtros.busca_campo or '' }}">
+    <input type="hidden" name="busca_valor" value="{{ filtros.busca_valor or '' }}">
   </form>
 
   <div class="fat-card fat-table-card">

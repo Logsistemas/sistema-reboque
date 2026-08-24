@@ -9747,14 +9747,23 @@ def finalizar_servico(sid: str):
     q("update servicos set status='finalizado',atualizado_em=now(),finalizado_em=now() where id=%s",(str(sid),)); registrar_evento_db(sid,'finalizado','Serviço finalizado pelo motorista'); return {'ok':True,'servico':servico_by_id(sid)}
 
 @app.get('/faturamento', response_class=HTMLResponse)
-def faturamento(request: Request, data_ini: str="", data_fim: str="", seguradora: str="", status_faturamento: str="", motorista: str=""):
-    filtros={k:(v or None) for k,v in dict(data_ini=data_ini,data_fim=data_fim,seguradora=seguradora,motorista=motorista).items()}
+def faturamento(request: Request, data_ini: str="", data_fim: str="", seguradora: str="", status_faturamento: str="", motorista: str="", busca_campo: str="", busca_valor: str=""):
+    filtros={k:(v or None) for k,v in dict(data_ini=data_ini,data_fim=data_fim,seguradora=seguradora,motorista=motorista,busca_campo=busca_campo,busca_valor=busca_valor).items()}
     where=[]; params=[]
     if filtros.get("data_ini"): where.append("date(created_at) >= %s"); params.append(filtros["data_ini"])
     if filtros.get("data_fim"): where.append("date(created_at) <= %s"); params.append(filtros["data_fim"])
     if filtros.get("seguradora"): where.append("seguradora ilike %s"); params.append(f"%{filtros['seguradora']}%")
     if filtros.get("motorista"): where.append("coalesce(motorista_nome,'') ilike %s"); params.append(f"%{filtros['motorista']}%")
     if status_faturamento: where.append("coalesce(status_faturamento,'para_conferir')=%s"); params.append(status_faturamento)
+    valor_busca = (busca_valor or "").strip()
+    if valor_busca:
+        campo = (busca_campo or "protocolo").strip().lower()
+        if campo == "placa":
+            where.append("(coalesce(placa_veiculo_removido,'') ilike %s or coalesce(placa_removida,'') ilike %s)")
+            params.append(f"%{valor_busca}%"); params.append(f"%{valor_busca}%")
+        else:
+            where.append("coalesce(protocolo,'') ilike %s")
+            params.append(f"%{valor_busca}%")
     sql="select * from servicos" + ((" where " + " and ".join(where)) if where else "") + " order by created_at desc"
     servs=[normalizar_servico(r) for r in q(sql, tuple(params), True)]
     # Pastinha de anexo: além da tabela genérica "fotos", o checklist do
@@ -9778,7 +9787,7 @@ def faturamento(request: Request, data_ini: str="", data_fim: str="", seguradora
       "negociacao": len([s for s in servs if s.get("status_faturamento")=="negociacao"]),
       "faturado": len([s for s in servs if s.get("status_faturamento")=="faturado"]),
     }
-    return templates.TemplateResponse('faturamento.html', {'request':request,'servicos':servs,'filtros':dict(data_ini=data_ini,data_fim=data_fim,seguradora=seguradora,status_faturamento=status_faturamento,motorista=motorista),'kpis':kpis,'nav_ativo':'faturamento','nav_som':False})
+    return templates.TemplateResponse('faturamento.html', {'request':request,'servicos':servs,'filtros':dict(data_ini=data_ini,data_fim=data_fim,seguradora=seguradora,status_faturamento=status_faturamento,motorista=motorista,busca_campo=busca_campo,busca_valor=busca_valor),'kpis':kpis,'nav_ativo':'faturamento','nav_som':False})
 
 
 def _faturamento_redirect_com_filtros(form_or_dict):
@@ -9794,6 +9803,8 @@ def _faturamento_redirect_com_filtros(form_or_dict):
         ("seguradora", "seguradora"),
         ("motorista", "motorista"),
         ("status_faturamento", "status_faturamento_filtro"),
+        ("busca_campo", "busca_campo"),
+        ("busca_valor", "busca_valor"),
     ]:
         val = (get(form_key) or get(key) or "").strip()
         if val:

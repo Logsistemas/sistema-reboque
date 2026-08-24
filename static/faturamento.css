@@ -139,6 +139,27 @@ body.fat-body {
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
 }
 
+.fat-busca-grupo {
+  display: flex;
+  gap: 6px;
+}
+
+.fat-busca-select {
+  flex: 0 0 118px;
+  min-height: 42px;
+  padding: 10px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  font-size: 13px;
+  background: #fff;
+  box-sizing: border-box;
+}
+
+.fat-busca-grupo input {
+  flex: 1;
+  min-width: 0;
+}
+
 .fat-field-action .fat-btn-filter {
   width: 100%;
   min-height: 42px;
