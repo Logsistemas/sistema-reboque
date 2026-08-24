@@ -293,7 +293,14 @@ export function toqueParaPercentual(
   imagemW: number,
   imagemH: number
 ): { x: number; y: number } | null {
-  if (containerW <= 0 || containerH <= 0 || imagemW <= 0 || imagemH <= 0) {
+  if (
+    !Number.isFinite(xPx) ||
+    !Number.isFinite(yPx) ||
+    containerW <= 0 ||
+    containerH <= 0 ||
+    imagemW <= 0 ||
+    imagemH <= 0
+  ) {
     return null;
   }
 

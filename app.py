@@ -9757,6 +9757,18 @@ def faturamento(request: Request, data_ini: str="", data_fim: str="", seguradora
     if status_faturamento: where.append("coalesce(status_faturamento,'para_conferir')=%s"); params.append(status_faturamento)
     sql="select * from servicos" + ((" where " + " and ".join(where)) if where else "") + " order by created_at desc"
     servs=[normalizar_servico(r) for r in q(sql, tuple(params), True)]
+    # Pastinha de anexo: além da tabela genérica "fotos", o checklist do
+    # motorista guarda fotos por parte em checklist_avarias. Uma única
+    # consulta pra todos os serviços da lista, pra não repetir por linha.
+    ids_com_foto_checklist = {
+        str(r["servico_id"])
+        for r in q(
+            "select distinct servico_id from checklist_avarias where jsonb_array_length(coalesce(fotos, '[]'::jsonb)) > 0",
+            fetch=True,
+        )
+    }
+    for s in servs:
+        s["tem_anexo"] = bool(s.get("fotos")) or s["id"] in ids_com_foto_checklist
     total=sum(float(s.get("valor_total") or 0) for s in servs)
     kpis={
       "total_servicos": len(servs),

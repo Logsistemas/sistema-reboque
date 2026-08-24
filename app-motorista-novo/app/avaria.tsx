@@ -1,11 +1,12 @@
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Image,
   LayoutChangeEvent,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -90,10 +91,39 @@ export default function AvariaScreen() {
     debugLog('checklist', 'tipoVeiculo', tipoVeiculo, 'imagem', imagemSelecionada, 'parte', parte);
   }, [tipoVeiculo, imagemSelecionada, parte]);
 
-  const dimensaoImagem = useMemo(() => {
-    if (!imagemFonte) return { width: 0, height: 0 };
-    const src = Image.resolveAssetSource(imagemFonte);
-    return { width: src.width || 1, height: src.height || 1 };
+  const [dimensaoImagem, setDimensaoImagem] = useState<LayoutSize>({ width: 1, height: 1 });
+
+  useEffect(() => {
+    let cancelado = false;
+    if (!imagemFonte) {
+      setDimensaoImagem({ width: 1, height: 1 });
+      return;
+    }
+    // Na web o bundler não expõe Image.resolveAssetSource (só existe no
+    // React Native nativo) — nesse caso resolvemos a dimensão via
+    // Image.getSize, que funciona tanto com uri quanto com o valor
+    // retornado pelo require() de uma imagem local no build web.
+    if (Platform.OS !== 'web' && typeof (Image as any).resolveAssetSource === 'function') {
+      const src = (Image as any).resolveAssetSource(imagemFonte);
+      setDimensaoImagem({ width: src?.width || 1, height: src?.height || 1 });
+      return;
+    }
+    const uri =
+      typeof imagemFonte === 'string'
+        ? imagemFonte
+        : (imagemFonte as any)?.uri || String(imagemFonte);
+    Image.getSize(
+      uri,
+      (width, height) => {
+        if (!cancelado) setDimensaoImagem({ width: width || 1, height: height || 1 });
+      },
+      () => {
+        if (!cancelado) setDimensaoImagem({ width: 1, height: 1 });
+      }
+    );
+    return () => {
+      cancelado = true;
+    };
   }, [imagemFonte]);
 
   const onLayoutImagem = useCallback((e: LayoutChangeEvent) => {
@@ -271,7 +301,21 @@ export default function AvariaScreen() {
 
         <Pressable
           style={styles.imagemOverlay}
-          onPress={(e) => onPressImagem(e.nativeEvent.locationX, e.nativeEvent.locationY)}
+          onPress={(e) => {
+            // No navegador, locationX/locationY (evento nativo do RN) não
+            // vêm preenchidos — o nativeEvent na web é o MouseEvent do
+            // próprio DOM, que tem offsetX/offsetY relativo ao elemento.
+            const nativo: any = e.nativeEvent;
+            const xPx =
+              Platform.OS === 'web' && typeof nativo.offsetX === 'number'
+                ? nativo.offsetX
+                : nativo.locationX;
+            const yPx =
+              Platform.OS === 'web' && typeof nativo.offsetY === 'number'
+                ? nativo.offsetY
+                : nativo.locationY;
+            onPressImagem(xPx, yPx);
+          }}
         >
           {marcacoes.map((m) => {
             const pos = percentualParaPosicaoContainer(

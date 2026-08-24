@@ -145,8 +145,8 @@
             </td>
             <td class="fat-protocolo">
               <a href="/faturamento/{{ s.id }}">{{ s.protocolo or '-' }}</a>
-              {% if s.fotos and s.fotos|length > 0 %}
-              <span class="fat-icon-anexo" title="{{ s.fotos|length }} arquivo(s) anexado(s)">📁</span>
+              {% if s.tem_anexo %}
+              <span class="fat-icon-anexo" title="Serviço tem foto/arquivo anexado">📁</span>
               {% endif %}
               <a class="fat-icon-checklist" href="/faturamento/{{ s.id }}?aba=checklist" title="Abrir checklist do serviço">📋</a>
             </td>
