@@ -9872,15 +9872,60 @@ def finalizar_servico(sid: str):
     except Exception: pass
     return {'ok':True,'servico':servico_by_id(sid)}
 
+STATUS_FATURAMENTO_OPCOES = [
+    ("para_conferir", "Para conferir"),
+    ("para_faturar", "Para faturar"),
+    ("negociacao", "Para negociar"),
+    ("faturado", "Faturado"),
+]
+
+
+def opcoes_filtro_faturamento():
+    """Listas usadas nos dropdowns de busca multi-seleção da tela de Faturamento
+    (Empresa/Seguradora, Motorista, Tipo de serviço) — só valores que
+    realmente existem em servicos, pra não oferecer opção que não filtra nada."""
+    seguradoras = [
+        r["seguradora"] for r in q(
+            "select distinct seguradora from servicos where coalesce(seguradora,'')<>'' order by seguradora",
+            fetch=True,
+        )
+    ]
+    motoristas_nomes = [
+        r["motorista_nome"] for r in q(
+            "select distinct motorista_nome from servicos where coalesce(motorista_nome,'')<>'' order by motorista_nome",
+            fetch=True,
+        )
+    ]
+    return seguradoras, motoristas_nomes
+
+
 @app.get('/faturamento', response_class=HTMLResponse)
-def faturamento(request: Request, data_ini: str="", data_fim: str="", seguradora: str="", status_faturamento: str="", motorista: str="", busca_campo: str="", busca_valor: str=""):
-    filtros={k:(v or None) for k,v in dict(data_ini=data_ini,data_fim=data_fim,seguradora=seguradora,motorista=motorista,busca_campo=busca_campo,busca_valor=busca_valor).items()}
+def faturamento(request: Request, data_ini: str="", data_fim: str="", status_faturamento: str="", busca_campo: str="", busca_valor: str=""):
+    seguradoras_f = [v for v in request.query_params.getlist("seguradoras") if v]
+    motoristas_f = [v for v in request.query_params.getlist("motoristas") if v]
+    tipos_f = [v for v in request.query_params.getlist("tipos") if v]
+    status_fat_f = [v for v in request.query_params.getlist("status_fat") if v]
+    if status_faturamento and status_faturamento not in status_fat_f:
+        status_fat_f.append(status_faturamento)
+
+    filtros = {
+        "data_ini": data_ini or None,
+        "data_fim": data_fim or None,
+        "seguradoras": seguradoras_f,
+        "motoristas": motoristas_f,
+        "tipos": tipos_f,
+        "status_fat": status_fat_f,
+        "busca_campo": busca_campo or None,
+        "busca_valor": busca_valor or None,
+    }
+
     where=[]; params=[]
-    if filtros.get("data_ini"): where.append("date(created_at) >= %s"); params.append(filtros["data_ini"])
-    if filtros.get("data_fim"): where.append("date(created_at) <= %s"); params.append(filtros["data_fim"])
-    if filtros.get("seguradora"): where.append("seguradora ilike %s"); params.append(f"%{filtros['seguradora']}%")
-    if filtros.get("motorista"): where.append("coalesce(motorista_nome,'') ilike %s"); params.append(f"%{filtros['motorista']}%")
-    if status_faturamento: where.append("coalesce(status_faturamento,'para_conferir')=%s"); params.append(status_faturamento)
+    if filtros["data_ini"]: where.append("date(created_at) >= %s"); params.append(filtros["data_ini"])
+    if filtros["data_fim"]: where.append("date(created_at) <= %s"); params.append(filtros["data_fim"])
+    if seguradoras_f: where.append("seguradora = ANY(%s)"); params.append(seguradoras_f)
+    if motoristas_f: where.append("coalesce(motorista_nome,'') = ANY(%s)"); params.append(motoristas_f)
+    if tipos_f: where.append("coalesce(tipo,'') = ANY(%s)"); params.append(tipos_f)
+    if status_fat_f: where.append("coalesce(status_faturamento,'para_conferir') = ANY(%s)"); params.append(status_fat_f)
     valor_busca = (busca_valor or "").strip()
     if valor_busca:
         campo = (busca_campo or "protocolo").strip().lower()
@@ -9918,7 +9963,30 @@ def faturamento(request: Request, data_ini: str="", data_fim: str="", seguradora
       "negociacao": len([s for s in servs if s.get("status_faturamento")=="negociacao"]),
       "faturado": len([s for s in servs if s.get("status_faturamento")=="faturado"]),
     }
-    return templates.TemplateResponse('faturamento.html', {'request':request,'servicos':servs,'filtros':dict(data_ini=data_ini,data_fim=data_fim,seguradora=seguradora,status_faturamento=status_faturamento,motorista=motorista,busca_campo=busca_campo,busca_valor=busca_valor),'kpis':kpis,'nav_ativo':'faturamento','nav_som':False,'km_pendentes':km_pendentes})
+    seguradoras_opcoes, motoristas_opcoes = opcoes_filtro_faturamento()
+    filtros_ativos_count = sum([
+        1 if filtros["data_ini"] else 0,
+        1 if filtros["data_fim"] else 0,
+        1 if seguradoras_f else 0,
+        1 if motoristas_f else 0,
+        1 if tipos_f else 0,
+        1 if status_fat_f else 0,
+        1 if valor_busca else 0,
+    ])
+    return templates.TemplateResponse('faturamento.html', {
+        'request': request,
+        'servicos': servs,
+        'filtros': filtros,
+        'filtros_ativos_count': filtros_ativos_count,
+        'seguradoras_opcoes': seguradoras_opcoes,
+        'motoristas_opcoes': motoristas_opcoes,
+        'tipos_opcoes': lista_tipos_servico(),
+        'status_fat_opcoes': STATUS_FATURAMENTO_OPCOES,
+        'kpis': kpis,
+        'nav_ativo': 'faturamento',
+        'nav_som': False,
+        'km_pendentes': km_pendentes,
+    })
 
 
 @app.post('/faturamento/{sid}/calcular-km')
@@ -9948,25 +10016,20 @@ def faturamento_calcular_km_pendentes(limite: int = 15):
 
 
 def _faturamento_redirect_com_filtros(form_or_dict):
-    """Monta URL /faturamento preservando filtros da query string."""
-    if hasattr(form_or_dict, "get"):
-        get = form_or_dict.get
-    else:
-        get = form_or_dict.get
+    """Monta URL /faturamento preservando filtros da query string (inclui os multi-seleção do modal Procurar)."""
+    get = form_or_dict.get
+    getlist = getattr(form_or_dict, "getlist", None)
     params = {}
-    for key, form_key in [
-        ("data_ini", "data_ini"),
-        ("data_fim", "data_fim"),
-        ("seguradora", "seguradora"),
-        ("motorista", "motorista"),
-        ("status_faturamento", "status_faturamento_filtro"),
-        ("busca_campo", "busca_campo"),
-        ("busca_valor", "busca_valor"),
-    ]:
-        val = (get(form_key) or get(key) or "").strip()
+    for key in ["data_ini", "data_fim", "busca_campo", "busca_valor"]:
+        val = (get(key) or "").strip()
         if val:
             params[key] = val
-    qs = urllib.parse.urlencode(params)
+    if getlist:
+        for key in ["seguradoras", "motoristas", "tipos", "status_fat"]:
+            vals = [v.strip() for v in getlist(key) if (v or "").strip()]
+            if vals:
+                params[key] = vals
+    qs = urllib.parse.urlencode(params, doseq=True)
     return f"/faturamento?{qs}" if qs else "/faturamento"
 
 

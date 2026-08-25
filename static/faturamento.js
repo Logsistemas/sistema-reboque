@@ -2,7 +2,7 @@
   const chkAll = document.getElementById("chk-all");
   const bulkBar = document.getElementById("bulk-bar");
   const bulkCount = document.getElementById("bulk-count");
-  const formFiltros = document.getElementById("fat-form-filtros");
+  const formFiltros = document.getElementById("formProcurar");
   const loadingEl = document.getElementById("fat-loading");
 
   function getCheckboxes() {
@@ -269,4 +269,99 @@
       }
     });
   }
+
+  /* Modal "Procurar" (estilo Autem) */
+  const modalOverlay = document.getElementById("modalProcurarOverlay");
+  const btnAbrirProcurar = document.getElementById("btnAbrirProcurar");
+  const btnFecharProcurar = document.getElementById("btnFecharProcurar");
+
+  function abrirModalProcurar() {
+    if (!modalOverlay) return;
+    modalOverlay.hidden = false;
+    document.body.style.overflow = "hidden";
+  }
+
+  function fecharModalProcurar() {
+    if (!modalOverlay) return;
+    modalOverlay.hidden = true;
+    document.body.style.overflow = "";
+    document.querySelectorAll(".fat-msel.open").forEach((m) => fecharMsel(m));
+  }
+
+  if (btnAbrirProcurar) btnAbrirProcurar.addEventListener("click", abrirModalProcurar);
+  if (btnFecharProcurar) btnFecharProcurar.addEventListener("click", fecharModalProcurar);
+  if (modalOverlay) {
+    modalOverlay.addEventListener("click", (e) => {
+      if (e.target === modalOverlay) fecharModalProcurar();
+    });
+  }
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && modalOverlay && !modalOverlay.hidden) fecharModalProcurar();
+  });
+
+  /* Dropdowns multi-seleção com busca (Empresa, Motorista, Tipo, Status) */
+  function fecharMsel(msel) {
+    msel.classList.remove("open");
+    const panel = msel.querySelector(".fat-msel-panel");
+    if (panel) panel.hidden = true;
+  }
+
+  function atualizarTextoMsel(msel) {
+    const textoEl = msel.querySelector(".fat-msel-trigger-text");
+    if (!textoEl) return;
+    const marcados = msel.querySelectorAll('input[type="checkbox"]:checked').length;
+    textoEl.textContent = marcados > 0 ? `${marcados} selecionado(s)` : "Todos";
+  }
+
+  document.querySelectorAll(".fat-msel").forEach((msel) => {
+    const trigger = msel.querySelector(".fat-msel-trigger");
+    const panel = msel.querySelector(".fat-msel-panel");
+    const busca = msel.querySelector(".fat-msel-search");
+    const opcoes = Array.from(msel.querySelectorAll(".fat-msel-option"));
+
+    if (trigger) {
+      trigger.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const abrir = !msel.classList.contains("open");
+        document.querySelectorAll(".fat-msel.open").forEach((m) => {
+          if (m !== msel) fecharMsel(m);
+        });
+        msel.classList.toggle("open", abrir);
+        if (panel) panel.hidden = !abrir;
+        if (abrir && busca) busca.focus();
+      });
+    }
+
+    if (panel) panel.addEventListener("click", (e) => e.stopPropagation());
+
+    if (busca) {
+      busca.addEventListener("input", () => {
+        const termo = busca.value.trim().toLowerCase();
+        opcoes.forEach((opt) => {
+          const texto = (opt.textContent || "").trim().toLowerCase();
+          opt.classList.toggle("fat-msel-hide", termo.length > 0 && !texto.includes(termo));
+        });
+      });
+    }
+
+    msel.querySelectorAll(".fat-msel-bulk-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const marcar = btn.dataset.action === "all";
+        opcoes.forEach((opt) => {
+          if (opt.classList.contains("fat-msel-hide")) return;
+          const chk = opt.querySelector('input[type="checkbox"]');
+          if (chk) chk.checked = marcar;
+        });
+        atualizarTextoMsel(msel);
+      });
+    });
+
+    msel.querySelectorAll('input[type="checkbox"]').forEach((chk) => {
+      chk.addEventListener("change", () => atualizarTextoMsel(msel));
+    });
+  });
+
+  document.addEventListener("click", () => {
+    document.querySelectorAll(".fat-msel.open").forEach((m) => fecharMsel(m));
+  });
 })();
