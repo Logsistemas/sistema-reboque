@@ -8654,8 +8654,15 @@ def calcular_km_excedente_servico(sid, forcar=False):
     servico = servico_by_id(sid)
     if not servico:
         return {"ok": False, "erro": "Serviço não encontrado"}
-    if servico.get("km_calculado_em") and not forcar:
-        return {"ok": True, "ja_calculado": True}
+    if not forcar:
+        # servico_by_id() passa por normalizar_servico(), que formata
+        # km_calculado_em nulo como "-" pra exibição — checar direto nesse
+        # dict faz essa condição dar sempre verdadeiro (string "-" é truthy)
+        # e a função nunca calcula nada, só finge sucesso. Por isso confere
+        # o valor cru no banco aqui.
+        cru = one("select km_calculado_em from servicos where id=%s", (str(sid),))
+        if cru and cru.get("km_calculado_em"):
+            return {"ok": True, "ja_calculado": True}
 
     origem = (servico.get("origem") or "").strip()
     destino = (servico.get("destino") or "").strip()
@@ -10097,7 +10104,9 @@ def faturamento_calcular_km_pendentes(limite: int = 15):
     )
     calculados = 0; erros = 0
     for r in pendentes:
-        resultado = calcular_km_excedente_servico(str(r["id"]))
+        # forcar=True: a seleção acima já garante que são pendentes de verdade
+        # (km_calculado_em is null), então não precisa checar de novo.
+        resultado = calcular_km_excedente_servico(str(r["id"]), forcar=True)
         if resultado.get("ok"): calculados += 1
         else: erros += 1
     restante = q(
