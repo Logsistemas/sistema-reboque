@@ -557,54 +557,30 @@ body.fat-body {
   line-height: 1;
 }
 
-.fat-km-calc-btn {
-  padding: 5px 11px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 700;
-  background: #fff;
-  color: #2563eb;
-  border: 1px dashed #93c5fd;
-  cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
-}
-
-.fat-km-calc-btn:hover {
-  background: #eff6ff;
-}
-
-.fat-km-calc-btn:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
 .fat-km-none {
   color: #94a3b8;
   font-size: 12px;
 }
 
-.fat-btn-km-pendentes {
-  white-space: nowrap;
-}
-
-.fat-km-auto-status {
+/* Skeleton discreto por linha — só aparece na própria célula, sem clique,
+   sem indicador global. O cálculo acontece em background no servidor. */
+.fat-km-skeleton {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 12.5px;
+  font-size: 11.5px;
   font-weight: 600;
-  color: #ff6b00;
+  color: #94a3b8;
   white-space: nowrap;
 }
 
-.fat-km-auto-status::before {
-  content: "";
-  width: 12px;
-  height: 12px;
+.fat-km-skeleton-dot {
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
-  border: 2px solid #ffd9b8;
-  border-top-color: #ff6b00;
-  animation: fat-km-spin 0.7s linear infinite;
+  border: 2px solid #e2e8f0;
+  border-top-color: #94a3b8;
+  animation: fat-km-spin 0.8s linear infinite;
 }
 
 @keyframes fat-km-spin {

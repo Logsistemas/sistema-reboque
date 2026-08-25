@@ -90,7 +90,7 @@ import urllib
 import urllib.request
 import urllib.parse
 import json
-from fastapi import FastAPI, Request, UploadFile, File, Form
+from fastapi import FastAPI, Request, UploadFile, File, Form, BackgroundTasks
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -9940,6 +9940,7 @@ def opcoes_filtro_faturamento():
 @app.get('/faturamento', response_class=HTMLResponse)
 def faturamento(
     request: Request,
+    background_tasks: BackgroundTasks,
     data_ini: str = "",
     data_fim: str = "",
     protocolo: str = "",
@@ -10043,6 +10044,13 @@ def faturamento(
         r for r in rows_raw
         if r.get("km_calculado_em") is None and (r.get("origem") or "").strip() and (r.get("destino") or "").strip()
     ])
+    if km_pendentes:
+        # Cálculo acontece em background no servidor, depois da resposta já
+        # ter sido enviada — nenhuma requisição extra do navegador, sem
+        # botão, sem indicador global. As linhas ainda pendentes aparecem
+        # com o skeleton na própria célula e ficam prontas na próxima
+        # abertura/filtro da tela.
+        background_tasks.add_task(_calcular_km_pendentes_lote, 40)
     total=sum(float(s.get("valor_total") or 0) for s in servs)
     kpis={
       "total_servicos": len(servs),
@@ -10088,6 +10096,35 @@ def faturamento(
     })
 
 
+def _calcular_km_pendentes_lote(limite: int = 40):
+    """
+    Processa até `limite` serviços pendentes de KM excedente (km_calculado_em
+    nulo, com origem e destino preenchidos). Usada tanto pelo endpoint manual
+    (mantido por compatibilidade, sem uso pela UI) quanto pela tarefa em
+    background disparada automaticamente ao abrir /faturamento — nesse caso
+    sem nenhuma requisição extra do navegador.
+    """
+    pendentes = q(
+        "select id from servicos where km_calculado_em is null and coalesce(origem,'')<>'' and coalesce(destino,'')<>'' order by created_at desc limit %s",
+        (limite,), True,
+    )
+    calculados = 0; erros = 0
+    for r in pendentes:
+        # forcar=True: a seleção acima já garante que são pendentes de verdade
+        # (km_calculado_em is null), então não precisa checar de novo.
+        try:
+            resultado = calcular_km_excedente_servico(str(r["id"]), forcar=True)
+        except Exception:
+            resultado = {"ok": False}
+        if resultado.get("ok"): calculados += 1
+        else: erros += 1
+    restante = q(
+        "select count(*) as n from servicos where km_calculado_em is null and coalesce(origem,'')<>'' and coalesce(destino,'')<>''",
+        fetch=True,
+    )[0]["n"]
+    return {"ok": True, "calculados": calculados, "erros": erros, "restantes": restante}
+
+
 @app.post('/faturamento/{sid}/calcular-km')
 def faturamento_calcular_km(sid: str):
     resultado = calcular_km_excedente_servico(sid, forcar=True)
@@ -10098,22 +10135,7 @@ def faturamento_calcular_km(sid: str):
 
 @app.post('/faturamento/calcular-km-pendentes')
 def faturamento_calcular_km_pendentes(limite: int = 15):
-    pendentes = q(
-        "select id from servicos where km_calculado_em is null and coalesce(origem,'')<>'' and coalesce(destino,'')<>'' order by created_at desc limit %s",
-        (limite,), True,
-    )
-    calculados = 0; erros = 0
-    for r in pendentes:
-        # forcar=True: a seleção acima já garante que são pendentes de verdade
-        # (km_calculado_em is null), então não precisa checar de novo.
-        resultado = calcular_km_excedente_servico(str(r["id"]), forcar=True)
-        if resultado.get("ok"): calculados += 1
-        else: erros += 1
-    restante = q(
-        "select count(*) as n from servicos where km_calculado_em is null and coalesce(origem,'')<>'' and coalesce(destino,'')<>''",
-        fetch=True,
-    )[0]["n"]
-    return JSONResponse({"ok": True, "calculados": calculados, "erros": erros, "restantes": restante})
+    return JSONResponse(_calcular_km_pendentes_lote(limite))
 
 
 def _faturamento_redirect_com_filtros(form_or_dict):
