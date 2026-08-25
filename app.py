@@ -9993,7 +9993,14 @@ def faturamento(
     if status_fat_f: where.append("coalesce(status_faturamento,'para_conferir') = ANY(%s)"); params.append(status_fat_f)
     if status_servico_f: where.append("coalesce(status,'novo') = ANY(%s)"); params.append(status_servico_f)
     if itens_f:
-        where.append("exists (select 1 from servico_itens si where si.servico_id = servicos.id and si.nome_item = ANY(%s))")
+        # Só conta como "serviço com esse item" se o item foi de fato usado
+        # (qtd/valor preenchidos) — linhas padrão zeradas (criadas automaticamente
+        # pra todo tipo de serviço) não devem contar como presença do item.
+        where.append(
+            "exists (select 1 from servico_itens si where si.servico_id = servicos.id "
+            "and si.nome_item = ANY(%s) "
+            "and (coalesce(si.quantidade,0) > 0 or coalesce(si.valor_unitario,0) > 0 or coalesce(si.valor_total,0) > 0))"
+        )
         params.append(itens_f)
     if bairro_valor:
         if bairro_campo == "origem":
