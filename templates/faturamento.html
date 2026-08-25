@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Faturamento — Essência Logística</title>
-<link rel="stylesheet" href="/static/faturamento.css?v=20260825">
+<link rel="stylesheet" href="/static/faturamento.css?v=20260825b">
   {% include "partials/head_pages_v2.html" %}
 </head>
 <body class="ess-app fat-body">
@@ -19,31 +19,42 @@
     <a href="/financeiro" class="fat-btn fat-btn-outline fat-header-link">← Hub Financeiro</a>
   </header>
 
-  {% macro multiselect(name, label, opcoes, selecionados, com_busca=True) %}
+  {% macro multiselect(name, label, opcoes, selecionados, placeholder_todos, busca_placeholder='', selecionar_todos_label='Selecionar todos', com_busca=True, tuplas=False) %}
   <div class="fat-field">
     <label>{{ label }}</label>
-    <div class="fat-msel" data-name="{{ name }}">
+    <div class="fat-msel" data-name="{{ name }}" data-placeholder="{{ placeholder_todos }}">
       <button type="button" class="fat-msel-trigger">
-        <span class="fat-msel-trigger-text">{% if selecionados %}{{ selecionados|length }} selecionado(s){% else %}Todos{% endif %}</span>
+        <span class="fat-msel-trigger-content"></span>
         <span class="fat-msel-arrow" aria-hidden="true">▾</span>
       </button>
       <div class="fat-msel-panel" hidden>
         {% if com_busca %}
-        <input type="text" class="fat-msel-search" placeholder="Buscar...">
+        <input type="text" class="fat-msel-search" placeholder="{{ busca_placeholder }}">
         {% endif %}
         <div class="fat-msel-bulk">
-          <button type="button" class="fat-msel-bulk-btn" data-action="all">Selecionar todos</button>
-          <button type="button" class="fat-msel-bulk-btn" data-action="none">Desmarcar todos</button>
+          <button type="button" class="fat-msel-bulk-btn" data-action="all">{{ selecionar_todos_label }}</button>
+          <button type="button" class="fat-msel-bulk-btn" data-action="none">Limpar seleção</button>
         </div>
         <div class="fat-msel-options">
-          {% for opt in opcoes %}
-          <label class="fat-msel-option">
-            <input type="checkbox" name="{{ name }}" value="{{ opt }}" {% if opt in selecionados %}checked{% endif %}>
-            <span>{{ opt }}</span>
-          </label>
+          {% if tuplas %}
+            {% for valor, rotulo in opcoes %}
+            <label class="fat-msel-option">
+              <input type="checkbox" name="{{ name }}" value="{{ valor }}" {% if valor in selecionados %}checked{% endif %}>
+              <span>{{ rotulo }}</span>
+            </label>
+            {% else %}
+            <div class="fat-msel-empty">Nenhuma opção disponível.</div>
+            {% endfor %}
           {% else %}
-          <div class="fat-msel-empty">Nenhuma opção disponível.</div>
-          {% endfor %}
+            {% for opt in opcoes %}
+            <label class="fat-msel-option">
+              <input type="checkbox" name="{{ name }}" value="{{ opt }}" {% if opt in selecionados %}checked{% endif %}>
+              <span>{{ opt }}</span>
+            </label>
+            {% else %}
+            <div class="fat-msel-empty">Nenhuma opção disponível.</div>
+            {% endfor %}
+          {% endif %}
         </div>
       </div>
     </div>
@@ -69,18 +80,21 @@
   <div class="fat-modal-overlay" id="modalProcurarOverlay" hidden>
     <div class="fat-modal" role="dialog" aria-modal="true" aria-labelledby="modalProcurarTitulo">
       <div class="fat-modal-header">
-        <h3 id="modalProcurarTitulo"><span aria-hidden="true">🔎</span> Procurar</h3>
+        <div class="fat-modal-header-text">
+          <h3 id="modalProcurarTitulo"><span class="fat-modal-header-icon" aria-hidden="true">🔎</span> Procurar serviços</h3>
+          <p>Use os filtros abaixo para localizar os serviços desejados.</p>
+        </div>
         <button type="button" class="fat-modal-close" id="btnFecharProcurar" aria-label="Fechar">×</button>
       </div>
       <form method="get" action="/faturamento" id="formProcurar">
         <div class="fat-modal-body">
           <div class="fat-modal-grid fat-modal-grid-2">
             <div class="fat-field">
-              <label for="fat-data-ini">Período — data inicial</label>
+              <label for="fat-data-ini">Data inicial</label>
               <input type="date" id="fat-data-ini" name="data_ini" value="{{ filtros.data_ini or '' }}">
             </div>
             <div class="fat-field">
-              <label for="fat-data-fim">Período — data final</label>
+              <label for="fat-data-fim">Data final</label>
               <input type="date" id="fat-data-fim" name="data_fim" value="{{ filtros.data_fim or '' }}">
             </div>
           </div>
@@ -99,40 +113,21 @@
           </div>
 
           <div class="fat-modal-grid fat-modal-grid-2">
-            {{ multiselect('seguradoras', 'Empresa', seguradoras_opcoes, filtros.seguradoras) }}
-            {{ multiselect('motoristas', 'Motorista', motoristas_opcoes, filtros.motoristas) }}
+            {{ multiselect('seguradoras', 'Seguradora', seguradoras_opcoes, filtros.seguradoras, 'Todas as seguradoras', 'Buscar seguradora...', 'Selecionar todas') }}
+            {{ multiselect('motoristas', 'Motorista', motoristas_opcoes, filtros.motoristas, 'Todos os motoristas', 'Buscar motorista...', 'Selecionar todos') }}
           </div>
 
           <div class="fat-modal-grid fat-modal-grid-2">
-            {{ multiselect('tipos', 'Tipo de serviço', tipos_opcoes, filtros.tipos) }}
-            <div class="fat-field">
-              <label>Status faturamento</label>
-              <div class="fat-msel" data-name="status_fat">
-                <button type="button" class="fat-msel-trigger">
-                  <span class="fat-msel-trigger-text">{% if filtros.status_fat %}{{ filtros.status_fat|length }} selecionado(s){% else %}Todos{% endif %}</span>
-                  <span class="fat-msel-arrow" aria-hidden="true">▾</span>
-                </button>
-                <div class="fat-msel-panel" hidden>
-                  <div class="fat-msel-bulk">
-                    <button type="button" class="fat-msel-bulk-btn" data-action="all">Selecionar todos</button>
-                    <button type="button" class="fat-msel-bulk-btn" data-action="none">Desmarcar todos</button>
-                  </div>
-                  <div class="fat-msel-options">
-                    {% for valor, rotulo in status_fat_opcoes %}
-                    <label class="fat-msel-option">
-                      <input type="checkbox" name="status_fat" value="{{ valor }}" {% if valor in filtros.status_fat %}checked{% endif %}>
-                      <span>{{ rotulo }}</span>
-                    </label>
-                    {% endfor %}
-                  </div>
-                </div>
-              </div>
-            </div>
+            {{ multiselect('tipos', 'Tipo de serviço', tipos_opcoes, filtros.tipos, 'Todos os tipos', 'Buscar tipo...', 'Selecionar todos') }}
+            {{ multiselect('status_fat', 'Status faturamento', status_fat_opcoes, filtros.status_fat, 'Todos os status', '', 'Selecionar todos', com_busca=False, tuplas=True) }}
           </div>
         </div>
         <div class="fat-modal-footer">
-          <a href="/faturamento" class="fat-btn fat-btn-outline">Resetar</a>
-          <button type="submit" class="fat-btn fat-btn-primary">Procurar</button>
+          <span class="fat-modal-footer-info">{% if filtros_ativos_count %}{{ filtros_ativos_count }} filtro(s) aplicado(s){% endif %}</span>
+          <div class="fat-modal-footer-actions">
+            <a href="/faturamento" class="fat-btn fat-btn-outline">Resetar</a>
+            <button type="submit" class="fat-btn fat-btn-primary"><span aria-hidden="true">🔎</span> Procurar</button>
+          </div>
         </div>
       </form>
     </div>
@@ -306,7 +301,7 @@
   </div>
 </div>
 
-<script src="/static/faturamento.js?v=20260825"></script>
+<script src="/static/faturamento.js?v=20260825b"></script>
 {% include "partials/app_shell_end.html" %}
 </body>
 </html>

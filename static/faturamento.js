@@ -299,7 +299,7 @@
     if (e.key === "Escape" && modalOverlay && !modalOverlay.hidden) fecharModalProcurar();
   });
 
-  /* Dropdowns multi-seleção com busca (Empresa, Motorista, Tipo, Status) */
+  /* Dropdowns multi-seleção com busca (Seguradora, Motorista, Tipo, Status) */
   function fecharMsel(msel) {
     msel.classList.remove("open");
     const panel = msel.querySelector(".fat-msel-panel");
@@ -307,10 +307,58 @@
   }
 
   function atualizarTextoMsel(msel) {
-    const textoEl = msel.querySelector(".fat-msel-trigger-text");
-    if (!textoEl) return;
-    const marcados = msel.querySelectorAll('input[type="checkbox"]:checked').length;
-    textoEl.textContent = marcados > 0 ? `${marcados} selecionado(s)` : "Todos";
+    const conteudo = msel.querySelector(".fat-msel-trigger-content");
+    if (!conteudo) return;
+    const placeholder = msel.dataset.placeholder || "Todos";
+    const marcados = Array.from(msel.querySelectorAll('input[type="checkbox"]:checked'));
+
+    conteudo.innerHTML = "";
+
+    if (marcados.length === 0) {
+      const span = document.createElement("span");
+      span.className = "fat-msel-placeholder-text";
+      span.textContent = placeholder;
+      conteudo.appendChild(span);
+      return;
+    }
+
+    if (marcados.length <= 3) {
+      marcados.forEach((chk) => {
+        const rotulo = chk.closest(".fat-msel-option")?.querySelector("span")?.textContent || chk.value;
+        const chip = document.createElement("span");
+        chip.className = "fat-msel-chip";
+        const texto = document.createElement("span");
+        texto.textContent = rotulo;
+        chip.appendChild(texto);
+        const remover = document.createElement("span");
+        remover.className = "fat-msel-chip-remove";
+        remover.setAttribute("role", "button");
+        remover.setAttribute("tabindex", "0");
+        remover.setAttribute("title", "Remover");
+        remover.textContent = "×";
+        remover.addEventListener("click", (e) => {
+          e.stopPropagation();
+          chk.checked = false;
+          atualizarTextoMsel(msel);
+        });
+        remover.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            e.stopPropagation();
+            chk.checked = false;
+            atualizarTextoMsel(msel);
+          }
+        });
+        chip.appendChild(remover);
+        conteudo.appendChild(chip);
+      });
+      return;
+    }
+
+    const span = document.createElement("span");
+    span.className = "fat-msel-count-text";
+    span.textContent = `${marcados.length} selecionado(s)`;
+    conteudo.appendChild(span);
   }
 
   document.querySelectorAll(".fat-msel").forEach((msel) => {
@@ -318,6 +366,8 @@
     const panel = msel.querySelector(".fat-msel-panel");
     const busca = msel.querySelector(".fat-msel-search");
     const opcoes = Array.from(msel.querySelectorAll(".fat-msel-option"));
+
+    atualizarTextoMsel(msel);
 
     if (trigger) {
       trigger.addEventListener("click", (e) => {
