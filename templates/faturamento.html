@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Faturamento — Essência Logística</title>
-<link rel="stylesheet" href="/static/faturamento.css?v=20260825e">
+<link rel="stylesheet" href="/static/faturamento.css?v=20260825f">
   {% include "partials/head_pages_v2.html" %}
 </head>
 <body class="ess-app fat-body">
@@ -245,6 +245,7 @@
       <div class="fat-table-head-tools">
         <span class="fat-table-meta">{{ servicos|length }} registro(s)</span>
         {% if km_pendentes %}
+        <span class="fat-km-auto-status" id="fat-km-auto-status" hidden></span>
         <button type="button" class="fat-btn fat-btn-outline fat-btn-km-pendentes" id="btn-calcular-km-pendentes">Calcular KM pendentes ({{ km_pendentes }})</button>
         {% endif %}
         <button type="button" class="fat-btn fat-btn-outline fat-btn-export" id="btn-export-excel">Exportar Excel</button>
@@ -354,7 +355,7 @@
   </div>
 </div>
 
-<script src="/static/faturamento.js?v=20260825c"></script>
+<script src="/static/faturamento.js?v=20260825d"></script>
 {% include "partials/app_shell_end.html" %}
 </body>
 </html>

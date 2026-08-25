@@ -587,6 +587,30 @@ body.fat-body {
   white-space: nowrap;
 }
 
+.fat-km-auto-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #ff6b00;
+  white-space: nowrap;
+}
+
+.fat-km-auto-status::before {
+  content: "";
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid #ffd9b8;
+  border-top-color: #ff6b00;
+  animation: fat-km-spin 0.7s linear infinite;
+}
+
+@keyframes fat-km-spin {
+  to { transform: rotate(360deg); }
+}
+
 /* —— Ações por linha —— */
 .fat-actions {
   display: flex;
