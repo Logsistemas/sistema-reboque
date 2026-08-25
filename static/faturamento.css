@@ -489,6 +489,12 @@ body.fat-body {
   border: 1px solid #cbd5e1;
 }
 
+.fat-badge-op-cancelado {
+  background: #fde8e8;
+  color: #b91c1c;
+  border-color: #f5b5b5;
+}
+
 .fat-badge-fat {
   display: inline-block;
   padding: 5px 11px;

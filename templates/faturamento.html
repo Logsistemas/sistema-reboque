@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Faturamento — Essência Logística</title>
-<link rel="stylesheet" href="/static/faturamento.css?v=20260825d">
+<link rel="stylesheet" href="/static/faturamento.css?v=20260825e">
   {% include "partials/head_pages_v2.html" %}
 </head>
 <body class="ess-app fat-body">
@@ -288,7 +288,7 @@
             <td class="fat-col-date">{{ s.created_at or '-' }}</td>
             <td>{{ s.seguradora or '-' }}</td>
             <td>{{ s.tipo or '-' }}</td>
-            <td><span class="fat-badge-op">{{ s.status or '-' }}</span></td>
+            <td><span class="fat-badge-op{% if s.status == 'cancelado' %} fat-badge-op-cancelado{% endif %}">{{ s.status or '-' }}</span></td>
             <td><span class="fat-badge-fat {{ fat_st }}">{{ fat_lbl }}</span></td>
             <td>{{ s.motorista_nome or '-' }}</td>
             <td class="fat-col-placa"><b>{{ s.placa_veiculo_removido or s.placa_removida or '-' }}</b></td>
