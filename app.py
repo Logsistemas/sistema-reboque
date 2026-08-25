@@ -9879,11 +9879,36 @@ STATUS_FATURAMENTO_OPCOES = [
     ("faturado", "Faturado"),
 ]
 
+STATUS_SERVICO_OPCOES = [
+    ("novo", "Novo"),
+    ("enviado", "Enviado"),
+    ("aceito", "Aceito"),
+    ("a caminho", "A caminho"),
+    ("na origem", "Na origem"),
+    ("em transporte", "Em transporte"),
+    ("finalizado", "Finalizado"),
+    ("recusado", "Recusado"),
+    ("cancelado", "Cancelado"),
+]
+
+ORDENAR_POR_OPCOES = [
+    ("data", "Data"),
+    ("protocolo", "Protocolo"),
+    ("valor", "Valor"),
+    ("seguradora", "Seguradora"),
+]
+ORDENAR_POR_COLUNAS = {"data": "created_at", "protocolo": "protocolo", "valor": "valor_total", "seguradora": "seguradora"}
+
+BAIRRO_CAMPO_OPCOES = [
+    ("ambos", "Origem ou destino"),
+    ("origem", "Origem"),
+    ("destino", "Destino"),
+]
+
 
 def opcoes_filtro_faturamento():
-    """Listas usadas nos dropdowns de busca multi-seleção da tela de Faturamento
-    (Empresa/Seguradora, Motorista, Tipo de serviço) — só valores que
-    realmente existem em servicos, pra não oferecer opção que não filtra nada."""
+    """Listas usadas nos dropdowns de busca multi-seleção da tela de Faturamento —
+    só valores que realmente existem nos dados, pra não oferecer opção que não filtra nada."""
     seguradoras = [
         r["seguradora"] for r in q(
             "select distinct seguradora from servicos where coalesce(seguradora,'')<>'' order by seguradora",
@@ -9896,46 +9921,92 @@ def opcoes_filtro_faturamento():
             fetch=True,
         )
     ]
-    return seguradoras, motoristas_nomes
+    itens_nomes = [
+        r["nome_item"] for r in q(
+            "select distinct nome_item from servico_itens where coalesce(nome_item,'')<>'' order by nome_item",
+            fetch=True,
+        )
+    ]
+    return seguradoras, motoristas_nomes, itens_nomes
 
 
 @app.get('/faturamento', response_class=HTMLResponse)
-def faturamento(request: Request, data_ini: str="", data_fim: str="", status_faturamento: str="", busca_campo: str="", busca_valor: str=""):
+def faturamento(
+    request: Request,
+    data_ini: str = "",
+    data_fim: str = "",
+    protocolo: str = "",
+    placa: str = "",
+    cnpj: str = "",
+    ordenar_por: str = "data",
+    ordenacao: str = "desc",
+    bairro_campo: str = "ambos",
+    bairro_valor: str = "",
+    somente_finalizados: str = "",
+):
     seguradoras_f = [v for v in request.query_params.getlist("seguradoras") if v]
     motoristas_f = [v for v in request.query_params.getlist("motoristas") if v]
     tipos_f = [v for v in request.query_params.getlist("tipos") if v]
     status_fat_f = [v for v in request.query_params.getlist("status_fat") if v]
-    if status_faturamento and status_faturamento not in status_fat_f:
-        status_fat_f.append(status_faturamento)
+    status_servico_f = [v for v in request.query_params.getlist("status_servico") if v]
+    itens_f = [v for v in request.query_params.getlist("itens") if v]
+
+    protocolo = (protocolo or "").strip()
+    placa = (placa or "").strip()
+    cnpj = (cnpj or "").strip()
+    bairro_valor = (bairro_valor or "").strip()
+    ordenar_por = ordenar_por if ordenar_por in ORDENAR_POR_COLUNAS else "data"
+    ordenacao = "asc" if ordenacao == "asc" else "desc"
+    bairro_campo = bairro_campo if bairro_campo in {"origem", "destino", "ambos"} else "ambos"
+    finalizados = somente_finalizados in ("1", "on", "true")
 
     filtros = {
         "data_ini": data_ini or None,
         "data_fim": data_fim or None,
+        "protocolo": protocolo or None,
+        "placa": placa or None,
+        "cnpj": cnpj or None,
         "seguradoras": seguradoras_f,
         "motoristas": motoristas_f,
         "tipos": tipos_f,
         "status_fat": status_fat_f,
-        "busca_campo": busca_campo or None,
-        "busca_valor": busca_valor or None,
+        "status_servico": status_servico_f,
+        "itens": itens_f,
+        "ordenar_por": ordenar_por,
+        "ordenacao": ordenacao,
+        "bairro_campo": bairro_campo,
+        "bairro_valor": bairro_valor or None,
+        "somente_finalizados": finalizados,
     }
 
-    where=[]; params=[]
+    where = []; params = []
     if filtros["data_ini"]: where.append("date(created_at) >= %s"); params.append(filtros["data_ini"])
     if filtros["data_fim"]: where.append("date(created_at) <= %s"); params.append(filtros["data_fim"])
+    if protocolo: where.append("coalesce(protocolo,'') ilike %s"); params.append(f"%{protocolo}%")
+    if placa:
+        where.append("(coalesce(placa_veiculo_removido,'') ilike %s or coalesce(placa_removida,'') ilike %s)")
+        params.append(f"%{placa}%"); params.append(f"%{placa}%")
+    if cnpj: where.append("coalesce(cnpj_cliente,'') ilike %s"); params.append(f"%{cnpj}%")
     if seguradoras_f: where.append("seguradora = ANY(%s)"); params.append(seguradoras_f)
     if motoristas_f: where.append("coalesce(motorista_nome,'') = ANY(%s)"); params.append(motoristas_f)
     if tipos_f: where.append("coalesce(tipo,'') = ANY(%s)"); params.append(tipos_f)
     if status_fat_f: where.append("coalesce(status_faturamento,'para_conferir') = ANY(%s)"); params.append(status_fat_f)
-    valor_busca = (busca_valor or "").strip()
-    if valor_busca:
-        campo = (busca_campo or "protocolo").strip().lower()
-        if campo == "placa":
-            where.append("(coalesce(placa_veiculo_removido,'') ilike %s or coalesce(placa_removida,'') ilike %s)")
-            params.append(f"%{valor_busca}%"); params.append(f"%{valor_busca}%")
+    if status_servico_f: where.append("coalesce(status,'novo') = ANY(%s)"); params.append(status_servico_f)
+    if itens_f:
+        where.append("exists (select 1 from servico_itens si where si.servico_id = servicos.id and si.nome_item = ANY(%s))")
+        params.append(itens_f)
+    if bairro_valor:
+        if bairro_campo == "origem":
+            where.append("coalesce(origem,'') ilike %s"); params.append(f"%{bairro_valor}%")
+        elif bairro_campo == "destino":
+            where.append("coalesce(destino,'') ilike %s"); params.append(f"%{bairro_valor}%")
         else:
-            where.append("coalesce(protocolo,'') ilike %s")
-            params.append(f"%{valor_busca}%")
-    sql="select * from servicos" + ((" where " + " and ".join(where)) if where else "") + " order by created_at desc"
+            where.append("(coalesce(origem,'') ilike %s or coalesce(destino,'') ilike %s)")
+            params.append(f"%{bairro_valor}%"); params.append(f"%{bairro_valor}%")
+    if finalizados: where.append("status='finalizado'")
+
+    col = ORDENAR_POR_COLUNAS[ordenar_por]
+    sql = "select * from servicos" + ((" where " + " and ".join(where)) if where else "") + f" order by {col} {ordenacao}"
     servs=[normalizar_servico(r) for r in q(sql, tuple(params), True)]
     # Pastinha de anexo: além da tabela genérica "fotos", o checklist do
     # motorista guarda fotos por parte em checklist_avarias. Uma única
@@ -9963,15 +10034,21 @@ def faturamento(request: Request, data_ini: str="", data_fim: str="", status_fat
       "negociacao": len([s for s in servs if s.get("status_faturamento")=="negociacao"]),
       "faturado": len([s for s in servs if s.get("status_faturamento")=="faturado"]),
     }
-    seguradoras_opcoes, motoristas_opcoes = opcoes_filtro_faturamento()
+    seguradoras_opcoes, motoristas_opcoes, itens_opcoes = opcoes_filtro_faturamento()
     filtros_ativos_count = sum([
         1 if filtros["data_ini"] else 0,
         1 if filtros["data_fim"] else 0,
+        1 if protocolo else 0,
+        1 if placa else 0,
+        1 if cnpj else 0,
         1 if seguradoras_f else 0,
         1 if motoristas_f else 0,
         1 if tipos_f else 0,
         1 if status_fat_f else 0,
-        1 if valor_busca else 0,
+        1 if status_servico_f else 0,
+        1 if itens_f else 0,
+        1 if bairro_valor else 0,
+        1 if finalizados else 0,
     ])
     return templates.TemplateResponse('faturamento.html', {
         'request': request,
@@ -9981,7 +10058,11 @@ def faturamento(request: Request, data_ini: str="", data_fim: str="", status_fat
         'seguradoras_opcoes': seguradoras_opcoes,
         'motoristas_opcoes': motoristas_opcoes,
         'tipos_opcoes': lista_tipos_servico(),
+        'itens_opcoes': itens_opcoes,
         'status_fat_opcoes': STATUS_FATURAMENTO_OPCOES,
+        'status_servico_opcoes': STATUS_SERVICO_OPCOES,
+        'ordenar_por_opcoes': ORDENAR_POR_OPCOES,
+        'bairro_campo_opcoes': BAIRRO_CAMPO_OPCOES,
         'kpis': kpis,
         'nav_ativo': 'faturamento',
         'nav_som': False,
@@ -10020,12 +10101,15 @@ def _faturamento_redirect_com_filtros(form_or_dict):
     get = form_or_dict.get
     getlist = getattr(form_or_dict, "getlist", None)
     params = {}
-    for key in ["data_ini", "data_fim", "busca_campo", "busca_valor"]:
+    for key in [
+        "data_ini", "data_fim", "protocolo", "placa", "cnpj",
+        "ordenar_por", "ordenacao", "bairro_campo", "bairro_valor", "somente_finalizados",
+    ]:
         val = (get(key) or "").strip()
         if val:
             params[key] = val
     if getlist:
-        for key in ["seguradoras", "motoristas", "tipos", "status_fat"]:
+        for key in ["seguradoras", "motoristas", "tipos", "status_fat", "status_servico", "itens"]:
             vals = [v.strip() for v in getlist(key) if (v or "").strip()]
             if vals:
                 params[key] = vals

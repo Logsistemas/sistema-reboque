@@ -821,6 +821,25 @@ body.fat-skeleton .fat-kpi b {
   }
 }
 
+/* —— Checkbox simples (Somente finalizados) —— */
+.fat-checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 2px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+}
+
+.fat-checkbox-field input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #ff6b00;
+  flex-shrink: 0;
+}
+
 /* —— Filtros: resumo + botão Procurar —— */
 .fat-filtros-resumo {
   display: flex;

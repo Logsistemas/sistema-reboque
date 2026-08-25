@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Faturamento — Essência Logística</title>
-<link rel="stylesheet" href="/static/faturamento.css?v=20260825b">
+<link rel="stylesheet" href="/static/faturamento.css?v=20260825c">
   {% include "partials/head_pages_v2.html" %}
 </head>
 <body class="ess-app fat-body">
@@ -99,28 +99,73 @@
             </div>
           </div>
 
-          <div class="fat-field full">
-            <label>Protocolo / Placa</label>
-            <div class="fat-busca-bar">
-              <select name="busca_campo" class="fat-busca-select" aria-label="Buscar por">
-                <option value="protocolo" {% if not filtros.busca_campo or filtros.busca_campo == 'protocolo' %}selected{% endif %}>Protocolo</option>
-                <option value="placa" {% if filtros.busca_campo == 'placa' %}selected{% endif %}>Placa</option>
-              </select>
-              <span class="fat-busca-divisor" aria-hidden="true"></span>
-              <span class="fat-busca-icon" aria-hidden="true">🔎</span>
-              <input name="busca_valor" class="fat-busca-input" placeholder="Buscar serviço..." value="{{ filtros.busca_valor or '' }}">
+          <div class="fat-modal-grid fat-modal-grid-2">
+            <div class="fat-field">
+              <label for="fat-protocolo">Protocolo</label>
+              <input id="fat-protocolo" name="protocolo" placeholder="Ex: 52989058-1" value="{{ filtros.protocolo or '' }}">
+            </div>
+            <div class="fat-field">
+              <label for="fat-placa">Placa</label>
+              <input id="fat-placa" name="placa" placeholder="Ex: ABC1D23" value="{{ filtros.placa or '' }}">
             </div>
           </div>
 
-          <div class="fat-modal-grid fat-modal-grid-2">
-            {{ multiselect('seguradoras', 'Seguradora', seguradoras_opcoes, filtros.seguradoras, 'Todas as seguradoras', 'Buscar seguradora...', 'Selecionar todas') }}
-            {{ multiselect('motoristas', 'Motorista', motoristas_opcoes, filtros.motoristas, 'Todos os motoristas', 'Buscar motorista...', 'Selecionar todos') }}
+          <div class="fat-field full">
+            <label for="fat-cnpj">CNPJ do cliente</label>
+            <input id="fat-cnpj" name="cnpj" placeholder="Buscar por CNPJ..." value="{{ filtros.cnpj or '' }}">
           </div>
 
           <div class="fat-modal-grid fat-modal-grid-2">
-            {{ multiselect('tipos', 'Tipo de serviço', tipos_opcoes, filtros.tipos, 'Todos os tipos', 'Buscar tipo...', 'Selecionar todos') }}
-            {{ multiselect('status_fat', 'Status faturamento', status_fat_opcoes, filtros.status_fat, 'Todos os status', '', 'Selecionar todos', com_busca=False, tuplas=True) }}
+            {{ multiselect('seguradoras', 'Empresa (seguradora)', seguradoras_opcoes, filtros.seguradoras, 'Todas as seguradoras', 'Buscar seguradora...', 'Selecionar todas') }}
+            {{ multiselect('motoristas', 'Profissional (motorista)', motoristas_opcoes, filtros.motoristas, 'Todos os motoristas', 'Buscar motorista...', 'Selecionar todos') }}
           </div>
+
+          <div class="fat-modal-grid fat-modal-grid-2">
+            {{ multiselect('status_fat', 'Situação do item (faturamento)', status_fat_opcoes, filtros.status_fat, 'Todas as situações', '', 'Selecionar todas', com_busca=False, tuplas=True) }}
+            {{ multiselect('status_servico', 'Status do serviço', status_servico_opcoes, filtros.status_servico, 'Todos os status', '', 'Selecionar todos', com_busca=False, tuplas=True) }}
+          </div>
+
+          <div class="fat-modal-grid fat-modal-grid-2">
+            {{ multiselect('itens', 'Tipo de item', itens_opcoes, filtros.itens, 'Todos os itens', 'Buscar item...', 'Selecionar todos') }}
+            {{ multiselect('tipos', 'Tipo de serviço', tipos_opcoes, filtros.tipos, 'Todos os tipos', 'Buscar tipo...', 'Selecionar todos') }}
+          </div>
+
+          <div class="fat-modal-grid fat-modal-grid-2">
+            <div class="fat-field">
+              <label for="fat-ordenar-por">Ordenar por</label>
+              <select id="fat-ordenar-por" name="ordenar_por">
+                {% for valor, rotulo in ordenar_por_opcoes %}
+                <option value="{{ valor }}" {% if filtros.ordenar_por == valor %}selected{% endif %}>{{ rotulo }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="fat-field">
+              <label for="fat-ordenacao">Ordenação</label>
+              <select id="fat-ordenacao" name="ordenacao">
+                <option value="desc" {% if filtros.ordenacao == 'desc' %}selected{% endif %}>Descendente</option>
+                <option value="asc" {% if filtros.ordenacao == 'asc' %}selected{% endif %}>Ascendente</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="fat-field full">
+            <label>Bairro</label>
+            <div class="fat-busca-bar">
+              <select name="bairro_campo" class="fat-busca-select" aria-label="Bairro de">
+                {% for valor, rotulo in bairro_campo_opcoes %}
+                <option value="{{ valor }}" {% if filtros.bairro_campo == valor %}selected{% endif %}>{{ rotulo }}</option>
+                {% endfor %}
+              </select>
+              <span class="fat-busca-divisor" aria-hidden="true"></span>
+              <span class="fat-busca-icon" aria-hidden="true">🔎</span>
+              <input name="bairro_valor" class="fat-busca-input" placeholder="Buscar bairro..." value="{{ filtros.bairro_valor or '' }}">
+            </div>
+          </div>
+
+          <label class="fat-checkbox-field">
+            <input type="checkbox" name="somente_finalizados" value="1" {% if filtros.somente_finalizados %}checked{% endif %}>
+            <span>Somente serviços finalizados</span>
+          </label>
         </div>
         <div class="fat-modal-footer">
           <span class="fat-modal-footer-info">{% if filtros_ativos_count %}{{ filtros_ativos_count }} filtro(s) aplicado(s){% endif %}</span>
@@ -175,12 +220,20 @@
     <input type="hidden" name="status_faturamento" id="massa-status">
     <input type="hidden" name="data_ini" value="{{ filtros.data_ini or '' }}">
     <input type="hidden" name="data_fim" value="{{ filtros.data_fim or '' }}">
-    <input type="hidden" name="busca_campo" value="{{ filtros.busca_campo or '' }}">
-    <input type="hidden" name="busca_valor" value="{{ filtros.busca_valor or '' }}">
+    <input type="hidden" name="protocolo" value="{{ filtros.protocolo or '' }}">
+    <input type="hidden" name="placa" value="{{ filtros.placa or '' }}">
+    <input type="hidden" name="cnpj" value="{{ filtros.cnpj or '' }}">
+    <input type="hidden" name="ordenar_por" value="{{ filtros.ordenar_por or '' }}">
+    <input type="hidden" name="ordenacao" value="{{ filtros.ordenacao or '' }}">
+    <input type="hidden" name="bairro_campo" value="{{ filtros.bairro_campo or '' }}">
+    <input type="hidden" name="bairro_valor" value="{{ filtros.bairro_valor or '' }}">
+    <input type="hidden" name="somente_finalizados" value="{{ '1' if filtros.somente_finalizados else '' }}">
     {% for v in filtros.seguradoras %}<input type="hidden" name="seguradoras" value="{{ v }}">{% endfor %}
     {% for v in filtros.motoristas %}<input type="hidden" name="motoristas" value="{{ v }}">{% endfor %}
     {% for v in filtros.tipos %}<input type="hidden" name="tipos" value="{{ v }}">{% endfor %}
     {% for v in filtros.status_fat %}<input type="hidden" name="status_fat" value="{{ v }}">{% endfor %}
+    {% for v in filtros.status_servico %}<input type="hidden" name="status_servico" value="{{ v }}">{% endfor %}
+    {% for v in filtros.itens %}<input type="hidden" name="itens" value="{{ v }}">{% endfor %}
   </form>
 
   <div class="fat-card fat-table-card">
@@ -301,7 +354,7 @@
   </div>
 </div>
 
-<script src="/static/faturamento.js?v=20260825b"></script>
+<script src="/static/faturamento.js?v=20260825c"></script>
 {% include "partials/app_shell_end.html" %}
 </body>
 </html>
