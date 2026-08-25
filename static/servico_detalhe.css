@@ -335,3 +335,75 @@
   .sd-grid, .sd-grid-3 { grid-template-columns: 1fr; }
   .sd-finance-grid { grid-template-columns: 1fr; gap: 4px; }
 }
+
+/* —— Cancelar serviço —— */
+.sd-nav-item-cancelar { color: #b91c1c; }
+.sd-nav-item-cancelar:hover { background: #fee2e2; color: #991b1b; }
+.sd-nav-item-cancelar.active { background: #b91c1c; color: #fff; }
+
+.sd-btn-danger { background: #dc2626; color: #fff; }
+.sd-btn-danger:hover { background: #b91c1c; }
+
+.sd-alert-erro {
+  background: #fee2e2;
+  color: #991b1b;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.sd-obrigatorio { color: #dc2626; }
+
+.sd-radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sd-radio-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.sd-radio-option:hover { border-color: #fca5a5; background: #fef2f2; }
+
+.sd-radio-option input[type="radio"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #dc2626;
+  flex-shrink: 0;
+}
+
+.sd-radio-option:has(input:checked) {
+  border-color: #dc2626;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.sd-cancelado-info {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  padding: 16px;
+}
+
+.sd-cancelado-row {
+  font-size: 14px;
+  color: #334155;
+  padding: 6px 0;
+}
+
+.sd-cancelado-row + .sd-cancelado-row { border-top: 1px solid #fecaca; }
+
+.sd-cancelado-row b { color: #991b1b; margin-right: 6px; }

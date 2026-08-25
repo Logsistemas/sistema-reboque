@@ -1609,7 +1609,7 @@ def normalizar_servico(s, incluir_fotos=True):
     if s.get("motorista_id"): s["motorista_id"]=str(s["motorista_id"])
     if not s.get("placa_veiculo_removido") and s.get("placa_removida"): s["placa_veiculo_removido"]=s.get("placa_removida")
     if not s.get("placa_removida") and s.get("placa_veiculo_removido"): s["placa_removida"]=s.get("placa_veiculo_removido")
-    for k in ["criado_em","atualizado_em","finalizado_em","created_at","km_calculado_em"]: s[k]=dt_str(s.get(k))
+    for k in ["criado_em","atualizado_em","finalizado_em","created_at","km_calculado_em","cancelado_em"]: s[k]=dt_str(s.get(k))
     if s.get("km_excedente") is not None: s["km_excedente"]=float(s["km_excedente"])
     if s.get("km_total_ida_volta") is not None: s["km_total_ida_volta"]=float(s["km_total_ida_volta"])
     h=s.get("historico") or []
@@ -10084,7 +10084,7 @@ async def faturamento_exportar_excel(request: Request):
 
 
 @app.get('/faturamento/{sid}', response_class=HTMLResponse)
-def faturamento_detalhe(sid: str, request: Request, aba: str = "editar", ok: str = ""):
+def faturamento_detalhe(sid: str, request: Request, aba: str = "editar", ok: str = "", erro: str = ""):
     s = servico_by_id(sid)
     if not s:
         return RedirectResponse('/faturamento', 303)
@@ -10096,7 +10096,7 @@ def faturamento_detalhe(sid: str, request: Request, aba: str = "editar", ok: str
     end_origem = desmontar_endereco_servico(s.get("origem"))
     end_destino = desmontar_endereco_servico(s.get("destino"))
     chk = checklist_resumo_servico(sid, request, s)
-    abas_validas = {"editar", "financeiro", "comentarios", "mobile", "arquivos", "checklist", "patio"}
+    abas_validas = {"editar", "financeiro", "comentarios", "mobile", "arquivos", "checklist", "patio", "cancelar"}
     aba_ativa = aba if aba in abas_validas else "editar"
     return templates.TemplateResponse(
         'servico_financeiro.html',
@@ -10111,6 +10111,7 @@ def faturamento_detalhe(sid: str, request: Request, aba: str = "editar", ok: str
                 'novo', 'enviado', 'aceito', 'a caminho', 'na origem',
                 'em transporte', 'finalizado', 'recusado', 'cancelado',
             ],
+            'motivos_cancelamento': MOTIVOS_CANCELAMENTO,
             'end_origem': end_origem,
             'end_destino': end_destino,
             'comentarios': listar_comentarios_servico(sid),
@@ -10118,10 +10119,38 @@ def faturamento_detalhe(sid: str, request: Request, aba: str = "editar", ok: str
             'checklist_resumo': chk,
             'aba_ativa': aba_ativa,
             'ok': ok,
+            'erro': erro,
             'nav_ativo': 'faturamento',
             'nav_som': False,
         },
     )
+
+
+MOTIVOS_CANCELAMENTO = [
+    "CADASTRO INCORRETO",
+    "CANCELADO PELO PRESTADOR",
+    "CANCELADO PELO SEGURADO",
+    "MECÂNICO SEM SUCESSO",
+    "NÃO FOI POSSÍVEL EXECUTAR O SERVIÇO",
+]
+
+
+@app.post('/faturamento/{sid}/cancelar')
+async def faturamento_cancelar(sid: str, request: Request):
+    s = servico_by_id(sid)
+    if not s:
+        return RedirectResponse('/faturamento', 303)
+    form = await request.form()
+    motivo = (form.get("motivo_cancelamento") or "").strip()
+    observacao = (form.get("observacao_cancelamento") or "").strip()
+    if not motivo or motivo not in MOTIVOS_CANCELAMENTO or not observacao:
+        return RedirectResponse(f"/faturamento/{sid}?aba=cancelar&erro=1", 303)
+    q(
+        "update servicos set status='cancelado', motivo_cancelamento=%s, observacao_cancelamento=%s, cancelado_em=now(), atualizado_em=now() where id=%s",
+        (motivo, observacao, str(sid)),
+    )
+    registrar_evento_db(sid, "cancelado", f"Serviço cancelado — Motivo: {motivo}. Observação: {observacao}")
+    return RedirectResponse(f"/faturamento/{sid}?aba=cancelar&ok=1", 303)
 
 
 @app.post('/faturamento/{sid}/editar')

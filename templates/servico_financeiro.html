@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Serviço {{ s.protocolo }} — Auditoria</title>
   {% include "partials/head_pages_v2.html" %}
-<link rel="stylesheet" href="/static/servico_detalhe.css">
+<link rel="stylesheet" href="/static/servico_detalhe.css?v=20260825">
 <link rel="stylesheet" href="/static/checklist_central.css?v=20260624">
 <link rel="stylesheet" href="/static/central_patio_integracao.css?v=20260529">
 <link rel="stylesheet" href="/static/central_mobile_chat.css?v=20260601">
@@ -51,6 +51,9 @@
       <button type="button" class="sd-nav-item {% if aba_ativa == 'patio' %}active{% endif %}" data-aba="patio">
         <span class="sd-nav-icon">🅿</span> Pátio
       </button>
+      <button type="button" class="sd-nav-item sd-nav-item-cancelar {% if aba_ativa == 'cancelar' %}active{% endif %}" data-aba="cancelar">
+        <span class="sd-nav-icon">✕</span> Cancelar
+      </button>
       <a href="/central" class="sd-nav-item voltar">
         <span class="sd-nav-icon">←</span> Voltar
       </a>
@@ -59,6 +62,9 @@
     <main class="sd-main">
       {% if ok %}
       <div class="sd-alert-ok">Alterações salvas com sucesso.</div>
+      {% endif %}
+      {% if erro %}
+      <div class="sd-alert-erro">Selecione um motivo de cancelamento e preencha a observação antes de confirmar.</div>
       {% endif %}
 
       <!-- ABA EDITAR -->
@@ -445,6 +451,42 @@
           </div>
         </div>
       </div>
+
+      <!-- ABA CANCELAR -->
+      <div class="sd-panel {% if aba_ativa == 'cancelar' %}active{% endif %}" id="panel-cancelar">
+        {% if s.status == 'cancelado' %}
+        <div class="sd-section">
+          <h3>Serviço cancelado</h3>
+          <div class="sd-cancelado-info">
+            <div class="sd-cancelado-row"><b>Motivo:</b> {{ s.motivo_cancelamento or '-' }}</div>
+            <div class="sd-cancelado-row"><b>Observação:</b> {{ s.observacao_cancelamento or '-' }}</div>
+            <div class="sd-cancelado-row"><b>Cancelado em:</b> {{ s.cancelado_em or '-' }}</div>
+          </div>
+        </div>
+        {% else %}
+        <form method="post" action="/faturamento/{{ s.id }}/cancelar" id="formCancelarServico">
+          <div class="sd-section">
+            <h3>Cancelar serviço</h3>
+            <p class="muted" style="margin:0 0 14px;font-size:13px">Selecione o motivo do cancelamento e descreva o que aconteceu. Essas informações ficam registradas no histórico do serviço.</p>
+            <div class="sd-radio-group">
+              {% for motivo in motivos_cancelamento %}
+              <label class="sd-radio-option">
+                <input type="radio" name="motivo_cancelamento" value="{{ motivo }}" required>
+                <span>{{ motivo }}</span>
+              </label>
+              {% endfor %}
+            </div>
+            <div class="sd-field full" style="margin-top:16px">
+              <label>Observação <span class="sd-obrigatorio">*</span></label>
+              <textarea name="observacao_cancelamento" rows="4" placeholder="Descreva o motivo do cancelamento…" required></textarea>
+            </div>
+          </div>
+          <div class="sd-actions">
+            <button type="submit" class="sd-btn sd-btn-danger">Confirmar cancelamento</button>
+          </div>
+        </form>
+        {% endif %}
+      </div>
     </main>
   </div>
 </div>
@@ -567,6 +609,19 @@ document.getElementById('btnAddItemTabelaCliente')?.addEventListener('click', ()
 document.getElementById('tipo-servico')?.addEventListener('change', function () {
   aplicarMapaClienteItens(this.value);
   carregarOpcoesTabelaCliente();
+});
+
+document.getElementById('formCancelarServico')?.addEventListener('submit', function (e) {
+  const motivoMarcado = this.querySelector('input[name="motivo_cancelamento"]:checked');
+  const observacao = (this.querySelector('textarea[name="observacao_cancelamento"]')?.value || '').trim();
+  if (!motivoMarcado || !observacao) {
+    e.preventDefault();
+    alert('Selecione um motivo e preencha a observação antes de confirmar o cancelamento.');
+    return;
+  }
+  if (!confirm('Confirmar o cancelamento deste serviço? Essa ação não pode ser desfeita por aqui.')) {
+    e.preventDefault();
+  }
 });
 
 function ativarAba(nome) {
