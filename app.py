@@ -10014,7 +10014,8 @@ def faturamento(
 
     col = ORDENAR_POR_COLUNAS[ordenar_por]
     sql = "select * from servicos" + ((" where " + " and ".join(where)) if where else "") + f" order by {col} {ordenacao}"
-    servs=[normalizar_servico(r) for r in q(sql, tuple(params), True)]
+    rows_raw = q(sql, tuple(params), True)
+    servs=[normalizar_servico(r) for r in rows_raw]
     # Pastinha de anexo: além da tabela genérica "fotos", o checklist do
     # motorista guarda fotos por parte em checklist_avarias. Uma única
     # consulta pra todos os serviços da lista, pra não repetir por linha.
@@ -10028,9 +10029,12 @@ def faturamento(
     for s in servs:
         s["tem_anexo"] = bool(s.get("fotos")) or s["id"] in ids_com_foto_checklist
         s["km_maps_link"] = gerar_link_rota_maps_km_excedente(s.get("origem"), s.get("destino"))
+    # Importante: usa rows_raw (antes de normalizar_servico), porque a normalização
+    # formata km_calculado_em nulo como "-" pra exibição — usar servs aqui faria
+    # essa contagem dar sempre zero e o botão/auto-cálculo nunca apareceriam.
     km_pendentes = len([
-        s for s in servs
-        if s.get("km_calculado_em") is None and (s.get("origem") or "").strip() and (s.get("destino") or "").strip()
+        r for r in rows_raw
+        if r.get("km_calculado_em") is None and (r.get("origem") or "").strip() and (r.get("destino") or "").strip()
     ])
     total=sum(float(s.get("valor_total") or 0) for s in servs)
     kpis={
