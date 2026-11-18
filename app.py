@@ -9817,9 +9817,16 @@ async def motorista_login(request: Request):
     m = one("""
         select * from motoristas
         where coalesce(ativo,true)=true
-          and (lower(coalesce(login,''))=lower(%s) or regexp_replace(coalesce(cpf,''),'[^0-9]','','g')=regexp_replace(%s,'[^0-9]','','g'))
+          and (
+            lower(coalesce(login,''))=lower(%s)
+            or (
+              regexp_replace(%s,'[^0-9]','','g')<>''
+              and regexp_replace(coalesce(cpf,''),'[^0-9]','','g')=regexp_replace(%s,'[^0-9]','','g')
+            )
+          )
+        order by (lower(coalesce(login,''))=lower(%s)) desc
         limit 1
-    """, (login, login))
+    """, (login, login, login, login))
 
     if not m or not verificar_senha(senha, m.get("senha")):
         return templates.TemplateResponse('motorista_login.html', {'request': request, 'erro': 'Login ou senha inválidos.'})
